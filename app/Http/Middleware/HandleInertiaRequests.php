@@ -50,14 +50,15 @@ class HandleInertiaRequests extends Middleware
                 },
                 'auth' => Auth::check() ? [
                     'user' => [
+                        'id' => Auth::user()->id,
                         'username' => Auth::user()->username,
-                        'name' => Auth::user()->profile->getFullName(),
-                        'nickname' => Auth::user()->profile->nickname,
                         'email' => Auth::user()->email,
-                        'isAdmin' => (bool) Auth::user()->is_admin,
-                        'isFirstLogin' => (bool) Auth::user()->is_first_login,
-                        'isAbleToLogin' => (bool) Auth::user()->is_able_to_login,
-                        'property_id' => (int) Auth::user()->profile->property_id,
+                        'first_name' => Auth::user()->first_name ?? '',
+                        'last_name' => Auth::user()->last_name ?? '',
+                        'role' => Auth::user()->role ?? 'student',
+                        'isAdmin' => (bool) (Auth::user()->isAdmin ?? Auth::user()->is_admin ?? false),
+                        'profile_picture' => Auth::user()->profile_picture ?? null,
+                        'contact_number' => Auth::user()->contact_number ?? '',
                     ]
                 ] : null,
             ]);

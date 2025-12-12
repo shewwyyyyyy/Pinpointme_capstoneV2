@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\HandleInertiaRequests;
+use App\Http\Middleware\CheckPasswordChange;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -15,6 +16,12 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->web(append: [
             HandleInertiaRequests::class,
+            CheckPasswordChange::class,
+        ]);
+        
+        // Disable CSRF for API routes
+        $middleware->validateCsrfTokens(except: [
+            '/api/*'
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

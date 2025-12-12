@@ -9,3 +9,50 @@
     --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
         'Segoe UI Symbol', 'Noto Color Emoji';
 }
+
+/* =================================================================
+   Global User App Background Classes
+   ================================================================= */
+
+/* Primary gradient background - for user-facing pages */
+.bg-user-gradient {
+    background: linear-gradient(
+        to bottom,
+        #f8f0f0 0%,
+        #ffffff 40%,
+        #f8f8f8 50%,
+        #d1f8ef 80%,
+        #a1e3f9 100%
+    ) !important;
+}
+
+/* Light gradient - same as bg-user-gradient for consistency */
+.bg-user-gradient-light {
+    background: linear-gradient(
+        to bottom,
+        #f8f0f0 0%,
+        #ffffff 40%,
+        #f8f8f8 50%,
+        #d1f8ef 80%,
+        #a1e3f9 100%
+    ) !important;
+}
+
+/* Solid primary background */
+.bg-user-primary {
+    background-color: rgb(var(--v-theme-primary)) !important;
+}
+
+/* Alternative: Soft gradient for forms/cards */
+.bg-user-soft {
+    background: linear-gradient(
+        180deg,
+        #f8f0f0 0%,
+        #ffffff 100%
+    ) !important;
+}
+
+/* User app surface background */
+.bg-user-surface {
+    background-color: #f8f9fa !important;
+}

@@ -21,11 +21,12 @@ class DatabaseSeeder extends Seeder
         // ]);
 
         $this->call([
-            PropertySeeder::class,
-            DepartmentSeeder::class,
-            LocationSeeder::class,
-            ProfileSeeder::class,
-            ProfilePropertySeeder::class,
+            // PinPointMe seeders
+            UserSeeder::class,
+            BuildingStructureSeeder::class, // Now uses GD 1, GD 2, GD 3
+            RescueRequestSeeder::class,
+            ConversationMessagingSeeder::class,
+            AuditTrailSeeder::class,
         ]);
     }
 }

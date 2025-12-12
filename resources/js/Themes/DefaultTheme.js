@@ -9,6 +9,10 @@ const light = {
         "search-bg": "#FBFBFC",
         "status-occupied": "#4c3629", // light brown
         "expansion-panel-bg": "#FFFFFF", // white
+        // User App colors
+        "user-bg-start": "#13294B", // primary gradient start
+        "user-bg-end": "#185D33", // accent gradient end
+        "user-surface": "#f8f9fa", // light surface
     },
 };
 
@@ -31,6 +35,10 @@ const dark = {
         "error-tonal-alert": "#F44336", //red
         "status-occupied": "#c1b7b1", //brown
         "expansion-panel-bg": "#252525",
+        // User App colors
+        "user-bg-start": "#1a1a2e", // dark gradient start
+        "user-bg-end": "#16213e", // dark gradient end
+        "user-surface": "#252525", // dark surface
     },
 };
 

@@ -8,8 +8,8 @@
                     color="white"
                 ></v-icon>
             </v-avatar>
-            <div class="user-name">John Doe Doorman</div>
-            <div class="user-email">johndoedoorman@example.com</div>
+            <div class="user-name">{{ fullName }}</div>
+            <div class="user-email">{{ emailAddress }}</div>
         </v-sheet>
 
         <v-divider></v-divider>
@@ -62,7 +62,7 @@
                 </v-list-item>
             </Link>
 
-            <!-- <v-list-group>
+            <v-list-group>
                 <template v-slot:activator="{ props }">
                     <v-list-item
                         v-bind="props"
@@ -79,13 +79,11 @@
                     :href="`/${moduleLink(link.module)}`"
                 >
                     <v-list-item
-                        v-bind="props"
                         class="sidebar-hover"
                         :class="{
                             selected:
                                 page.url === `/${moduleLink(link.module)}`,
                         }"
-                        :key="link.module"
                         @click="router.visit(`/${moduleLink(link.module)}`)"
                     >
                         <v-list-item-title class="text-body-2">{{
@@ -93,7 +91,7 @@
                         }}</v-list-item-title>
                     </v-list-item>
                 </Link>
-            </v-list-group> -->
+            </v-list-group>
 
             <v-list-group>
                 <template v-slot:activator="{ props }">
@@ -199,36 +197,41 @@ const accountType = computed(() => {
 
 const accessibleModules = computed(() => page.props?.accessibleModules ?? []);
 
-const moduleLinks = [];
+const moduleLinks = [
+    {
+        module: "buildings",
+        icon: "mdi-office-building",
+    },
+    {
+        module: "floors",
+        icon: "mdi-layers",
+    },
+    {
+        module: "rooms",
+        icon: "mdi-door",
+    },
+    {
+        module: "rescue_requests",
+        icon: "mdi-alert-circle",
+    },
+];
 
-const reportLinks = [];
+const reportLinks = [
+    {
+        module: "audit_trails",
+        icon: "mdi-clipboard-text-clock",
+    },
+];
 
 const systemLinks = [
     {
-        module: "profiles",
-        icon: "mdi-card-account-details-outline",
+        module: "users",
+        icon: "mdi-account-group",
     },
     {
-        module: "employees",
-        icon: "mdi-office-building-cog",
+        module: "conversations",
+        icon: "mdi-message-text",
     },
-    {
-        module: "departments",
-        icon: "mdi-office-building",
-    },
-    {
-        module: "properties",
-        icon: "mdi-office-building",
-    },
-    {
-        module: "locations",
-        icon: "mdi-office-building",
-    },
-    {
-        module: "scan_histories",
-        icon: "mdi-history",
-    },
-
 ];
 
 const moduleLink = (module) => module.replace(/_/g, "-");

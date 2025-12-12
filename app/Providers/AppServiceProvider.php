@@ -2,44 +2,75 @@
 
 namespace App\Providers;
 
-use App\Interfaces\AccountInterface;
 use App\Interfaces\AuthInterface;
 use App\Interfaces\CurrentUserInterface;
-use App\Interfaces\DepartmentInterface;
-use App\Interfaces\Fetches\DepartmentFetchInterface;
-use App\Interfaces\Fetches\PropertyFetchInterface;
-use App\Interfaces\Fetches\ScanHistoryFetchInterface;
-use App\Interfaces\Fetches\ScanProfileFetchInterface;
-use App\Interfaces\ProfileInterface;
-use App\Interfaces\ProfileMealScheduleInterface;
-use App\Interfaces\PropertyInterface;
-use App\Interfaces\LocationInterface;
-use App\Interfaces\Fetches\LocationFetchInterface;
-use App\Interfaces\ScanHistoryInterface;
-use App\Interfaces\ScanProcessInterface;
 use App\Interfaces\UserInterface;
 use App\Interfaces\EmployeeInterface;
 use App\Interfaces\Fetches\EmployeeFetchInterface;
-use App\Services\AccountService;
+
+// Building Interfaces
+use App\Interfaces\BuildingInterface;
+use App\Interfaces\Fetches\BuildingFetchInterface;
+
+// Floor Interfaces
+use App\Interfaces\FloorInterface;
+use App\Interfaces\Fetches\FloorFetchInterface;
+
+// Room Interfaces
+use App\Interfaces\RoomInterface;
+use App\Interfaces\Fetches\RoomFetchInterface;
+
+// Rescue Request Interfaces
+use App\Interfaces\RescueRequestInterface;
+use App\Interfaces\Fetches\RescueRequestFetchInterface;
+
+// Conversation Interfaces
+use App\Interfaces\ConversationInterface;
+use App\Interfaces\Fetches\ConversationFetchInterface;
+
+// Message Interfaces
+use App\Interfaces\MessageInterface;
+use App\Interfaces\Fetches\MessageFetchInterface;
+
+// Audit Trail Interfaces
+use App\Interfaces\AuditTrailInterface;
+use App\Interfaces\Fetches\AuditTrailFetchInterface;
+
 use App\Services\AuthService;
 use App\Services\CurrentUserService;
-use App\Services\DepartmentService;
-use App\Services\Fetches\DepartmentFetchService;
-use App\Services\Fetches\PropertyFetchService;
-use App\Services\Fetches\LocationFetchService;
-use App\Services\LocationService;
-use App\Services\Fetches\ScanHistoryFetchService;
-use App\Services\Fetches\ScanProfileFetchService;
-use App\Services\ProfileMealScheduleService;
-use App\Services\ProfileService;
-use App\Services\PropertyService;
-use App\Services\ScanHistoryService;
-use App\Services\ScanProcessService;
 use App\Services\UserService;
 use App\Services\EmployeeService;
 use App\Services\Fetches\EmployeeFetchService;
+
+// Building Services
+use App\Services\BuildingService;
+use App\Services\Fetches\BuildingFetchService;
+
+// Floor Services
+use App\Services\FloorService;
+use App\Services\Fetches\FloorFetchService;
+
+// Room Services
+use App\Services\RoomService;
+use App\Services\Fetches\RoomFetchService;
+
+// Rescue Request Services
+use App\Services\RescueRequestService;
+use App\Services\Fetches\RescueRequestFetchService;
+
+// Conversation Services
+use App\Services\ConversationService;
+use App\Services\Fetches\ConversationFetchService;
+
+// Message Services
+use App\Services\MessageService;
+use App\Services\Fetches\MessageFetchService;
+
+// Audit Trail Services
+use App\Services\AuditTrailService;
+use App\Services\Fetches\AuditTrailFetchService;
+
 use Illuminate\Http\Resources\Json\JsonResource;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -49,40 +80,42 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        // User
         $this->app->bind(UserInterface::class, UserService::class);
-        $this->app->bind(ProfileInterface::class, ProfileService::class);
-        $this->app->bind(AccountInterface::class, AccountService::class);
-
-        // property
-        $this->app->bind(PropertyInterface::class, PropertyService::class);
-        $this->app->bind(PropertyFetchInterface::class, PropertyFetchService::class);
-
-        // department
-        $this->app->bind(DepartmentFetchInterface::class, DepartmentFetchService::class);
-        $this->app->bind(DepartmentInterface::class, DepartmentService::class);
-
-        // location
-        $this->app->bind(LocationInterface::class, LocationService::class);
-        $this->app->bind(LocationFetchInterface::class, LocationFetchService::class);
-
-        // scan history
-        $this->app->bind(ScanHistoryInterface::class, ScanHistoryService::class);
-        $this->app->bind(ScanHistoryFetchInterface::class, ScanHistoryFetchService::class);
-        // scan
-        $this->app->bind(ScanProcessInterface::class, ScanProcessService::class);
-
-        //scan profile
-        $this->app->bind(ScanProfileFetchInterface::class, ScanProfileFetchService::class);
-
-        //profile meal schedule
-        $this->app->bind(ProfileMealScheduleInterface::class, ProfileMealScheduleService::class);
-
         $this->app->bind(AuthInterface::class, AuthService::class);
         $this->app->bind(CurrentUserInterface::class, CurrentUserService::class);
 
+        // Employee
         $this->app->bind(EmployeeInterface::class, EmployeeService::class);
         $this->app->bind(EmployeeFetchInterface::class, EmployeeFetchService::class);
 
+        // Building
+        $this->app->bind(BuildingInterface::class, BuildingService::class);
+        $this->app->bind(BuildingFetchInterface::class, BuildingFetchService::class);
+
+        // Floor
+        $this->app->bind(FloorInterface::class, FloorService::class);
+        $this->app->bind(FloorFetchInterface::class, FloorFetchService::class);
+
+        // Room
+        $this->app->bind(RoomInterface::class, RoomService::class);
+        $this->app->bind(RoomFetchInterface::class, RoomFetchService::class);
+
+        // Rescue Request
+        $this->app->bind(RescueRequestInterface::class, RescueRequestService::class);
+        $this->app->bind(RescueRequestFetchInterface::class, RescueRequestFetchService::class);
+
+        // Conversation
+        $this->app->bind(ConversationInterface::class, ConversationService::class);
+        $this->app->bind(ConversationFetchInterface::class, ConversationFetchService::class);
+
+        // Message
+        $this->app->bind(MessageInterface::class, MessageService::class);
+        $this->app->bind(MessageFetchInterface::class, MessageFetchService::class);
+
+        // Audit Trail
+        $this->app->bind(AuditTrailInterface::class, AuditTrailService::class);
+        $this->app->bind(AuditTrailFetchInterface::class, AuditTrailFetchService::class);
     }
 
     /**

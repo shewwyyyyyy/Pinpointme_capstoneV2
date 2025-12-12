@@ -44,10 +44,12 @@ return [
     | This value controls the number of minutes until an issued token will be
     | considered expired. This will override any values set in the token's
     | "expires_at" attribute, but first-party sessions are not affected.
+    | 
+    | 259200 = 6 months (for emergency response app - keep users logged in)
     |
     */
 
-    'expiration' => null,
+    'expiration' => 259200,
 
     /*
     |--------------------------------------------------------------------------

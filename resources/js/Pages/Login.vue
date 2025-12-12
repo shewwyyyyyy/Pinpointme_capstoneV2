@@ -15,10 +15,8 @@
                     class="bg-primary d-flex justify-center align-center flex-column"
                     style="height: 100vh; position: relative"
                 >
-                    <!-- Foreground image -->
-                    <img
-                        src="images/logos/a_sign_in_left_blueee.png"
-                        alt="Sign In Left"
+                    <!-- Background pattern -->
+                    <div
                         class="foreground-image"
                         style="
                             position: absolute;
@@ -27,8 +25,7 @@
                             z-index: 1;
                             width: 100%;
                             height: 100%;
-                            object-fit: fill;
-                            opacity: 0.05; /* makes image 50% faded */
+                            background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, transparent 50%);
                         "
                     />
 
@@ -37,18 +34,19 @@
                         class="d-flex justify-center align-center"
                         style="z-index: 2"
                     >
-                        <v-img
-                            max-height="450"
-                            max-width="450"
-                            src="images/logos/APZ_s_w.png"
-                        ></v-img>
+                         <v-img
+                            src="/images/logos/pinpointme.png"
+                            max-height="250"
+                            max-width="250"
+                            contain
+                        />
                     </c-container>
 
                     <div
-                        class="font-weight-medium text-center mb-2"
+                        class="font-weight-medium text-center mb-2 text-white"
                         style="z-index: 2; font-size: clamp(1.5rem, 4vw, 3rem)"
                     >
-                        Astoria QR Scanner <br />Inventory System
+                        PinPointMe <br />Emergency Rescue System
                         <br />
                     </div>
                 </c-container>
@@ -62,9 +60,7 @@
                         <c-container
                             class="pa-0 d-flex justify-center align-center"
                         >
-                            <img
-                                src="images/logos/a_sign_in_side_blue.png"
-                                alt="Sign In Right"
+                            <div
                                 style="
                                     position: absolute;
                                     margin-right: 0px;
@@ -73,17 +69,16 @@
                                     right: 0px;
                                     height: 100%;
                                     max-width: 100%;
-                                    object-fit: cover;
-                                    opacity: 0.15; /* 50% transparency */
+                                    opacity: 0.1;
+                                    background: linear-gradient(135deg, var(--v-theme-primary) 0%, transparent 50%);
                                 "
                             />
 
-                            <v-img
-                                max-height="130"
-                                max-width="130"
-                                :src="logoImage"
+                            <v-icon
+                                size="100"
+                                color="primary"
                                 style="display: block; margin: 0 auto"
-                            ></v-img>
+                            >mdi-map-marker-radius</v-icon>
                         </c-container>
                     </div>
                     <div
@@ -241,10 +236,6 @@ const appDeveloper = computed(() => {
 
 const theme = useTheme();
 const isDarkMode = ref(false);
-
-const logoImage = computed(() =>
-    isDarkMode.value ? "images/logos/APZ_s_w.png" : "images/logos/APZ_s_b.png"
-);
 
 const appVersion = computed(() => {
     return page.props.appVersion;
