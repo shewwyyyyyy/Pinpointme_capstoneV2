@@ -15,6 +15,7 @@ use App\Http\Controllers\AuditTrailController;
 use App\Http\Controllers\OpenAIController;
 use App\Http\Controllers\PreventiveMeasureController;
 use App\Http\Controllers\AdminController;
+use App\Http\Controllers\FloorPlanController;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken as Csrf;
 
 use Illuminate\Support\Facades\Auth;
@@ -273,6 +274,9 @@ Route::middleware(['auth'])->group(function () {
         
         // Preventive Measures admin
         Route::get('/preventive-measures', [PreventiveMeasureController::class, 'adminIndex'])->name('preventive-measures');
+        
+        // Floor Plan Editor
+        Route::get('/floor-plan/{floorId}', [FloorPlanController::class, 'editor'])->name('floor-plan.editor');
     });
 
     // Building, Floor, Room routes
@@ -281,6 +285,12 @@ Route::middleware(['auth'])->group(function () {
     Route::post('buildings/{building}/rooms', [BuildingController::class, 'addRoom']);
 
     Route::resource('floors', FloorController::class)->except(['create', 'edit']);
+    
+    // Floor Plan routes
+    Route::get('floor-plans/{floorId}', [FloorPlanController::class, 'show']);
+    Route::post('floor-plans/{floorId}/upload', [FloorPlanController::class, 'uploadImage']);
+    Route::post('floor-plans/{floorId}/annotations', [FloorPlanController::class, 'saveAnnotations']);
+    Route::delete('floor-plans/{floorId}', [FloorPlanController::class, 'deleteFloorPlan']);
     
     Route::resource('rooms', RoomController::class)->except(['create', 'edit']);
 

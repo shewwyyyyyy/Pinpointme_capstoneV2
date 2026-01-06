@@ -148,7 +148,37 @@
                                                 <v-chip size="x-small" class="ml-2" color="grey">
                                                     {{ floor.rooms?.length || 0 }} rooms
                                                 </v-chip>
+                                                <v-chip 
+                                                    v-if="floor.floor_plan_url" 
+                                                    size="x-small" 
+                                                    class="ml-2" 
+                                                    color="success"
+                                                >
+                                                    <v-icon start size="x-small">mdi-floor-plan</v-icon>
+                                                    Floor Plan
+                                                </v-chip>
                                                 <v-spacer />
+                                                <v-btn 
+                                                    v-if="floor.floor_plan_url && floor.floor_plan_data?.evacuation_paths?.length"
+                                                    variant="text" 
+                                                    size="x-small" 
+                                                    color="warning"
+                                                    @click="openEvacuationPathDialog(building, floor)"
+                                                    title="View Evacuation Paths"
+                                                >
+                                                    <v-icon start size="small">mdi-routes</v-icon>
+                                                    Evacuation
+                                                </v-btn>
+                                                <v-btn 
+                                                    variant="text" 
+                                                    size="x-small" 
+                                                    color="primary"
+                                                    @click="openFloorPlanEditor(floor)"
+                                                    title="Edit Floor Plan"
+                                                >
+                                                    <v-icon start size="small">mdi-floor-plan</v-icon>
+                                                    Floor Plan
+                                                </v-btn>
                                                 <v-btn variant="text" size="x-small" @click="openAddRoomDialog(building, floor)">
                                                     <v-icon start size="small">mdi-plus</v-icon>
                                                     Add Room
@@ -372,6 +402,104 @@
             </v-card>
         </v-dialog>
 
+        <!-- Evacuation Path Preview Dialog -->
+        <v-dialog v-model="evacuationDialog" max-width="900" scrollable>
+            <v-card>
+                <v-card-title class="d-flex align-center">
+                    <v-icon start color="warning">mdi-routes</v-icon>
+                    Evacuation Paths - {{ evacuationFloorInfo.building }} / {{ evacuationFloorInfo.floor }}
+                </v-card-title>
+                <v-card-subtitle class="px-6 pt-3">
+                    <v-select
+                        v-model="selectedEvacuationRoom"
+                        :items="evacuationRoomOptions"
+                        item-title="text"
+                        item-value="value"
+                        label="Select Room to View Evacuation Paths"
+                        variant="outlined"
+                        density="compact"
+                        @update:model-value="onEvacuationRoomChange"
+                    >
+                        <template v-slot:prepend-inner>
+                            <v-icon>mdi-door</v-icon>
+                        </template>
+                    </v-select>
+                    <v-alert
+                        v-if="selectedEvacuationRoom && filteredEvacuationPaths.length === 0"
+                        type="info"
+                        variant="tonal"
+                        density="compact"
+                        class="mt-2"
+                    >
+                        No evacuation paths assigned to this room yet.
+                    </v-alert>
+                </v-card-subtitle>
+                <v-card-text class="pa-0">
+                    <div class="evacuation-canvas-container">
+                        <div class="evacuation-canvas-wrapper" :style="evacuationWrapperStyle">
+                            <img 
+                                v-if="evacuationFloorInfo.imageUrl" 
+                                :src="evacuationFloorInfo.imageUrl" 
+                                class="evacuation-image"
+                                ref="evacuationImage"
+                                @load="onEvacuationImageLoad"
+                            />
+                            <canvas 
+                                ref="evacuationCanvas" 
+                                class="evacuation-overlay"
+                            ></canvas>
+                        </div>
+                    </div>
+                    <!-- Legend -->
+                    <div class="pa-4 bg-grey-lighten-4">
+                        <div class="text-subtitle-2 mb-2">Legend</div>
+                        <div class="d-flex flex-wrap gap-4">
+                            <div class="d-flex align-center">
+                                <v-avatar color="success" size="16" class="mr-2"></v-avatar>
+                                <span class="text-caption">Start Point</span>
+                            </div>
+                            <div class="d-flex align-center">
+                                <v-avatar color="error" size="16" class="mr-2"></v-avatar>
+                                <span class="text-caption">Exit Point</span>
+                            </div>
+                            <div class="d-flex align-center">
+                                <div class="legend-line mr-2"></div>
+                                <span class="text-caption">Evacuation Path</span>
+                            </div>
+                            <div class="d-flex align-center">
+                                <div class="legend-room mr-2"></div>
+                                <span class="text-caption">Room</span>
+                            </div>
+                        </div>
+                        <div v-if="filteredEvacuationPaths.length" class="mt-3">
+                            <div class="text-subtitle-2 mb-1">Paths ({{ filteredEvacuationPaths.length }})</div>
+                            <v-chip 
+                                v-for="(path, idx) in filteredEvacuationPaths" 
+                                :key="idx" 
+                                size="small" 
+                                class="mr-1 mb-1"
+                                :color="path.color || '#FF5722'"
+                            >
+                                {{ path.name || 'Path ' + (idx + 1) }}
+                            </v-chip>
+                        </div>
+                    </div>
+                </v-card-text>
+                <v-card-actions>
+                    <v-btn 
+                        variant="text" 
+                        @click="printEvacuationPlan"
+                        :disabled="!selectedEvacuationRoom || filteredEvacuationPaths.length === 0"
+                    >
+                        <v-icon start>mdi-printer</v-icon>
+                        Print
+                    </v-btn>
+                    <v-spacer />
+                    <v-btn variant="text" @click="evacuationDialog = false">Close</v-btn>
+                </v-card-actions>
+            </v-card>
+        </v-dialog>
+
         <!-- Snackbar -->
         <v-snackbar v-model="snackbar" :color="snackbarColor" timeout="3000">
             {{ snackbarText }}
@@ -432,6 +560,42 @@ const qrDataPreview = computed(() => JSON.stringify(qrData.value, null, 2));
 // Bulk QR dialog
 const bulkQrDialog = ref(false);
 const bulkQrItems = ref([]);
+
+// Evacuation path dialog
+const evacuationDialog = ref(false);
+const evacuationImage = ref(null);
+const evacuationCanvas = ref(null);
+const selectedEvacuationRoom = ref(null);
+const evacuationFloorInfo = ref({
+    building: '',
+    floor: '',
+    imageUrl: '',
+    paths: [],
+    rooms: [],
+    floorRooms: []
+});
+const evacuationZoom = ref(1);
+const evacuationWrapperStyle = computed(() => ({
+    transform: `scale(${evacuationZoom.value})`,
+    transformOrigin: 'top left'
+}));
+
+// Computed: Room options for evacuation path selector
+const evacuationRoomOptions = computed(() => {
+    const rooms = evacuationFloorInfo.value.floorRooms || [];
+    return rooms.map(room => ({
+        value: room.id,
+        text: room.room_name
+    }));
+});
+
+// Computed: Filter evacuation paths based on selected room
+const filteredEvacuationPaths = computed(() => {
+    if (!selectedEvacuationRoom.value) return [];
+    return evacuationFloorInfo.value.paths.filter(
+        path => path.room_id === selectedEvacuationRoom.value
+    );
+});
 
 const totalFloors = computed(() => {
     return buildingsList.value.reduce((sum, b) => sum + (b.floors?.length || 0), 0);
@@ -955,6 +1119,235 @@ const printAllQrCodes = () => {
     }, 250);
 };
 
+// ============================================================
+// Floor Plan Editor Functions
+// ============================================================
+
+const openFloorPlanEditor = (floor) => {
+    window.location.href = `/admin/floor-plan/${floor.id}`;
+};
+
+// ============================================================
+// Evacuation Path Preview Functions
+// ============================================================
+
+const openEvacuationPathDialog = async (building, floor) => {
+    evacuationFloorInfo.value = {
+        building: building.name,
+        floor: floor.floor_name,
+        imageUrl: floor.floor_plan_url,
+        paths: floor.floor_plan_data?.evacuation_paths || [],
+        rooms: floor.floor_plan_data?.rooms || [],
+        floorRooms: floor.rooms || []
+    };
+    
+    // Select first room by default if available
+    if (evacuationFloorInfo.value.floorRooms.length > 0) {
+        selectedEvacuationRoom.value = evacuationFloorInfo.value.floorRooms[0].id;
+    } else {
+        selectedEvacuationRoom.value = null;
+    }
+    
+    evacuationDialog.value = true;
+    
+    // Wait for dialog to open and draw paths
+    await nextTick();
+    setTimeout(() => drawEvacuationPaths(), 100);
+};
+
+const onEvacuationRoomChange = () => {
+    drawEvacuationPaths();
+};
+
+const onEvacuationImageLoad = () => {
+    drawEvacuationPaths();
+};
+
+const drawEvacuationPaths = () => {
+    const canvas = evacuationCanvas.value;
+    const image = evacuationImage.value;
+    
+    if (!canvas || !image) return;
+    
+    // Set canvas size to match image
+    canvas.width = image.naturalWidth;
+    canvas.height = image.naturalHeight;
+    
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // Draw all room boxes (faded)
+    evacuationFloorInfo.value.rooms.forEach(room => {
+        const isSelectedRoom = room.room_id === selectedEvacuationRoom.value;
+        const opacity = isSelectedRoom ? 0.5 : 0.1;
+        
+        // Fill
+        ctx.fillStyle = hexToRgba(room.color || '#4CAF50', opacity);
+        ctx.fillRect(room.x, room.y, room.width, room.height);
+        
+        // Border
+        ctx.strokeStyle = room.color || '#4CAF50';
+        ctx.lineWidth = isSelectedRoom ? 3 : 1;
+        ctx.strokeRect(room.x, room.y, room.width, room.height);
+        
+        // Label
+        if (room.room_name) {
+            ctx.fillStyle = isSelectedRoom ? '#000' : '#666';
+            ctx.font = isSelectedRoom ? 'bold 14px Arial' : '12px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(room.room_name, room.x + room.width / 2, room.y + room.height / 2);
+        }
+    });
+    
+    // Draw only evacuation paths for the selected room
+    filteredEvacuationPaths.value.forEach(path => {
+        if (path.points.length < 2) return;
+        
+        // Draw path line
+        ctx.beginPath();
+        ctx.moveTo(path.points[0].x, path.points[0].y);
+        for (let i = 1; i < path.points.length; i++) {
+            ctx.lineTo(path.points[i].x, path.points[i].y);
+        }
+        ctx.strokeStyle = path.color || '#FF5722';
+        ctx.lineWidth = 4;
+        ctx.stroke();
+        
+        // Draw arrow heads along the path
+        for (let i = 1; i < path.points.length; i++) {
+            drawArrowHead(ctx, path.points[i - 1], path.points[i], path.color || '#FF5722');
+        }
+        
+        // Draw points
+        path.points.forEach((point, i) => {
+            ctx.beginPath();
+            ctx.arc(point.x, point.y, 8, 0, Math.PI * 2);
+            ctx.fillStyle = i === 0 ? '#4CAF50' : (i === path.points.length - 1 ? '#f44336' : path.color || '#FF5722');
+            ctx.fill();
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        });
+        
+        // Draw path name at first point
+        if (path.name) {
+            ctx.fillStyle = '#000';
+            ctx.font = 'bold 12px Arial';
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'bottom';
+            ctx.fillText(path.name, path.points[0].x + 12, path.points[0].y - 5);
+        }
+    });
+};
+
+const drawArrowHead = (ctx, from, to, color) => {
+    const headLength = 15;
+    const angle = Math.atan2(to.y - from.y, to.x - from.x);
+    
+    // Position arrow head at 70% of the line
+    const midX = from.x + (to.x - from.x) * 0.7;
+    const midY = from.y + (to.y - from.y) * 0.7;
+    
+    ctx.beginPath();
+    ctx.moveTo(midX, midY);
+    ctx.lineTo(
+        midX - headLength * Math.cos(angle - Math.PI / 6),
+        midY - headLength * Math.sin(angle - Math.PI / 6)
+    );
+    ctx.moveTo(midX, midY);
+    ctx.lineTo(
+        midX - headLength * Math.cos(angle + Math.PI / 6),
+        midY - headLength * Math.sin(angle + Math.PI / 6)
+    );
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 4;
+    ctx.stroke();
+};
+
+const hexToRgba = (hex, alpha) => {
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    if (result) {
+        return `rgba(${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}, ${alpha})`;
+    }
+    return `rgba(76, 175, 80, ${alpha})`;
+};
+
+const printEvacuationPlan = () => {
+    const canvas = evacuationCanvas.value;
+    const image = evacuationImage.value;
+    
+    if (!canvas || !image || !selectedEvacuationRoom.value) return;
+    
+    // Get selected room name
+    const selectedRoom = evacuationFloorInfo.value.floorRooms.find(
+        r => r.id === selectedEvacuationRoom.value
+    );
+    const roomName = selectedRoom ? selectedRoom.room_name : 'Unknown Room';
+    
+    // Create a combined canvas with image and annotations
+    const combinedCanvas = document.createElement('canvas');
+    combinedCanvas.width = image.naturalWidth;
+    combinedCanvas.height = image.naturalHeight;
+    const combinedCtx = combinedCanvas.getContext('2d');
+    
+    // Draw background image
+    combinedCtx.drawImage(image, 0, 0);
+    
+    // Draw annotations on top
+    combinedCtx.drawImage(canvas, 0, 0);
+    
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Evacuation Plan - ${evacuationFloorInfo.value.building} / ${evacuationFloorInfo.value.floor} / ${roomName}</title>
+            <style>
+                body { font-family: Arial, sans-serif; text-align: center; padding: 20px; }
+                h1 { margin-bottom: 5px; }
+                h2 { margin-top: 0; color: #666; font-weight: normal; }
+                .room-name { color: #1976D2; font-weight: bold; margin: 10px 0; }
+                img { max-width: 100%; height: auto; border: 1px solid #ccc; }
+                .legend { margin-top: 20px; display: flex; justify-content: center; gap: 30px; }
+                .legend-item { display: flex; align-items: center; gap: 8px; }
+                .legend-dot { width: 16px; height: 16px; border-radius: 50%; }
+                .legend-line { width: 30px; height: 4px; background: #FF5722; }
+                .path-count { margin-top: 10px; color: #666; }
+                @media print { body { padding: 0; } }
+            </style>
+        </head>
+        <body>
+            <h1>${evacuationFloorInfo.value.building}</h1>
+            <h2>${evacuationFloorInfo.value.floor} - Evacuation Plan</h2>
+            <div class="room-name">Room: ${roomName}</div>
+            <div class="path-count">${filteredEvacuationPaths.value.length} evacuation path(s)</div>
+            <img src="${combinedCanvas.toDataURL('image/png')}" alt="Evacuation Plan" />
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-dot" style="background: #4CAF50;"></div>
+                    <span>Start Point</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-dot" style="background: #f44336;"></div>
+                    <span>Exit Point</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-line"></div>
+                    <span>Evacuation Path</span>
+                </div>
+            </div>
+        </body>
+        </html>
+    `);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+        printWindow.print();
+        printWindow.close();
+    }, 250);
+};
+
 const logout = async () => {
     localStorage.removeItem('userData');
     localStorage.removeItem('authToken');
@@ -979,3 +1372,55 @@ onMounted(() => {
     }
 });
 </script>
+
+<style scoped>
+.evacuation-canvas-container {
+    overflow: auto;
+    background-color: #e0e0e0;
+    background-image: 
+        linear-gradient(45deg, #ccc 25%, transparent 25%),
+        linear-gradient(-45deg, #ccc 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, #ccc 75%),
+        linear-gradient(-45deg, transparent 75%, #ccc 75%);
+    background-size: 20px 20px;
+    background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+    max-height: 60vh;
+    min-height: 300px;
+}
+
+.evacuation-canvas-wrapper {
+    position: relative;
+    display: inline-block;
+}
+
+.evacuation-image {
+    display: block;
+    max-width: none;
+}
+
+.evacuation-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    pointer-events: none;
+}
+
+.legend-line {
+    width: 30px;
+    height: 4px;
+    background: #FF5722;
+    border-radius: 2px;
+}
+
+.legend-room {
+    width: 24px;
+    height: 16px;
+    background: rgba(76, 175, 80, 0.3);
+    border: 2px solid #4CAF50;
+    border-radius: 2px;
+}
+
+.gap-4 {
+    gap: 16px;
+}
+</style>

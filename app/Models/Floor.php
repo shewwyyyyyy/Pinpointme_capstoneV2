@@ -15,7 +15,12 @@ class Floor extends Model
     protected $fillable = [
         'floor_name',
         'building_id',
-        'floor_plan_url'
+        'floor_plan_url',
+        'floor_plan_data'
+    ];
+
+    protected $casts = [
+        'floor_plan_data' => 'array'
     ];
 
     /**
