@@ -459,6 +459,63 @@
                     </v-card-text>
                 </v-card>
 
+                <!-- Evacuation Path Display -->
+                <v-card v-if="selectedRoom && hasFloorPlan" class="mb-6" elevation="3" rounded="lg">
+                    <v-card-title class="d-flex align-center">
+                        <v-icon class="mr-2" color="error">mdi-exit-run</v-icon>
+                        Evacuation Path for {{ selectedRoom.room_name }}
+                    </v-card-title>
+                    <v-card-subtitle>
+                        {{ selectedBuilding?.name }} - {{ selectedFloor?.floor_name }}
+                    </v-card-subtitle>
+                    <v-card-text>
+                        <div class="evacuation-canvas-container">
+                            <div class="evacuation-canvas-wrapper" :style="evacuationWrapperStyle">
+                                <img
+                                    ref="evacuationImage"
+                                    :src="selectedFloor.floor_plan_url"
+                                    class="evacuation-image"
+                                    @load="onEvacuationImageLoad"
+                                />
+                                <canvas
+                                    ref="evacuationCanvas"
+                                    class="evacuation-overlay"
+                                ></canvas>
+                            </div>
+                        </div>
+                        
+                        <!-- Zoom Controls -->
+                        <div class="d-flex justify-center align-center mt-3 gap-2">
+                            <v-btn size="small" icon @click="evacuationZoomOut">
+                                <v-icon>mdi-minus</v-icon>
+                            </v-btn>
+                            <v-chip size="small">{{ Math.round(evacuationZoom * 100) }}%</v-chip>
+                            <v-btn size="small" icon @click="evacuationZoomIn">
+                                <v-icon>mdi-plus</v-icon>
+                            </v-btn>
+                            <v-btn size="small" icon @click="resetEvacuationZoom">
+                                <v-icon>mdi-restore</v-icon>
+                            </v-btn>
+                        </div>
+
+                        <!-- Legend -->
+                        <v-row class="mt-4">
+                            <v-col cols="12" sm="6">
+                                <div class="d-flex align-center">
+                                    <div class="legend-line mr-2"></div>
+                                    <span class="text-body-2">Evacuation Path</span>
+                                </div>
+                            </v-col>
+                            <v-col cols="12" sm="6">
+                                <div class="d-flex align-center">
+                                    <div class="legend-room mr-2"></div>
+                                    <span class="text-body-2">Your Room</span>
+                                </div>
+                            </v-col>
+                        </v-row>
+                    </v-card-text>
+                </v-card>
+
                 <!-- Emergency Form -->
                 <v-card id="emergency-form-section" class="mb-6" elevation="4" rounded="lg">
                     <v-card-title class="d-flex align-center bg-error text-white">
@@ -821,6 +878,15 @@ const locationScanned = ref(false); // Track if location was scanned via QR
 const locationCard = ref(null); // Reference to location card for scrolling
 const emergencyFormCard = ref(null); // Reference to emergency form card
 
+// Evacuation path display refs
+const evacuationImage = ref(null);
+const evacuationCanvas = ref(null);
+const evacuationZoom = ref(1);
+const evacuationWrapperStyle = computed(() => ({
+    transform: `scale(${evacuationZoom.value})`,
+    transformOrigin: 'top left'
+}));
+
 // Active rescue request check
 const hasActiveRequest = ref(false);
 const activeRequest = ref(null);
@@ -833,6 +899,25 @@ const availableFloors = computed(() => {
 
 const availableRooms = computed(() => {
     return selectedFloor.value?.rooms || [];
+});
+
+const hasFloorPlan = computed(() => {
+    return selectedFloor.value?.floor_plan_url && selectedFloor.value?.floor_plan_data;
+});
+
+const evacuationPaths = computed(() => {
+    if (!selectedFloor.value?.floor_plan_data) return [];
+    const paths = selectedFloor.value.floor_plan_data.evacuation_paths || [];
+    // Filter paths for selected room
+    if (selectedRoom.value) {
+        return paths.filter(path => path.room_id === selectedRoom.value.id);
+    }
+    return [];
+});
+
+const floorPlanRooms = computed(() => {
+    if (!selectedFloor.value?.floor_plan_data) return [];
+    return selectedFloor.value.floor_plan_data.rooms || [];
 });
 
 // QR Scanner
@@ -1187,6 +1272,15 @@ const onFloorChange = () => {
     selectedRoom.value = null;
     locationScanned.value = false; // Reset scanned state when manually changing
 };
+
+// Watch for room selection changes to draw evacuation path
+watch([selectedRoom, selectedFloor], () => {
+    if (selectedRoom.value && hasFloorPlan.value) {
+        nextTick(() => {
+            setTimeout(() => drawEvacuationPaths(), 100);
+        });
+    }
+});
 
 // QR Scanner Implementation
 const startQrScan = async () => {
@@ -1710,6 +1804,132 @@ const submitRescueRequest = async () => {
     }
 };
 
+// Evacuation Path Drawing Functions
+const onEvacuationImageLoad = () => {
+    drawEvacuationPaths();
+};
+
+const drawEvacuationPaths = () => {
+    const canvas = evacuationCanvas.value;
+    const image = evacuationImage.value;
+    
+    if (!canvas || !image || !selectedRoom.value) return;
+    
+    // Set canvas size to match image
+    canvas.width = image.naturalWidth;
+    canvas.height = image.naturalHeight;
+    
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // Draw all room boxes (faded)
+    floorPlanRooms.value.forEach(room => {
+        const isSelectedRoom = room.room_id === selectedRoom.value.id;
+        const opacity = isSelectedRoom ? 0.5 : 0.1;
+        
+        // Fill
+        ctx.fillStyle = hexToRgbaEvac(room.color || '#4CAF50', opacity);
+        ctx.fillRect(room.x, room.y, room.width, room.height);
+        
+        // Border
+        ctx.strokeStyle = room.color || '#4CAF50';
+        ctx.lineWidth = isSelectedRoom ? 3 : 1;
+        ctx.strokeRect(room.x, room.y, room.width, room.height);
+        
+        // Label
+        if (room.room_name) {
+            ctx.fillStyle = '#000';
+            ctx.font = 'bold 14px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(room.room_name, room.x + room.width / 2, room.y + room.height / 2);
+        }
+    });
+    
+    // Draw evacuation paths for selected room
+    evacuationPaths.value.forEach(path => {
+        if (path.points.length < 2) return;
+        
+        // Draw path line
+        ctx.beginPath();
+        ctx.moveTo(path.points[0].x, path.points[0].y);
+        for (let i = 1; i < path.points.length; i++) {
+            ctx.lineTo(path.points[i].x, path.points[i].y);
+        }
+        ctx.strokeStyle = path.color || '#FF5722';
+        ctx.lineWidth = 4;
+        ctx.stroke();
+        
+        // Draw arrow heads along the path
+        for (let i = 1; i < path.points.length; i++) {
+            drawArrowHeadEvac(ctx, path.points[i - 1], path.points[i], path.color || '#FF5722');
+        }
+        
+        // Draw points
+        path.points.forEach((point, i) => {
+            ctx.beginPath();
+            ctx.arc(point.x, point.y, 6, 0, Math.PI * 2);
+            ctx.fillStyle = i === 0 ? '#4CAF50' : (i === path.points.length - 1 ? '#f44336' : path.color || '#FF5722');
+            ctx.fill();
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        });
+        
+        // Draw path name at first point
+        if (path.name) {
+            ctx.fillStyle = '#000';
+            ctx.font = 'bold 12px Arial';
+            ctx.textAlign = 'left';
+            ctx.fillText(path.name, path.points[0].x + 10, path.points[0].y - 10);
+        }
+    });
+};
+
+const drawArrowHeadEvac = (ctx, from, to, color) => {
+    const headLength = 15;
+    const angle = Math.atan2(to.y - from.y, to.x - from.x);
+    
+    // Position arrow head at 70% of the line
+    const midX = from.x + (to.x - from.x) * 0.7;
+    const midY = from.y + (to.y - from.y) * 0.7;
+    
+    ctx.beginPath();
+    ctx.moveTo(midX, midY);
+    ctx.lineTo(
+        midX - headLength * Math.cos(angle - Math.PI / 6),
+        midY - headLength * Math.sin(angle - Math.PI / 6)
+    );
+    ctx.moveTo(midX, midY);
+    ctx.lineTo(
+        midX - headLength * Math.cos(angle + Math.PI / 6),
+        midY - headLength * Math.sin(angle + Math.PI / 6)
+    );
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 4;
+    ctx.stroke();
+};
+
+const hexToRgbaEvac = (hex, alpha) => {
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    if (result) {
+        return `rgba(${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}, ${alpha})`;
+    }
+    return `rgba(76, 175, 80, ${alpha})`;
+};
+
+const evacuationZoomIn = () => {
+    evacuationZoom.value = Math.min(3, evacuationZoom.value + 0.25);
+};
+
+const evacuationZoomOut = () => {
+    evacuationZoom.value = Math.max(0.25, evacuationZoom.value - 0.25);
+};
+
+const resetEvacuationZoom = () => {
+    evacuationZoom.value = 1;
+};
+
 const showNotification = (message, color = 'info') => {
     toastMessage.value = message;
     toastColor.value = color;
@@ -1719,4 +1939,53 @@ const showNotification = (message, color = 'info') => {
 
 <style scoped>
 /* Component-specific styles only - background is now global */
+.evacuation-canvas-container {
+    overflow: auto;
+    background-color: #e0e0e0;
+    background-image: 
+        linear-gradient(45deg, #ccc 25%, transparent 25%),
+        linear-gradient(-45deg, #ccc 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, #ccc 75%),
+        linear-gradient(-45deg, transparent 75%, #ccc 75%);
+    background-size: 20px 20px;
+    background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+    max-height: 60vh;
+    min-height: 300px;
+}
+
+.evacuation-canvas-wrapper {
+    position: relative;
+    display: inline-block;
+}
+
+.evacuation-image {
+    display: block;
+    max-width: none;
+}
+
+.evacuation-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    pointer-events: none;
+}
+
+.legend-line {
+    width: 30px;
+    height: 4px;
+    background: #FF5722;
+    border-radius: 2px;
+}
+
+.legend-room {
+    width: 24px;
+    height: 16px;
+    background: rgba(76, 175, 80, 0.3);
+    border: 2px solid #4CAF50;
+    border-radius: 2px;
+}
+
+.gap-2 {
+    gap: 8px;
+}
 </style>
