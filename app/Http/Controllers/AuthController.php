@@ -136,36 +136,44 @@ class AuthController extends Controller
                 $request->session()->invalidate();
                 $request->session()->regenerateToken();
                 
-                // Resend OTP if needed
-                $otp = str_pad(rand(0, 999999), 6, '0', STR_PAD_LEFT);
-                $user->update([
-                    'otp_code' => $otp,
-                    'otp_expires_at' => now()->addMinutes(30),
-                ]);
+                // Only send new OTP if there's no valid existing OTP
+                $hasValidOtp = $user->otp_code && 
+                               strlen($user->otp_code) === 6 && 
+                               $user->otp_expires_at && 
+                               Carbon::now()->isBefore($user->otp_expires_at);
                 
-                // Send OTP email
-                try {
-                    Mail::send([], [], function ($message) use ($user, $otp) {
-                        $message->to($user->email)
-                            ->subject('PinPointMe - Verification Code')
-                            ->html("
-                                <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;'>
-                                    <div style='background: linear-gradient(135deg, #1976D2, #0D47A1); padding: 30px; text-align: center;'>
-                                        <h1 style='color: white; margin: 0;'>PinPointMe</h1>
-                                    </div>
-                                    <div style='padding: 30px; background: #f5f5f5;'>
-                                        <h2 style='color: #333;'>Account Verification Required</h2>
-                                        <p style='color: #666;'>Hi {$user->first_name}, please verify your account with this code:</p>
-                                        <div style='background: white; padding: 20px; border-radius: 10px; text-align: center; margin: 20px 0;'>
-                                            <h1 style='color: #1976D2; letter-spacing: 8px; font-size: 36px; margin: 0;'>{$otp}</h1>
-                                            <p style='color: #888; font-size: 12px; margin-top: 10px;'>Code expires in 30 minutes</p>
+                if (!$hasValidOtp) {
+                    // Generate and send new OTP
+                    $otp = str_pad(rand(0, 999999), 6, '0', STR_PAD_LEFT);
+                    $user->update([
+                        'otp_code' => $otp,
+                        'otp_expires_at' => now()->addMinutes(30),
+                    ]);
+                    
+                    // Send OTP email
+                    try {
+                        Mail::send([], [], function ($message) use ($user, $otp) {
+                            $message->to($user->email)
+                                ->subject('PinPointMe - Verification Code')
+                                ->html("
+                                    <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;'>
+                                        <div style='background: linear-gradient(135deg, #1976D2, #0D47A1); padding: 30px; text-align: center;'>
+                                            <h1 style='color: white; margin: 0;'>PinPointMe</h1>
+                                        </div>
+                                        <div style='padding: 30px; background: #f5f5f5;'>
+                                            <h2 style='color: #333;'>Account Verification Required</h2>
+                                            <p style='color: #666;'>Hi {$user->first_name}, please verify your account with this code:</p>
+                                            <div style='background: white; padding: 20px; border-radius: 10px; text-align: center; margin: 20px 0;'>
+                                                <h1 style='color: #1976D2; letter-spacing: 8px; font-size: 36px; margin: 0;'>{$otp}</h1>
+                                                <p style='color: #888; font-size: 12px; margin-top: 10px;'>Code expires in 30 minutes</p>
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                            ");
-                    });
-                } catch (\Exception $e) {
-                    \Log::error('Failed to send verification OTP: ' . $e->getMessage());
+                                ");
+                        });
+                    } catch (\Exception $e) {
+                        \Log::error('Failed to send verification OTP: ' . $e->getMessage());
+                    }
                 }
                 
                 return redirect('/verify-account?email=' . urlencode($user->email));
@@ -435,7 +443,10 @@ class AuthController extends Controller
             'status' => 'active',
             'otp_code' => null,
             'otp_expires_at' => null,
+            'otp_verified' => true,
             'must_change_password' => false,
+            'force_password_change' => false, // Prevent double password change
+            'password_changed_at' => Carbon::now(),
         ]);
 
         return response()->json([

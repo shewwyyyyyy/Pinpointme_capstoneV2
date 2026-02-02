@@ -3,7 +3,6 @@
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
-use App\Models\Building;
 use App\Models\Floor;
 
 class FloorSeeder extends Seeder
@@ -13,40 +12,38 @@ class FloorSeeder extends Seeder
      */
     public function run(): void
     {
-        $buildingFloors = [
-            'GD 1' => [
-                'Basement Floor',
-                'Ground Floor',
-                '2nd Floor',
-                '3rd Floor',
-                '4th Floor',
-                '5th Floor',
-                '6th Floor',
-                '7th Floor',
-                '8th Floor',
-            ],
-            'GD 2' => [
-                'Ground Floor',
-                'First Floor',
-                'Second Floor',
-            ],
-            'GD 3' => [
-                'Ground Floor',
-                'First Floor',
-            ],
-        ];
+        $csvPath = storage_path('imports/floors.csv');
 
-        foreach ($buildingFloors as $buildingName => $floors) {
-            $building = Building::where('name', $buildingName)->first();
-
-            if ($building) {
-                foreach ($floors as $floorName) {
-                    Floor::firstOrCreate([
-                        'building_id' => $building->id,
-                        'floor_name' => $floorName,
-                    ], []);
-                }
-            }
+        if (!file_exists($csvPath)) {
+            $this->command->error("CSV file not found: {$csvPath}");
+            return;
         }
+
+        $file = fopen($csvPath, 'r');
+
+        // Skip header row
+        $header = fgetcsv($file, 0, ';');
+
+        while (($row = fgetcsv($file, 0, ';')) !== false) {
+            // Map CSV columns: id, building_id, floor_name, floor_plan_url, floor_plan_data, created_at, updated_at, deleted_at
+            $data = array_combine($header, $row);
+
+            // Skip soft-deleted records
+            if (!empty($data['deleted_at']) && $data['deleted_at'] !== 'NULL') {
+                continue;
+            }
+
+            Floor::firstOrCreate([
+                'building_id' => $data['building_id'],
+                'floor_name' => $data['floor_name'],
+            ], [
+                'floor_plan_url' => $data['floor_plan_url'] !== 'NULL' ? $data['floor_plan_url'] : null,
+                'floor_plan_data' => $data['floor_plan_data'] !== 'NULL' ? $data['floor_plan_data'] : null,
+            ]);
+        }
+
+        fclose($file);
+
+        $this->command->info('Floors seeded from CSV successfully.');
     }
 }

@@ -63,6 +63,16 @@ class User extends Authenticatable
     ];
 
     /**
+     * The accessors to append to the model's array form.
+     *
+     * @var array<string>
+     */
+    protected $appends = [
+        'phone_number',
+        'contact_number',
+    ];
+
+    /**
      * Get the attributes that should be cast.
      *
      * @return array<string, string>
@@ -93,6 +103,18 @@ class User extends Authenticatable
 
     // Mutator for phone_number (maps to phone)
     public function setPhoneNumberAttribute($value)
+    {
+        $this->attributes['phone'] = $value;
+    }
+
+    // Accessor for contact_number (maps to phone)
+    public function getContactNumberAttribute()
+    {
+        return $this->phone;
+    }
+
+    // Mutator for contact_number (maps to phone)
+    public function setContactNumberAttribute($value)
     {
         $this->attributes['phone'] = $value;
     }

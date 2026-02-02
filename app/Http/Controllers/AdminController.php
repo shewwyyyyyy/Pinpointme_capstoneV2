@@ -383,13 +383,23 @@ class AdminController extends Controller
             'role' => 'sometimes|in:student,faculty,staff,rescuer',
             'status' => 'sometimes|string',
             'phone' => 'nullable|string',
+            'phone_number' => 'nullable|string',
+            'contact_number' => 'nullable|string',
         ]);
 
         if ($validator->fails()) {
             return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
         }
 
-        $user->update($request->only(['first_name', 'last_name', 'email', 'role', 'status', 'phone', 'student_id']));
+        // Handle phone field from different sources (phone, phone_number, contact_number)
+        $phoneValue = $request->phone ?? $request->phone_number ?? $request->contact_number ?? $user->phone;
+        
+        $updateData = $request->only(['first_name', 'last_name', 'email', 'role', 'status', 'student_id']);
+        if ($phoneValue !== null) {
+            $updateData['phone'] = $phoneValue;
+        }
+        
+        $user->update($updateData);
 
         // Record audit trail
         AuditTrail::create([
@@ -450,15 +460,80 @@ class AdminController extends Controller
             ], 422);
         }
 
+        // Generate a random temporary password
+        $tempPassword = 'sdca' . rand(1000, 9999);
+        
+        // In local environment, create rescuer as available for easier testing
+        $isLocal = app()->environment('local', 'development');
+
         $rescuer = User::create([
             'first_name' => $request->first_name,
             'last_name' => $request->last_name,
             'email' => $request->email,
             'role' => 'rescuer',
             'phone' => $request->phone,
-            'password' => Hash::make('sdca2025'),
-            'status' => 'available',
+            'password' => Hash::make($tempPassword),
+            'status' => $isLocal ? 'available' : 'pending',
+            'otp_verified' => $isLocal,
+            'force_password_change' => true, // Rescuer must change password on first login
         ]);
+
+        // Send OTP email if requested
+        if ($request->send_otp) {
+            $otp = str_pad(rand(0, 999999), 6, '0', STR_PAD_LEFT);
+            $rescuer->otp_code = $otp;
+            $rescuer->otp_expires_at = now()->addMinutes(30); // 30 minutes for initial setup
+            $rescuer->save();
+
+            // Send welcome email with OTP
+            try {
+                \Mail::send([], [], function ($message) use ($rescuer, $otp, $tempPassword) {
+                    $message->to($rescuer->email)
+                        ->subject('Welcome to PinPointMe - Rescuer Account Verification')
+                        ->html("
+                            <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;'>
+                                <div style='background: linear-gradient(135deg, #1976D2, #0D47A1); padding: 30px; text-align: center;'>
+                                    <h1 style='color: white; margin: 0;'>Welcome to PinPointMe</h1>
+                                    <p style='color: rgba(255,255,255,0.8); margin: 5px 0 0;'>Emergency Rescue Team</p>
+                                </div>
+                                <div style='padding: 30px; background: #f5f5f5;'>
+                                    <h2 style='color: #333;'>Hello {$rescuer->first_name}!</h2>
+                                    <p style='color: #666; font-size: 16px;'>You have been registered as a <strong>Rescuer</strong> in the PinPointMe Emergency Response System.</p>
+                                    <p style='color: #666; font-size: 16px;'>Please verify your email to activate your account.</p>
+                                    
+                                    <div style='background: white; padding: 20px; border-radius: 10px; margin: 20px 0; text-align: center;'>
+                                        <p style='color: #888; margin-bottom: 10px;'>Your verification code is:</p>
+                                        <h1 style='color: #1976D2; letter-spacing: 8px; font-size: 36px; margin: 10px 0;'>{$otp}</h1>
+                                        <p style='color: #888; font-size: 12px;'>This code expires in 30 minutes</p>
+                                    </div>
+                                    
+                                    <div style='background: #fff3e0; padding: 15px; border-radius: 8px; margin: 20px 0;'>
+                                        <p style='color: #e65100; margin: 0;'><strong>Your temporary password:</strong> {$tempPassword}</p>
+                                        <p style='color: #666; font-size: 12px; margin: 5px 0 0;'>You will be required to change this after logging in.</p>
+                                    </div>
+                                    
+                                    <div style='background: #e3f2fd; padding: 15px; border-radius: 8px; margin: 20px 0;'>
+                                        <p style='color: #1565c0; margin: 0;'><strong>As a rescuer, you will:</strong></p>
+                                        <ul style='color: #666; margin: 10px 0 0; padding-left: 20px;'>
+                                            <li>Receive emergency rescue requests</li>
+                                            <li>Respond to users in need of assistance</li>
+                                            <li>Coordinate with the emergency response team</li>
+                                        </ul>
+                                    </div>
+                                    
+                                    <p style='color: #888; font-size: 14px;'>If you didn't expect this email, please contact the administrator.</p>
+                                </div>
+                                <div style='padding: 20px; background: #e0e0e0; text-align: center;'>
+                                    <p style='color: #666; margin: 0; font-size: 12px;'>&copy; " . date('Y') . " PinPointMe - SDCA Emergency Rescue System</p>
+                                </div>
+                            </div>
+                        ");
+                });
+            } catch (\Exception $e) {
+                \Log::error('Failed to send rescuer welcome email: ' . $e->getMessage());
+                // Still create the rescuer but note the email failure
+            }
+        }
 
         // Record audit trail
         AuditTrail::create([

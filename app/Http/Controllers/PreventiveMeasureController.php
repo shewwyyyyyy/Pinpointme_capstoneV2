@@ -113,8 +113,15 @@ class PreventiveMeasureController extends Controller
             'video_url' => 'nullable|url',
             'category' => 'nullable|string|max:100',
             'is_active' => 'boolean',
+            'is_published' => 'boolean',
             'sort_order' => 'integer',
         ]);
+
+        // Map is_published to is_active if provided
+        if ($request->has('is_published')) {
+            $validated['is_active'] = $request->boolean('is_published');
+            unset($validated['is_published']);
+        }
 
         // Handle thumbnail upload
         if ($request->hasFile('thumbnail')) {
@@ -180,8 +187,15 @@ class PreventiveMeasureController extends Controller
             'video_url' => 'nullable|url',
             'category' => 'nullable|string|max:100',
             'is_active' => 'boolean',
+            'is_published' => 'boolean',
             'sort_order' => 'integer',
         ]);
+
+        // Map is_published to is_active if provided
+        if ($request->has('is_published')) {
+            $validated['is_active'] = $request->boolean('is_published');
+            unset($validated['is_published']);
+        }
 
         // Handle thumbnail upload
         if ($request->hasFile('thumbnail')) {

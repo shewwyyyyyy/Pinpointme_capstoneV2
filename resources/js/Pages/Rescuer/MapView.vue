@@ -207,6 +207,9 @@
         <v-snackbar v-model="snackbar.show" :color="snackbar.color" :timeout="3000">
             {{ snackbar.message }}
         </v-snackbar>
+        
+        <!-- Bottom Navigation (Mobile/Tablet only) -->
+        <RescuerBottomNav :notification-count="0" />
     </v-app>
 </template>
 
@@ -214,6 +217,7 @@
 import { ref, computed, onMounted, watch } from 'vue';
 import { router } from '@inertiajs/vue3';
 import { useApi } from '@/Composables/useApi';
+import RescuerBottomNav from '@/Components/Pages/Rescuer/Menu/RescuerBottomNav.vue';
 
 const props = defineProps({
     rescueId: {

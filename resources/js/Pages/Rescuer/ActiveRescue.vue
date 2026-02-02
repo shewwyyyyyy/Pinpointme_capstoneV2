@@ -368,6 +368,9 @@
         <v-snackbar v-model="snackbar.show" :color="snackbar.color" :timeout="3000">
             {{ snackbar.message }}
         </v-snackbar>
+        
+        <!-- Bottom Navigation (Mobile/Tablet only) -->
+        <RescuerBottomNav :notification-count="0" />
     </v-app>
 </template>
 
@@ -375,6 +378,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { router } from '@inertiajs/vue3';
 import { apiFetch, getProfilePictureUrl } from '@/Composables/useApi';
+import RescuerBottomNav from '@/Components/Pages/Rescuer/Menu/RescuerBottomNav.vue';
 
 const props = defineProps({
     rescueId: {
@@ -597,12 +601,7 @@ const startRescue = async () => {
             // Store the rescue ID for later reference
             localStorage.setItem('lastRescueRequestId', rescueRequest.value.id.toString());
             
-            showSnackbar('Rescue started! Redirecting to dashboard...', 'success');
-            
-            // Redirect to dashboard after a short delay - rescue can be managed in "In Progress" tab
-            setTimeout(() => {
-                router.visit('/rescuer/dashboard');
-            }, 1500);
+            showSnackbar('Rescue started! You can now proceed to the location.', 'success');
         }
     } catch (error) {
         console.error('Error starting rescue:', error);

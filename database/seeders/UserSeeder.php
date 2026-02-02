@@ -73,6 +73,9 @@ class UserSeeder extends Seeder
         ];
 
         foreach ($users as $u) {
+            // Rescuers should have 'available' status, others have 'active'
+            $status = ($u['role'] === 'rescuer') ? 'available' : 'active';
+            
             User::updateOrCreate(
                 ['email' => $u['email']],
                 [
@@ -81,7 +84,7 @@ class UserSeeder extends Seeder
                     'last_name' => $u['last_name'],
                     'password' => $password,
                     'role' => $u['role'],
-                    'status' => 'active',
+                    'status' => $status,
                     'isAdmin' => $u['isAdmin'],
                     'is_able_to_login' => $u['is_able_to_login'],
                     'must_change_password' => false,

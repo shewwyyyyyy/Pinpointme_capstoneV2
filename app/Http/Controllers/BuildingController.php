@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\Building;
+use App\Models\Floor;
+use App\Models\Room;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -142,5 +144,53 @@ class BuildingController extends Controller
         $building->floors()->create($data);
 
         return redirect()->back()->with('success', 'Floor added successfully');
+    }
+
+    /**
+     * Add room to building (associates with floor)
+     *
+     * @param Request $request
+     * @param int $id Building ID
+     * @return \Illuminate\Http\JsonResponse|\Illuminate\Http\RedirectResponse
+     */
+    public function addRoom(Request $request, $id)
+    {
+        $validator = Validator::make($request->all(), [
+            'room_name' => 'required|string|max:255',
+            'floor_id' => 'required|exists:floors,id'
+        ]);
+
+        if ($validator->fails()) {
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $validator->errors()->first()
+                ], 422);
+            }
+            return redirect()->back()->with('error', $validator->errors()->first());
+        }
+
+        $building = Building::findOrFail($id);
+        
+        // Verify the floor belongs to this building
+        $floor = Floor::where('id', $request->floor_id)
+                      ->where('building_id', $building->id)
+                      ->firstOrFail();
+        
+        $room = Room::create([
+            'room_name' => $request->room_name,
+            'floor_id' => $floor->id,
+            'building_id' => $building->id
+        ]);
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Room added successfully',
+                'data' => $room
+            ], 201);
+        }
+
+        return redirect()->back()->with('success', 'Room added successfully');
     }
 }

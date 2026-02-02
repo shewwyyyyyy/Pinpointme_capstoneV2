@@ -165,3 +165,8 @@ const handleLogout = async () => {
     window.location.href = '/login';
 };
 </script>
+
+<style scoped>
+/* RescuerMenu is always available but the toggle button will be hidden on mobile */
+/* The drawer itself works on all screen sizes when triggered */
+</style>

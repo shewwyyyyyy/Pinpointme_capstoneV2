@@ -1,224 +1,211 @@
 <template>
   <v-app>
     <v-main class="change-password-bg">
-      <v-container fluid class="fill-height">
-        <v-row align="center" justify="center" class="fill-height">
-          <v-col cols="12" sm="10" md="8" lg="6" xl="5">
-            <v-card class="elevation-12 rounded-xl overflow-hidden">
-              <!-- Header -->
-              <div class="header-gradient pa-6 text-center">
-                <v-icon size="64" color="white" class="mb-3">mdi-lock-reset</v-icon>
-                <h1 class="text-h4 font-weight-bold text-white">Password Change Required</h1>
-                <p class="text-body-1 text-white mt-2 opacity-80">
-                  For security purposes, please change your temporary password
-                </p>
+      <v-container fluid class="fill-height pa-0">
+        <v-row align="center" justify="center" class="fill-height ma-0">
+          <v-col cols="12" sm="10" md="6" lg="5" xl="4" class="px-6">
+            
+            <!-- Step 1 & 2: OTP Verification -->
+            <div v-if="step === 1 || step === 2" class="text-center">
+              <!-- Back Button for Step 2 -->
+              <div v-if="step === 2" class="text-left mb-4">
+                <v-btn icon variant="text" @click="step = 1" class="back-btn">
+                  <v-icon>mdi-arrow-left</v-icon>
+                </v-btn>
               </div>
 
-              <v-card-text class="pa-6">
-                <!-- Step 1: Request OTP -->
-                <div v-if="step === 1">
-                  <v-alert type="info" variant="tonal" class="mb-6">
-                    <v-icon start>mdi-information</v-icon>
-                    Click below to receive a verification code at your email address
-                  </v-alert>
-
-                  <div class="text-center mb-6">
-                    <v-chip color="primary" variant="flat" size="large" class="px-6">
-                      <v-icon start>mdi-email</v-icon>
-                      {{ userEmail }}
-                    </v-chip>
-                  </div>
-
-                  <v-btn
-                    block
-                    size="x-large"
-                    color="primary"
-                    :loading="sendingOtp"
-                    @click="sendOtp"
-                    class="rounded-lg"
-                  >
-                    <v-icon start>mdi-send</v-icon>
-                    Send Verification Code
-                  </v-btn>
+              <!-- Green Checkmark Badge -->
+              <div class="badge-icon mb-6">
+                <div class="badge-circle">
+                  <v-icon size="48" color="white">mdi-check</v-icon>
                 </div>
+              </div>
 
-                <!-- Step 2: Enter OTP -->
-                <div v-else-if="step === 2">
-                  <v-alert type="success" variant="tonal" class="mb-6">
-                    <v-icon start>mdi-check-circle</v-icon>
-                    Verification code sent to {{ userEmail }}
-                  </v-alert>
+              <!-- Title -->
+              <h1 class="text-h4 font-weight-bold mb-3 title-text">Verify via email</h1>
+              <p class="text-body-1 subtitle-text mb-2">
+                Enter the verification code we sent to
+              </p>
+              <p class="text-body-2 email-text mb-8">{{ userEmail }}</p>
 
-                  <div class="text-center mb-4">
-                    <p class="text-body-2 text-grey-darken-1">Enter the 6-digit code:</p>
-                  </div>
+              <!-- Step 1: Send OTP -->
+              <div v-if="step === 1">
+                <v-btn
+                  block
+                  size="x-large"
+                  color="#6BC04B"
+                  :loading="sendingOtp"
+                  @click="sendOtp"
+                  class="verify-btn rounded-pill text-white"
+                >
+                  Send Code
+                </v-btn>
+              </div>
 
+              <!-- Step 2: Enter OTP -->
+              <div v-else>
+                <!-- OTP Input Boxes -->
+                <div class="otp-container mb-4">
                   <v-otp-input
                     v-model="otpCode"
                     :length="6"
                     variant="outlined"
-                    class="mb-4 otp-input"
+                    class="otp-input-custom"
                     @finish="verifyOtp"
                   />
+                </div>
 
-                  <div class="text-center mb-4">
-                    <span class="text-caption text-grey">Code expires in </span>
-                    <span class="text-caption font-weight-bold" :class="otpTimer <= 60 ? 'text-error' : 'text-primary'">
-                      {{ formatTimer(otpTimer) }}
-                    </span>
-                  </div>
-
-                  <v-btn
-                    block
-                    size="large"
-                    color="primary"
-                    :loading="verifyingOtp"
-                    :disabled="getOtpLength() !== 6"
-                    @click="verifyOtp"
-                    class="rounded-lg mb-3"
-                  >
-                    <v-icon start>mdi-check</v-icon>
-                    Verify Code
-                  </v-btn>
-
-                  <v-btn
-                    block
-                    variant="text"
-                    :disabled="resendCooldown > 0"
-                    @click="resendOtp"
+                <!-- Resend Code Link -->
+                <div class="text-right mb-6">
+                  <a 
+                    href="#" 
+                    class="resend-link"
+                    :class="{ 'disabled-link': resendCooldown > 0 }"
+                    @click.prevent="resendCooldown === 0 && resendOtp()"
                   >
                     <span v-if="resendCooldown > 0">Resend in {{ resendCooldown }}s</span>
-                    <span v-else>Resend Code</span>
-                  </v-btn>
+                    <span v-else>Resend code</span>
+                  </a>
                 </div>
 
-                <!-- Step 3: Set New Password -->
-                <div v-else-if="step === 3">
-                  <v-alert type="success" variant="tonal" class="mb-6">
-                    <v-icon start>mdi-shield-check</v-icon>
-                    Email verified! Please set your new password
-                  </v-alert>
-
-                  <v-form ref="passwordForm" @submit.prevent="changePassword">
-                    <v-text-field
-                      v-model="newPassword"
-                      :type="showPassword ? 'text' : 'password'"
-                      label="New Password"
-                      variant="outlined"
-                      :rules="passwordRules"
-                      :append-inner-icon="showPassword ? 'mdi-eye-off' : 'mdi-eye'"
-                      @click:append-inner="showPassword = !showPassword"
-                      class="mb-2"
-                    />
-
-                    <!-- Password Strength Indicator -->
-                    <div class="mb-4">
-                      <v-progress-linear
-                        :model-value="passwordStrength"
-                        :color="passwordStrengthColor"
-                        height="8"
-                        rounded
-                        class="mb-1"
-                      />
-                      <div class="d-flex justify-space-between text-caption">
-                        <span>Password Strength</span>
-                        <span :class="`text-${passwordStrengthColor}`">{{ passwordStrengthText }}</span>
-                      </div>
-                    </div>
-
-                    <v-text-field
-                      v-model="confirmPassword"
-                      :type="showConfirmPassword ? 'text' : 'password'"
-                      label="Confirm New Password"
-                      variant="outlined"
-                      :rules="confirmPasswordRules"
-                      :append-inner-icon="showConfirmPassword ? 'mdi-eye-off' : 'mdi-eye'"
-                      @click:append-inner="showConfirmPassword = !showConfirmPassword"
-                      class="mb-4"
-                    />
-
-                    <!-- Password Requirements -->
-                    <v-card variant="outlined" class="mb-4 pa-3">
-                      <p class="text-caption text-grey-darken-1 mb-2">Password Requirements:</p>
-                      <div class="d-flex flex-wrap gap-2">
-                        <v-chip 
-                          :color="hasMinLength ? 'success' : 'grey'" 
-                          size="small" 
-                          variant="tonal"
-                        >
-                          <v-icon start size="14">{{ hasMinLength ? 'mdi-check' : 'mdi-close' }}</v-icon>
-                          8+ characters
-                        </v-chip>
-                        <v-chip 
-                          :color="hasUppercase ? 'success' : 'grey'" 
-                          size="small" 
-                          variant="tonal"
-                        >
-                          <v-icon start size="14">{{ hasUppercase ? 'mdi-check' : 'mdi-close' }}</v-icon>
-                          Uppercase
-                        </v-chip>
-                        <v-chip 
-                          :color="hasLowercase ? 'success' : 'grey'" 
-                          size="small" 
-                          variant="tonal"
-                        >
-                          <v-icon start size="14">{{ hasLowercase ? 'mdi-check' : 'mdi-close' }}</v-icon>
-                          Lowercase
-                        </v-chip>
-                        <v-chip 
-                          :color="hasNumber ? 'success' : 'grey'" 
-                          size="small" 
-                          variant="tonal"
-                        >
-                          <v-icon start size="14">{{ hasNumber ? 'mdi-check' : 'mdi-close' }}</v-icon>
-                          Number
-                        </v-chip>
-                      </div>
-                    </v-card>
-
-                    <v-btn
-                      block
-                      type="submit"
-                      size="x-large"
-                      color="primary"
-                      :loading="changingPassword"
-                      :disabled="!isPasswordValid"
-                      class="rounded-lg"
-                    >
-                      <v-icon start>mdi-lock-check</v-icon>
-                      Change Password
-                    </v-btn>
-                  </v-form>
-                </div>
-              </v-card-text>
-            </v-card>
-
-            <!-- Logout option -->
-            <div class="text-center mt-4">
-              <v-btn variant="text" color="white" @click="logout">
-                <v-icon start>mdi-logout</v-icon>
-                Cancel & Logout
-              </v-btn>
+                <!-- Verify Button -->
+                <v-btn
+                  block
+                  size="x-large"
+                  color="#6BC04B"
+                  :loading="verifyingOtp"
+                  :disabled="getOtpLength() !== 6"
+                  @click="verifyOtp"
+                  class="verify-btn rounded-pill text-white"
+                >
+                  Verify
+                </v-btn>
+              </div>
             </div>
+
+            <!-- Step 3: Create New Password -->
+            <div v-else-if="step === 3" class="text-center">
+              <!-- Back Button -->
+              <div class="text-left mb-4">
+                <v-btn icon variant="text" @click="step = 2" class="back-btn">
+                  <v-icon>mdi-arrow-left</v-icon>
+                </v-btn>
+              </div>
+
+              <!-- Lock Icon -->
+              <div class="lock-icon mb-6">
+                <div class="lock-circle">
+                  <v-icon size="48" color="#00BCD4">mdi-lock</v-icon>
+                </div>
+              </div>
+
+              <!-- Title -->
+              <h1 class="text-h4 font-weight-bold mb-8 title-text">Create new password</h1>
+
+              <!-- Password Form -->
+              <v-form ref="passwordForm" @submit.prevent="changePassword">
+                <v-text-field
+                  v-model="newPassword"
+                  :type="showPassword ? 'text' : 'password'"
+                  placeholder="Set new password"
+                  variant="outlined"
+                  :rules="passwordRules"
+                  :append-inner-icon="showPassword ? 'mdi-eye' : 'mdi-eye-off'"
+                  @click:append-inner="showPassword = !showPassword"
+                  class="mb-4 password-field"
+                  hide-details="auto"
+                  bg-color="white"
+                />
+
+                <v-text-field
+                  v-model="confirmPassword"
+                  :type="showConfirmPassword ? 'text' : 'password'"
+                  placeholder="Confirm new password"
+                  variant="outlined"
+                  :rules="confirmPasswordRules"
+                  :append-inner-icon="showConfirmPassword ? 'mdi-eye' : 'mdi-eye-off'"
+                  @click:append-inner="showConfirmPassword = !showConfirmPassword"
+                  class="mb-6 password-field"
+                  hide-details="auto"
+                  bg-color="white"
+                />
+
+                <!-- Reset Password Button -->
+                <v-btn
+                  block
+                  type="submit"
+                  size="x-large"
+                  color="#2196F3"
+                  :loading="changingPassword"
+                  :disabled="!isPasswordValid"
+                  class="reset-btn rounded-pill text-white"
+                >
+                  Reset password
+                </v-btn>
+              </v-form>
+            </div>
+
           </v-col>
         </v-row>
       </v-container>
     </v-main>
 
-    <!-- Success Dialog -->
-    <v-dialog v-model="successDialog" persistent max-width="400">
-      <v-card class="rounded-xl text-center pa-6">
-        <v-icon size="80" color="success" class="mb-4">mdi-check-circle</v-icon>
-        <v-card-title class="text-h5 font-weight-bold">Password Changed!</v-card-title>
-        <v-card-text class="text-body-1 text-grey-darken-1">
-          Your password has been updated successfully. You will be redirected shortly.
-        </v-card-text>
-        <v-card-actions class="justify-center">
-          <v-btn color="primary" size="large" @click="redirectToDashboard">
+    <!-- Success Screen (Full Page) -->
+    <v-dialog v-model="successDialog" persistent fullscreen>
+      <div class="success-screen">
+        <div class="success-content text-center">
+          <!-- Celebration Illustration -->
+          <div class="celebration-icon mb-6">
+            <svg width="180" height="180" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <!-- YAY! text -->
+              <text x="100" y="30" text-anchor="middle" fill="#333" font-size="16" font-weight="bold" font-family="Arial">YAY!</text>
+              <!-- Person body -->
+              <ellipse cx="100" cy="85" rx="25" ry="12" fill="#F5D17A"/>
+              <!-- Head -->
+              <circle cx="100" cy="60" r="18" fill="#FFE4C4"/>
+              <!-- Hair -->
+              <path d="M82 55 Q85 40 100 42 Q115 40 118 55 Q120 48 115 45 Q100 35 85 45 Q80 48 82 55" fill="#333"/>
+              <!-- Face -->
+              <circle cx="94" cy="58" r="2" fill="#333"/>
+              <circle cx="106" cy="58" r="2" fill="#333"/>
+              <path d="M96 66 Q100 70 104 66" stroke="#333" stroke-width="1.5" fill="none"/>
+              <!-- Arms raised -->
+              <path d="M75 85 Q60 70 55 50" stroke="#FFE4C4" stroke-width="8" stroke-linecap="round"/>
+              <path d="M125 85 Q140 70 145 50" stroke="#FFE4C4" stroke-width="8" stroke-linecap="round"/>
+              <!-- Hands -->
+              <circle cx="55" cy="48" r="6" fill="#FFE4C4"/>
+              <circle cx="145" cy="48" r="6" fill="#FFE4C4"/>
+              <!-- Shirt -->
+              <path d="M75 90 L80 130 L120 130 L125 90 Q100 95 75 90" fill="#F5D17A"/>
+              <!-- Legs running -->
+              <path d="M90 130 L75 170" stroke="#89CFF0" stroke-width="12" stroke-linecap="round"/>
+              <path d="M110 130 L130 160" stroke="#89CFF0" stroke-width="12" stroke-linecap="round"/>
+              <!-- Shoes -->
+              <ellipse cx="73" cy="175" rx="8" ry="5" fill="#E8E8E8"/>
+              <ellipse cx="133" cy="165" rx="8" ry="5" fill="#E8E8E8"/>
+              <!-- Hair flowing -->
+              <path d="M118 55 Q130 50 140 65 Q135 55 125 52" fill="#333"/>
+            </svg>
+          </div>
+
+          <!-- Success Message -->
+          <h1 class="text-h4 font-weight-bold mb-3 success-title">Password Reset!</h1>
+          <p class="text-body-1 success-subtitle mb-8">
+            Your password has been successfully reset.<br>
+            Click continue to login.
+          </p>
+
+          <!-- Continue Button -->
+          <v-btn
+            size="x-large"
+            color="#6BC04B"
+            @click="redirectToDashboard"
+            class="continue-btn rounded-pill text-white px-12"
+          >
             Continue
           </v-btn>
-        </v-card-actions>
-      </v-card>
+        </div>
+      </div>
     </v-dialog>
 
     <!-- Snackbar for messages -->
@@ -470,30 +457,201 @@ onUnmounted(() => {
 
 <style scoped>
 .change-password-bg {
-  background: linear-gradient(135deg, #1976D2 0%, #0D47A1 50%, #002171 100%);
+  background: linear-gradient(180deg, 
+    rgba(255, 220, 220, 0.4) 0%, 
+    rgba(200, 230, 255, 0.5) 50%, 
+    rgba(180, 240, 220, 0.4) 100%);
   min-height: 100vh;
 }
 
-.header-gradient {
-  background: linear-gradient(135deg, #1976D2, #0D47A1);
+/* Badge Icon for Verify Screen */
+.badge-icon {
+  display: flex;
+  justify-content: center;
 }
 
-.opacity-80 {
-  opacity: 0.8;
+.badge-circle {
+  width: 100px;
+  height: 100px;
+  background: #6BC04B;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
 }
 
-.otp-input :deep(.v-otp-input__content) {
+.badge-circle::before {
+  content: '';
+  position: absolute;
+  width: 120px;
+  height: 120px;
+  background: #6BC04B;
+  border-radius: 50%;
+  z-index: -1;
+  clip-path: polygon(
+    50% 0%, 61% 7%, 75% 3%, 82% 15%, 97% 17%, 98% 32%, 
+    107% 43%, 100% 57%, 104% 72%, 92% 80%, 88% 95%, 
+    73% 93%, 60% 103%, 50% 95%, 40% 103%, 27% 93%, 
+    12% 95%, 8% 80%, -4% 72%, 0% 57%, -7% 43%, 
+    2% 32%, 3% 17%, 18% 15%, 25% 3%, 39% 7%
+  );
+}
+
+/* Lock Icon for Password Screen */
+.lock-icon {
+  display: flex;
+  justify-content: center;
+}
+
+.lock-circle {
+  width: 100px;
+  height: 100px;
+  background: transparent;
+  border: 3px solid #333;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Typography */
+.title-text {
+  color: #333;
+}
+
+.subtitle-text {
+  color: #666;
+}
+
+.email-text {
+  color: #999;
+  font-style: italic;
+}
+
+/* Back Button */
+.back-btn {
+  color: #333 !important;
+}
+
+/* OTP Input Styling */
+.otp-container {
+  max-width: 320px;
+  margin: 0 auto;
+}
+
+.otp-input-custom :deep(.v-otp-input__content) {
   justify-content: center;
   gap: 8px;
 }
 
-.otp-input :deep(input) {
-  font-size: 24px;
-  font-weight: bold;
-  text-align: center;
+.otp-input-custom :deep(.v-field) {
+  border-radius: 8px;
+  background: white;
 }
 
-.gap-2 {
-  gap: 8px;
+.otp-input-custom :deep(.v-field__outline__start),
+.otp-input-custom :deep(.v-field__outline__end) {
+  border-color: #ddd;
+}
+
+.otp-input-custom :deep(input) {
+  font-size: 20px;
+  font-weight: 600;
+  text-align: center;
+  color: #333;
+}
+
+/* Resend Link */
+.resend-link {
+  color: #6BC04B;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.resend-link:hover {
+  text-decoration: underline;
+}
+
+.disabled-link {
+  color: #999;
+  pointer-events: none;
+}
+
+/* Verify Button (Green) */
+.verify-btn {
+  font-weight: 600;
+  font-size: 16px;
+  letter-spacing: 0;
+  text-transform: none;
+  height: 52px !important;
+}
+
+/* Reset Button (Blue) */
+.reset-btn {
+  font-weight: 600;
+  font-size: 16px;
+  letter-spacing: 0;
+  text-transform: none;
+  height: 52px !important;
+}
+
+/* Password Fields */
+.password-field :deep(.v-field) {
+  border-radius: 8px;
+  background: white;
+}
+
+.password-field :deep(.v-field__outline__start),
+.password-field :deep(.v-field__outline__end) {
+  border-color: #ddd;
+}
+
+.password-field :deep(input) {
+  color: #333;
+}
+
+.password-field :deep(input::placeholder) {
+  color: #999;
+}
+
+/* Success Screen */
+.success-screen {
+  background: linear-gradient(180deg, 
+    rgba(200, 240, 220, 0.6) 0%, 
+    rgba(200, 230, 255, 0.5) 50%, 
+    rgba(180, 240, 220, 0.4) 100%);
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.success-content {
+  max-width: 350px;
+}
+
+.celebration-icon {
+  display: flex;
+  justify-content: center;
+}
+
+.success-title {
+  color: #333;
+}
+
+.success-subtitle {
+  color: #666;
+  line-height: 1.6;
+}
+
+.continue-btn {
+  font-weight: 600;
+  font-size: 16px;
+  letter-spacing: 0;
+  text-transform: none;
+  height: 52px !important;
 }
 </style>

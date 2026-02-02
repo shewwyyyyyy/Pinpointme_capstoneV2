@@ -1,25 +1,5 @@
 <template>
-    <v-app>
-        <v-app-bar color="primary" density="compact">
-            <v-app-bar-nav-icon @click="drawer = !drawer" />
-            <v-app-bar-title>Rescuer Dashboard</v-app-bar-title>
-            <v-spacer />
-            <v-btn icon @click="refreshData">
-                <v-icon>mdi-refresh</v-icon>
-            </v-btn>
-            <!-- Notification Bell with Badge -->
-            <v-btn icon @click="showNotificationPanel = !showNotificationPanel">
-                <v-badge
-                    :content="counts.pending"
-                    :model-value="counts.pending > 0"
-                    color="error"
-                    overlap
-                >
-                    <v-icon>mdi-bell</v-icon>
-                </v-badge>
-            </v-btn>
-        </v-app-bar>
-
+    <v-app class="app-container">
         <!-- Navigation Drawer -->
         <RescuerMenu v-model="drawer" />
 
@@ -28,7 +8,11 @@
             v-model="showNotificationPanel"
             location="right"
             temporary
-            width="350"
+            :width="notificationDrawerWidth"
+            class="notification-drawer"
+            :scrim="true"
+            touchless
+            disable-resize-watcher
         >
             <v-list-item class="pa-4 bg-primary">
                 <template v-slot:prepend>
@@ -98,195 +82,192 @@
             </template>
         </v-navigation-drawer>
 
-        <v-main class="bg-user-gradient-light">
-            <v-container fluid class="pa-4">
-                <!-- Tabs -->
-                <v-tabs v-model="selectedTab" color="primary" class="mb-4" grow>
-                    <v-tab value="pending">
-                        <v-badge :content="counts.pending" color="warning" inline>
-                            Trapped
-                        </v-badge>
-                    </v-tab>
-                    <v-tab value="inProgress">
-                        <v-badge :content="counts.inProgress" color="info" inline>
-                            In Progress
-                        </v-badge>
-                    </v-tab>
-                    <v-tab value="rescued">
-                        <v-badge :content="counts.completed" color="success" inline>
-                            Rescued
-                        </v-badge>
-                    </v-tab>
-                </v-tabs>
+        <v-main class="main-container">
+            <!-- Header -->
+            <div class="header-section">
+                <div class="d-flex align-center justify-space-between px-4 pt-4">
+                    <v-btn icon variant="text" @click="drawer = !drawer" class="menu-btn desktop-only">
+                        <v-icon>mdi-menu</v-icon>
+                    </v-btn>
+                    <div class="brand-logo text-center flex-grow-1">
+                        <h1 class="brand-title">PinPointMe</h1>
+                        <p class="brand-tagline">COMING YOUR WAY.</p>
+                    </div>
+                    <v-btn icon variant="text" @click="refreshData" class="action-btn">
+                        <v-icon size="22">mdi-refresh</v-icon>
+                    </v-btn>
+                </div>
+                
+                <!-- Section Title -->
+                <div class="section-title">
+                    <span class="divider-line"></span>
+                    <span class="title-text">Alerts and Notifications</span>
+                    <span class="divider-line"></span>
+                </div>
 
+                <!-- Tab Pills -->
+                <div class="tab-pills-container">
+                    <button 
+                        :class="['tab-pill', selectedTab === 'pending' ? 'tab-pill-pending active' : '']"
+                        @click="selectedTab = 'pending'"
+                    >
+                        Need Help ({{ counts.pending }})
+                    </button>
+                    <button 
+                        :class="['tab-pill', selectedTab === 'inProgress' ? 'tab-pill-progress active' : '']"
+                        @click="selectedTab = 'inProgress'"
+                    >
+                        In progress ({{ counts.inProgress }})
+                    </button>
+                    <button 
+                        :class="['tab-pill', selectedTab === 'rescued' ? 'tab-pill-rescued active' : '']"
+                        @click="selectedTab = 'rescued'"
+                    >
+                        Rescued ({{ counts.completed }})
+                    </button>
+                </div>
+            </div>
+
+            <!-- Content Area -->
+            <div class="content-area">
                 <!-- Loading State -->
                 <div v-if="loading" class="d-flex justify-center py-8">
                     <v-progress-circular indeterminate color="primary" size="48" />
                 </div>
 
                 <!-- Request Lists -->
-                <v-window v-else v-model="selectedTab">
-                    <!-- Pending/Trapped Tab -->
-                    <v-window-item value="pending">
-                        <div v-if="pendingRequests.length === 0" class="text-center py-8">
-                            <v-icon size="64" color="grey">mdi-inbox-outline</v-icon>
+                <div v-else class="request-list">
+                    <!-- Pending/Need Help Tab -->
+                    <div v-if="selectedTab === 'pending'">
+                        <div v-if="pendingRequests.length === 0" class="empty-state">
+                            <v-icon size="64" color="grey-lighten-1">mdi-inbox-outline</v-icon>
                             <p class="text-grey mt-2">No pending rescue requests</p>
                         </div>
-                        <v-card
+                        <div
                             v-for="request in pendingRequests"
                             :key="request.id"
-                            class="mb-3"
-                            elevation="2"
-                            rounded="lg"
+                            class="request-card"
                             @click="viewPendingRequest(request)"
                         >
-                            <v-card-text>
-                                <div class="d-flex justify-space-between align-start">
-                                    <div>
-                                        <v-chip color="warning" size="small" class="mb-2">
-                                            {{ request.rescue_code }}
-                                        </v-chip>
-                                        <h3 class="text-subtitle-1 font-weight-bold">
-                                            {{ request.firstName || 'Unknown' }} {{ request.lastName || '' }}
-                                        </h3>
-                                        <p class="text-caption text-grey mb-1">
-                                            <v-icon size="14">mdi-map-marker</v-icon>
-                                            {{ getLocationDisplay(request) }}
-                                        </p>
-                                        <p class="text-caption text-grey mb-0">
-                                            <v-icon size="14">mdi-clock</v-icon>
-                                            {{ formatTime(request.created_at) }}
-                                        </p>
-                                    </div>
-                                    <div class="text-right">
-                                        <v-chip
-                                            :color="getUrgencyColor(request.urgency_level)"
-                                            size="small"
-                                            variant="tonal"
-                                        >
-                                            {{ request.urgency_level || 'Unknown' }}
-                                        </v-chip>
+                            <div class="request-card-content">
+                                <div class="request-info">
+                                    <h3 class="request-name">
+                                        {{ request.firstName || 'User Name' }} {{ request.lastName || '' }}
+                                        <span v-if="request.description" class="injury-type">({{ getInjuryType(request.description) }})</span>
+                                    </h3>
+                                    <p class="request-location">
+                                        Scanned at {{ getLocationDisplay(request) }} on ...
+                                    </p>
+                                </div>
+                                <div class="request-status">
+                                    <div :class="['timer-badge', getTimerColorClass(request.urgency_level)]">
+                                        {{ formatElapsedTime(request.created_at) }}
                                     </div>
                                 </div>
-                                <v-divider class="my-2" />
-                                <p class="text-body-2 text-truncate mb-0">
-                                    {{ request.description || 'No description provided' }}
-                                </p>
-                            </v-card-text>
-                            <v-card-actions>
-                                <v-spacer />
+                            </div>
+                            <div class="request-actions" @click.stop>
                                 <v-btn
                                     color="primary"
                                     variant="flat"
                                     size="small"
+                                    rounded="pill"
                                     @click.stop="acceptRescue(request)"
                                     :loading="updatingId === request.id"
                                 >
                                     Accept Rescue
                                 </v-btn>
-                            </v-card-actions>
-                        </v-card>
-                    </v-window-item>
+                            </div>
+                        </div>
+                    </div>
 
                     <!-- In Progress Tab -->
-                    <v-window-item value="inProgress">
-                        <div v-if="inProgressRequests.length === 0" class="text-center py-8">
-                            <v-icon size="64" color="grey">mdi-progress-clock</v-icon>
+                    <div v-if="selectedTab === 'inProgress'">
+                        <div v-if="inProgressRequests.length === 0" class="empty-state">
+                            <v-icon size="64" color="grey-lighten-1">mdi-progress-clock</v-icon>
                             <p class="text-grey mt-2">No rescues in progress</p>
                         </div>
-                        <v-card
+                        <div
                             v-for="request in inProgressRequests"
                             :key="request.id"
-                            class="mb-3"
-                            elevation="2"
-                            rounded="lg"
+                            class="request-card"
                             @click="viewInProgressRequest(request)"
                         >
-                            <v-card-text>
-                                <div class="d-flex justify-space-between align-start">
-                                    <div>
-                                        <v-chip color="info" size="small" class="mb-2">
-                                            {{ request.rescue_code }}
-                                        </v-chip>
-                                        <h3 class="text-subtitle-1 font-weight-bold">
-                                            {{ request.firstName || 'Unknown' }} {{ request.lastName || '' }}
-                                        </h3>
-                                        <p class="text-caption text-grey mb-1">
-                                            <v-icon size="14">mdi-map-marker</v-icon>
-                                            {{ getLocationDisplay(request) }}
-                                        </p>
-                                    </div>
-                                    <v-chip color="info" size="small" variant="tonal">
-                                        In Progress
-                                    </v-chip>
+                            <div class="request-card-content">
+                                <div class="request-info">
+                                    <h3 class="request-name">
+                                        {{ request.firstName || 'User Name' }} {{ request.lastName || '' }}
+                                    </h3>
+                                    <p class="request-location">
+                                        Scanned at {{ getLocationDisplay(request) }} on ...
+                                    </p>
                                 </div>
-                            </v-card-text>
-                            <v-card-actions>
+                                <div class="request-status">
+                                    <div class="status-icon progress">
+                                        <v-icon color="white" size="20">mdi-check</v-icon>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="request-actions" @click.stop>
                                 <v-btn
-                                    color="primary"
+                                    color="grey-darken-1"
                                     variant="text"
                                     size="small"
                                     @click.stop="openChat(request)"
                                 >
-                                    <v-icon start>mdi-message</v-icon>
+                                    <v-icon start size="18">mdi-message</v-icon>
                                     Message
                                 </v-btn>
-                                <v-spacer />
                                 <v-btn
                                     color="success"
                                     variant="flat"
                                     size="small"
+                                    rounded="pill"
                                     @click.stop="markAsRescued(request)"
                                     :loading="updatingId === request.id"
                                 >
                                     Mark Rescued
                                 </v-btn>
-                            </v-card-actions>
-                        </v-card>
-                    </v-window-item>
+                            </div>
+                        </div>
+                    </div>
 
                     <!-- Rescued Tab -->
-                    <v-window-item value="rescued">
-                        <div v-if="rescuedRequests.length === 0" class="text-center py-8">
-                            <v-icon size="64" color="grey">mdi-check-circle-outline</v-icon>
+                    <div v-if="selectedTab === 'rescued'">
+                        <div v-if="rescuedRequests.length === 0" class="empty-state">
+                            <v-icon size="64" color="grey-lighten-1">mdi-check-circle-outline</v-icon>
                             <p class="text-grey mt-2">No rescued users yet</p>
                         </div>
-                        <v-card
+                        <div
                             v-for="request in rescuedRequests"
                             :key="request.id"
-                            class="mb-3"
-                            elevation="2"
-                            rounded="lg"
+                            class="request-card rescued"
                             @click="viewRescuedRequest(request)"
                         >
-                            <v-card-text>
-                                <div class="d-flex justify-space-between align-start">
-                                    <div>
-                                        <v-chip color="success" size="small" class="mb-2">
-                                            {{ request.rescue_code }}
-                                        </v-chip>
-                                        <h3 class="text-subtitle-1 font-weight-bold">
-                                            {{ request.firstName || 'Unknown' }} {{ request.lastName || '' }}
-                                        </h3>
-                                        <p class="text-caption text-grey mb-1">
-                                            <v-icon size="14">mdi-map-marker</v-icon>
-                                            {{ getLocationDisplay(request) }}
-                                        </p>
-                                        <p class="text-caption text-grey mb-0">
-                                            <v-icon size="14">mdi-clock</v-icon>
-                                            Rescued: {{ formatTime(request.updated_at) }}
-                                        </p>
-                                    </div>
-                                    <v-chip color="success" size="small" variant="tonal">
-                                        <v-icon start size="14">mdi-check</v-icon>
-                                        Rescued
-                                    </v-chip>
+                            <div class="request-card-content">
+                                <div class="request-info">
+                                    <h3 class="request-name">
+                                        {{ request.firstName || 'User Name' }} {{ request.lastName || '' }}
+                                    </h3>
+                                    <p class="request-location">
+                                        Scanned at {{ getLocationDisplay(request) }} on ...
+                                    </p>
                                 </div>
-                            </v-card-text>
-                        </v-card>
-                    </v-window-item>
-                </v-window>
-            </v-container>
+                                <div class="request-status">
+                                    <div class="status-icon rescued">
+                                        <v-icon color="white" size="20">mdi-check</v-icon>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bottom Navigation (Mobile/Tablet only) -->
+            <RescuerBottomNav 
+                :notification-count="counts.pending"
+                @open-notifications="showNotificationPanel = true"
+            />
 
             <!-- Toast -->
             <v-snackbar v-model="showToast" :color="toastColor" location="top">
@@ -316,6 +297,7 @@ import { router, usePage } from '@inertiajs/vue3';
 import { apiFetch, getProfilePictureUrl } from '@/Composables/useApi';
 import { useNotificationAlert } from '@/Composables/useNotificationAlert';
 import RescuerMenu from '@/Components/Pages/Rescuer/Menu/RescuerMenu.vue';
+import RescuerBottomNav from '@/Components/Pages/Rescuer/Menu/RescuerBottomNav.vue';
 import NotificationPopup from '@/Components/NotificationPopup.vue';
 
 // Get Inertia page for auth
@@ -360,6 +342,14 @@ const userProfilePicture = computed(() => {
     return getProfilePictureUrl(picturePath);
 });
 
+// Responsive notification drawer width
+const notificationDrawerWidth = computed(() => {
+    if (typeof window !== 'undefined') {
+        return window.innerWidth < 400 ? window.innerWidth * 0.85 : 300;
+    }
+    return 300;
+});
+
 // Counts
 const counts = computed(() => ({
     total: rescueRequests.value.length,
@@ -385,6 +375,21 @@ const toastMessage = ref('');
 const toastColor = ref('success');
 
 onMounted(async () => {
+    // Prevent zoom and ensure proper viewport
+    const viewport = document.querySelector('meta[name="viewport"]');
+    if (viewport) {
+        viewport.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover');
+    } else {
+        const meta = document.createElement('meta');
+        meta.name = 'viewport';
+        meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover';
+        document.head.appendChild(meta);
+    }
+    
+    // Prevent pull-to-refresh and overscroll
+    document.body.style.overscrollBehavior = 'none';
+    document.documentElement.style.overscrollBehavior = 'none';
+    
     loadUserData();
     await fetchRescueRequests();
     
@@ -543,7 +548,7 @@ const acceptRescue = async (request) => {
         });
         showNotification('Rescue accepted!', 'success');
         await fetchRescueRequests();
-        router.visit(`/rescuer/active/${request.rescue_code}`);
+        router.visit(`/rescuer/active/${request.id}`);
     } catch (error) {
         console.error('Failed to accept rescue:', error);
         showNotification('Failed to accept rescue', 'error');
@@ -621,6 +626,42 @@ const getUrgencyColor = (level) => {
     }
 };
 
+const getTimerColorClass = (level) => {
+    switch (level?.toLowerCase()) {
+        case 'critical':
+            return 'timer-critical';
+        case 'high':
+            return 'timer-high';
+        case 'medium':
+            return 'timer-medium';
+        default:
+            return 'timer-low';
+    }
+};
+
+const getInjuryType = (description) => {
+    if (!description) return '';
+    // Extract first word or keyword from description
+    const keywords = ['Seizure', 'Sprains', 'Fracture', 'Dislocation', 'Bleeding', 'Burns', 'Injury', 'Trapped'];
+    for (const keyword of keywords) {
+        if (description.toLowerCase().includes(keyword.toLowerCase())) {
+            return keyword;
+        }
+    }
+    // Return first 15 chars of description
+    return description.length > 15 ? description.substring(0, 15) + '...' : description;
+};
+
+const formatElapsedTime = (timestamp) => {
+    if (!timestamp) return '0:00';
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffSecs = Math.floor((diffMs % 60000) / 1000);
+    return `${diffMins}:${diffSecs.toString().padStart(2, '0')}`;
+};
+
 const formatTime = (timestamp) => {
     if (!timestamp) return '';
     const date = new Date(timestamp);
@@ -658,7 +699,324 @@ const showNotification = (message, color = 'info') => {
 </script>
 
 <style scoped>
-/* Component-specific styles */
+/* App Container - Prevent all unwanted scrolling/dragging */
+.app-container {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    overflow: hidden !important;
+    touch-action: none;
+}
+
+.app-container :deep(.v-application__wrap) {
+    min-height: 100vh !important;
+    max-height: 100vh !important;
+    overflow: hidden !important;
+}
+
+/* Main Container */
+.main-container {
+    background: linear-gradient(180deg, #e8f5f3 0%, #f5f9f8 50%, #ffffff 100%);
+    height: 100vh !important;
+    max-height: 100vh !important;
+    overflow: hidden !important;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Header Section */
+.header-section {
+    padding-bottom: 8px;
+    flex-shrink: 0;
+}
+
+.menu-btn,
+.action-btn {
+    color: #555;
+    flex-shrink: 0;
+}
+
+.brand-logo {
+    padding: 8px 0;
+}
+
+.brand-title {
+    font-size: 1.5rem;
+    font-weight: 600;
+    font-style: italic;
+    color: #2c3e50;
+    margin: 0;
+    line-height: 1.2;
+}
+
+.brand-tagline {
+    font-size: 0.65rem;
+    letter-spacing: 2px;
+    color: #7f8c8d;
+    margin: 0;
+    text-transform: uppercase;
+}
+
+/* Section Title */
+.section-title {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 12px 24px;
+    gap: 12px;
+    flex-shrink: 0;
+}
+
+.divider-line {
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, #ccc, transparent);
+    max-width: 60px;
+}
+
+.title-text {
+    font-size: 0.85rem;
+    color: #666;
+    white-space: nowrap;
+}
+
+/* Tab Pills */
+.tab-pills-container {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    padding: 0 16px 12px;
+    flex-wrap: wrap;
+    flex-shrink: 0;
+}
+
+.tab-pill {
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    border: none;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    background: #e0e0e0;
+    color: #666;
+}
+
+.tab-pill:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+
+.tab-pill.active {
+    color: white;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+.tab-pill-pending.active {
+    background: #26a69a;
+}
+
+.tab-pill-progress.active {
+    background: #42a5f5;
+}
+
+.tab-pill-rescued.active {
+    background: #66bb6a;
+}
+
+/* Content Area */
+.content-area {
+    padding: 0 16px;
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
+    overscroll-behavior: contain;
+    /* padding-bottom is handled by media queries for responsive bottom nav */
+}
+
+.request-list {
+    padding-bottom: 20px;
+}
+
+/* Request Cards */
+.request-card {
+    background: white;
+    border-radius: 12px;
+    margin-bottom: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    overflow: hidden;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border-left: 4px solid transparent;
+}
+
+.request-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+}
+
+.request-card:active {
+    transform: translateY(0);
+}
+
+.request-card-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px;
+}
+
+.request-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.request-name {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #2c3e50;
+    margin: 0 0 4px 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.injury-type {
+    font-weight: 400;
+    color: #666;
+}
+
+.request-location {
+    font-size: 0.75rem;
+    color: #7f8c8d;
+    margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.request-status {
+    margin-left: 12px;
+    flex-shrink: 0;
+}
+
+/* Timer Badge */
+.timer-badge {
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: white;
+    min-width: 50px;
+    text-align: center;
+}
+
+.timer-critical {
+    background: #e53935;
+}
+
+.timer-high {
+    background: #ffb300;
+}
+
+.timer-medium {
+    background: #fb8c00;
+}
+
+.timer-low {
+    background: #66bb6a;
+}
+
+/* Status Icons */
+.status-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.status-icon.progress {
+    background: #42a5f5;
+}
+
+.status-icon.rescued {
+    background: #66bb6a;
+}
+
+/* Request Actions */
+.request-actions {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 8px;
+    padding: 0 16px 16px;
+}
+
+/* Rescued Card Styling */
+.request-card.rescued {
+    border-left-color: #66bb6a;
+    background: linear-gradient(90deg, #f1f8f4 0%, white 20%);
+}
+
+/* Empty State */
+.empty-state {
+    text-align: center;
+    padding: 48px 24px;
+}
+
+/* Desktop-only elements (hidden on mobile/tablet) */
+.desktop-only {
+    display: flex;
+}
+
+/* Mobile-only elements (hidden on desktop) */
+.mobile-only {
+    display: none;
+}
+
+/* Responsive visibility */
+@media (max-width: 1024px) {
+    /* On mobile/tablet: hide desktop menu button, content doesn't need bottom padding on desktop */
+    .desktop-only {
+        display: none;
+    }
+    
+    .mobile-only {
+        display: flex;
+    }
+    
+    /* Add padding for bottom nav on mobile/tablet */
+    .content-area {
+        padding-bottom: 80px;
+    }
+}
+
+@media (min-width: 1025px) {
+    /* On desktop: no bottom padding needed since no bottom nav */
+    .content-area {
+        padding-bottom: 20px;
+    }
+}
+
+/* Notification Panel Styles */
+.notification-drawer {
+    z-index: 2000 !important;
+}
+
+.notification-drawer :deep(.v-navigation-drawer__content) {
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+}
+
 .notification-item {
     border-bottom: 1px solid rgba(0, 0, 0, 0.08);
     cursor: pointer;
@@ -667,5 +1025,79 @@ const showNotification = (message, color = 'info') => {
 
 .notification-item:hover {
     background-color: rgba(var(--v-theme-primary), 0.08);
+}
+
+/* Mobile Responsive */
+@media (max-width: 600px) {
+    .brand-title {
+        font-size: 1.25rem;
+    }
+    
+    .tab-pill {
+        padding: 6px 10px;
+        font-size: 0.65rem;
+    }
+    
+    .tab-pills-container {
+        gap: 4px;
+        padding: 0 8px 12px;
+    }
+    
+    .request-card-content {
+        padding: 12px;
+    }
+    
+    .request-name {
+        font-size: 0.85rem;
+    }
+    
+    .request-location {
+        font-size: 0.7rem;
+    }
+    
+    .timer-badge {
+        padding: 6px 10px;
+        font-size: 0.75rem;
+    }
+    
+    .header-section {
+        padding-bottom: 8px;
+    }
+    
+    .section-title {
+        padding: 8px 16px;
+    }
+}
+
+@media (max-width: 360px) {
+    .tab-pill {
+        padding: 5px 8px;
+        font-size: 0.6rem;
+    }
+}
+
+/* Scrollbar Styling */
+.content-area::-webkit-scrollbar {
+    width: 4px;
+}
+
+.content-area::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.content-area::-webkit-scrollbar-thumb {
+    background: rgba(0,0,0,0.2);
+    border-radius: 4px;
+}
+
+/* Prevent text selection everywhere except inputs */
+* {
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+input, textarea {
+    -webkit-user-select: auto;
+    user-select: auto;
 }
 </style>

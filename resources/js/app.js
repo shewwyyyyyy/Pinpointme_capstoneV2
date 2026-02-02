@@ -2,19 +2,19 @@ import { createApp, h } from "vue";
 import { createInertiaApp } from "@inertiajs/vue3";
 import Layout from "@/App.vue";
 import vuetify from "./vuetify";
-import { registerSW } from 'virtual:pwa-register';
 
-// Register Service Worker
-const updateSW = registerSW({
-    onNeedRefresh() {
-        if (confirm('New content available. Reload?')) {
-            updateSW(true);
-        }
-    },
-    onOfflineReady() {
-        console.log('App ready to work offline');
-    },
-});
+// PWA Service Worker - disabled for local development
+// import { registerSW } from 'virtual:pwa-register';
+// const updateSW = registerSW({
+//     onNeedRefresh() {
+//         if (confirm('New content available. Reload?')) {
+//             updateSW(true);
+//         }
+//     },
+//     onOfflineReady() {
+//         console.log('App ready to work offline');
+//     },
+// });
 
 createInertiaApp({
     resolve: (name) => {

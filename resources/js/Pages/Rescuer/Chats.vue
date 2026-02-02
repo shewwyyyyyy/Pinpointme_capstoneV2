@@ -127,6 +127,9 @@
             @close="popupAlert.show = false"
             @click="handleNotificationClick"
         />
+        
+        <!-- Bottom Navigation (Mobile/Tablet only) -->
+        <RescuerBottomNav :notification-count="0" />
     </v-app>
 </template>
 
@@ -136,6 +139,7 @@ import { router } from '@inertiajs/vue3';
 import { getConversations, getProfilePictureUrl } from '@/Composables/useApi';
 import { useNotificationAlert } from '@/Composables/useNotificationAlert';
 import RescuerMenu from '@/Components/Pages/Rescuer/Menu/RescuerMenu.vue';
+import RescuerBottomNav from '@/Components/Pages/Rescuer/Menu/RescuerBottomNav.vue';
 import NotificationPopup from '@/Components/NotificationPopup.vue';
 
 // State
