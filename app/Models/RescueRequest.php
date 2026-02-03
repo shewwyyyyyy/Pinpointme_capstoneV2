@@ -24,13 +24,15 @@ class RescueRequest extends Model
         'injuries',
         'urgency_level',
         'additional_info',
+        'media_attachments',
         'firstName',
         'lastName'
     ];
 
     protected $casts = [
         'created_at' => 'datetime',
-        'updated_at' => 'datetime'
+        'updated_at' => 'datetime',
+        'media_attachments' => 'array'
     ];
 
     /**

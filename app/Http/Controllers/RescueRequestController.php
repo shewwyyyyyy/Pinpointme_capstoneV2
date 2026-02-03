@@ -94,6 +94,28 @@ class RescueRequestController extends Controller
         $data['rescue_code'] = $this->generateUniqueRescueCode();
         $data['status'] = $data['status'] ?? 'pending';
 
+        // Handle media file uploads
+        if ($request->hasFile('media_files')) {
+            $mediaAttachments = [];
+            $files = $request->file('media_files');
+            
+            foreach ($files as $file) {
+                $filename = time() . '_' . uniqid() . '.' . $file->getClientOriginalExtension();
+                $path = $file->storeAs('rescue_media', $filename, 'public');
+                
+                $mediaAttachments[] = [
+                    'path' => $path,
+                    'url' => '/storage/' . $path,
+                    'type' => str_starts_with($file->getMimeType(), 'video/') ? 'video' : 'image',
+                    'mime_type' => $file->getMimeType(),
+                    'original_name' => $file->getClientOriginalName(),
+                    'size' => $file->getSize()
+                ];
+            }
+            
+            $data['media_attachments'] = $mediaAttachments;
+        }
+
         $rescueRequest = RescueRequest::create($data);
 
         // Handle API requests differently

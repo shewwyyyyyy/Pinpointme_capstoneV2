@@ -149,11 +149,6 @@
                                 </v-chip>
                             </div>
                             
-                            <!-- Additional Info -->
-                            <div v-if="notification.description" class="card-description">
-                                <p>{{ truncateText(notification.description, 100) }}</p>
-                            </div>
-                            
                             <!-- Action hint -->
                             <div class="card-action-hint">
                                 <span>Tap to view details</span>

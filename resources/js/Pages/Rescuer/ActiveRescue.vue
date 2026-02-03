@@ -133,7 +133,7 @@
                 </div>
 
                 <!-- Additional Info Card -->
-                <div v-if="rescueRequest.people_count || rescueRequest.mobility_status || rescueRequest.injuries" class="info-card additional-card">
+                <div v-if="rescueRequest.people_count || rescueRequest.mobility_status || rescueRequest.injuries || hasMediaAttachments" class="info-card additional-card">
                     <div class="card-header">
                         <v-icon size="20" color="info">mdi-clipboard-list</v-icon>
                         <span>Additional Information</span>
@@ -152,9 +152,51 @@
                             {{ rescueRequest.injuries }}
                         </v-chip>
                     </div>
+                    
+                    <!-- Media Attachments Section -->
+                    <div v-if="hasMediaAttachments" class="media-section">
+                        <div class="media-section-header">
+                            <v-icon size="16" color="purple">mdi-image-multiple</v-icon>
+                            <span>Attached Media ({{ mediaAttachments.length }})</span>
+                        </div>
+                        <div class="media-grid">
+                            <div 
+                                v-for="(media, index) in mediaAttachments" 
+                                :key="index" 
+                                class="media-item"
+                                @click="openMediaViewer(media, index)"
+                            >
+                                <!-- Image Thumbnail -->
+                                <template v-if="media.type === 'image'">
+                                    <v-img
+                                        :src="media.url"
+                                        :alt="media.original_name || 'Attachment'"
+                                        cover
+                                        class="media-thumbnail"
+                                    >
+                                        <template v-slot:placeholder>
+                                            <div class="d-flex align-center justify-center fill-height">
+                                                <v-progress-circular indeterminate color="primary" size="24" />
+                                            </div>
+                                        </template>
+                                    </v-img>
+                                    <div class="media-overlay">
+                                        <v-icon color="white" size="20">mdi-magnify-expand</v-icon>
+                                    </div>
+                                </template>
+                                <!-- Video Thumbnail -->
+                                <template v-else-if="media.type === 'video'">
+                                    <div class="video-thumbnail">
+                                        <video :src="media.url" muted preload="metadata" />
+                                        <div class="video-play-overlay">
+                                            <v-icon color="white" size="32">mdi-play-circle</v-icon>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-
-              
 
                 <!-- Action Buttons -->
                 <div class="action-section">
@@ -418,6 +460,79 @@
             </v-card>
         </v-dialog>
 
+        <!-- Media Viewer Dialog (for photos/videos from rescue request) -->
+        <v-dialog v-model="showMediaViewer" max-width="600" content-class="media-viewer-dialog">
+            <v-card class="bg-black rounded-xl">
+                <v-card-title class="d-flex align-center justify-space-between text-white pa-3">
+                    <div class="d-flex align-center">
+                        <v-icon :color="currentMediaItem?.type === 'video' ? 'red' : 'blue'" class="mr-2">
+                            {{ currentMediaItem?.type === 'video' ? 'mdi-video' : 'mdi-image' }}
+                        </v-icon>
+                        <span class="text-body-1">{{ currentMediaItem?.original_name || 'Media' }}</span>
+                    </div>
+                    <div class="d-flex align-center">
+                        <span class="text-caption text-grey mr-3">{{ currentMediaIndex + 1 }} / {{ mediaAttachments.length }}</span>
+                        <v-btn icon variant="text" color="white" size="small" @click="showMediaViewer = false">
+                            <v-icon>mdi-close</v-icon>
+                        </v-btn>
+                    </div>
+                </v-card-title>
+                <v-divider color="grey-darken-3" />
+                <v-card-text class="pa-0 d-flex justify-center align-center media-viewer-content">
+                    <!-- Image Viewer -->
+                    <template v-if="currentMediaItem?.type === 'image'">
+                        <v-img
+                            :src="currentMediaItem?.url"
+                            max-height="500"
+                            contain
+                            class="bg-black"
+                        >
+                            <template v-slot:placeholder>
+                                <div class="d-flex align-center justify-center fill-height">
+                                    <v-progress-circular indeterminate color="primary" size="48" />
+                                </div>
+                            </template>
+                        </v-img>
+                    </template>
+                    <!-- Video Viewer -->
+                    <template v-else-if="currentMediaItem?.type === 'video'">
+                        <video
+                            ref="mediaVideoPlayer"
+                            :src="currentMediaItem?.url"
+                            controls
+                            class="media-video-player"
+                            preload="metadata"
+                        />
+                    </template>
+                </v-card-text>
+                <!-- Navigation Arrows -->
+                <div v-if="mediaAttachments.length > 1" class="media-nav-arrows">
+                    <v-btn 
+                        icon 
+                        variant="flat" 
+                        color="white" 
+                        size="small"
+                        class="nav-arrow left"
+                        :disabled="currentMediaIndex === 0"
+                        @click="navigateMedia(-1)"
+                    >
+                        <v-icon>mdi-chevron-left</v-icon>
+                    </v-btn>
+                    <v-btn 
+                        icon 
+                        variant="flat" 
+                        color="white" 
+                        size="small"
+                        class="nav-arrow right"
+                        :disabled="currentMediaIndex === mediaAttachments.length - 1"
+                        @click="navigateMedia(1)"
+                    >
+                        <v-icon>mdi-chevron-right</v-icon>
+                    </v-btn>
+                </div>
+            </v-card>
+        </v-dialog>
+
         <!-- Snackbar -->
         <v-snackbar v-model="snackbar.show" :color="snackbar.color" :timeout="3000">
             {{ snackbar.message }}
@@ -474,6 +589,54 @@ const openPhotoViewer = (url, name) => {
     showPhotoViewer.value = true;
 };
 
+// Media Viewer State (for rescue request attachments)
+const showMediaViewer = ref(false);
+const currentMediaIndex = ref(0);
+const mediaVideoPlayer = ref(null);
+
+// Computed property for media attachments
+const mediaAttachments = computed(() => {
+    const attachments = rescueRequest.value?.media_attachments;
+    if (!attachments) return [];
+    // Handle both array and JSON string formats
+    if (typeof attachments === 'string') {
+        try {
+            return JSON.parse(attachments);
+        } catch (e) {
+            return [];
+        }
+    }
+    return Array.isArray(attachments) ? attachments : [];
+});
+
+// Check if there are media attachments
+const hasMediaAttachments = computed(() => {
+    return mediaAttachments.value && mediaAttachments.value.length > 0;
+});
+
+// Get current media item being viewed
+const currentMediaItem = computed(() => {
+    return mediaAttachments.value[currentMediaIndex.value] || null;
+});
+
+// Open media viewer
+const openMediaViewer = (media, index) => {
+    currentMediaIndex.value = index;
+    showMediaViewer.value = true;
+};
+
+// Navigate through media
+const navigateMedia = (direction) => {
+    const newIndex = currentMediaIndex.value + direction;
+    if (newIndex >= 0 && newIndex < mediaAttachments.value.length) {
+        // Pause video if playing
+        if (mediaVideoPlayer.value) {
+            mediaVideoPlayer.value.pause();
+        }
+        currentMediaIndex.value = newIndex;
+    }
+};
+
 // Computed property for requester's profile picture
 const requesterProfilePicture = computed(() => {
     const requester = rescueRequest.value?.requester;
@@ -496,9 +659,10 @@ const hasEmergencyContact = computed(() => {
 
 // Check if the user is reporting for someone else (form has name filled in)
 const isReportingForOthers = computed(() => {
-    // If first_name or last_name is filled in the form, it means reporting for others
-    const formFirstName = rescueRequest.value?.first_name;
-    const formLastName = rescueRequest.value?.last_name;
+    // If firstName or lastName is filled in the form, it means reporting for others
+    // Check both camelCase (as stored in DB) and snake_case (for API normalization)
+    const formFirstName = rescueRequest.value?.firstName || rescueRequest.value?.first_name;
+    const formLastName = rescueRequest.value?.lastName || rescueRequest.value?.last_name;
     return !!(formFirstName || formLastName);
 });
 
@@ -506,8 +670,8 @@ const isReportingForOthers = computed(() => {
 const getPersonInNeedName = () => {
     if (isReportingForOthers.value) {
         // Use the name from the form (reporting for someone else)
-        const firstName = rescueRequest.value?.first_name || '';
-        const lastName = rescueRequest.value?.last_name || '';
+        const firstName = rescueRequest.value?.firstName || rescueRequest.value?.first_name || '';
+        const lastName = rescueRequest.value?.lastName || rescueRequest.value?.last_name || '';
         return `${firstName} ${lastName}`.trim() || 'Unknown Person';
     } else {
         // Use the requester's name (reporting for self)
@@ -520,8 +684,8 @@ const getPersonInNeedName = () => {
 // Get initials for person in need
 const getPersonInNeedInitials = () => {
     if (isReportingForOthers.value) {
-        const firstName = rescueRequest.value?.first_name || '';
-        const lastName = rescueRequest.value?.last_name || '';
+        const firstName = rescueRequest.value?.firstName || rescueRequest.value?.first_name || '';
+        const lastName = rescueRequest.value?.lastName || rescueRequest.value?.last_name || '';
         if (firstName && lastName) {
             return `${firstName[0]}${lastName[0]}`.toUpperCase();
         }
@@ -1279,7 +1443,26 @@ onUnmounted(() => {
     gap: 10px;
 }
 
-/* Medical Information Card */
+/* Media Section within Additional Info */
+.media-section {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid #e2e8f0;
+}
+
+.media-section-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 12px;
+}
+
+/* Media Attachments */
 .medical-card {
     border-left: 4px solid #e53935;
 }
@@ -1418,6 +1601,120 @@ onUnmounted(() => {
     font-weight: 500;
 }
 
+/* Media Attachments */
+.media-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+    gap: 10px;
+}
+
+.media-item {
+    position: relative;
+    aspect-ratio: 1;
+    border-radius: 12px;
+    overflow: hidden;
+    cursor: pointer;
+    background: #f5f5f5;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.media-item:hover {
+    transform: scale(1.03);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.media-item:active {
+    transform: scale(0.98);
+}
+
+.media-thumbnail {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.media-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.media-item:hover .media-overlay {
+    opacity: 1;
+}
+
+.video-thumbnail {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    background: #1a1a1a;
+}
+
+.video-thumbnail video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.video-play-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Media Viewer Dialog */
+.media-viewer-content {
+    min-height: 300px;
+    max-height: 500px;
+    background: #000;
+}
+
+.media-video-player {
+    width: 100%;
+    max-height: 500px;
+    background: #000;
+}
+
+.media-nav-arrows {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    right: 0;
+    transform: translateY(-50%);
+    display: flex;
+    justify-content: space-between;
+    padding: 0 8px;
+    pointer-events: none;
+}
+
+.nav-arrow {
+    pointer-events: auto;
+    opacity: 0.8;
+    transition: opacity 0.2s ease;
+}
+
+.nav-arrow:hover {
+    opacity: 1;
+}
+
+.nav-arrow:disabled {
+    opacity: 0.3;
+}
+
 /* Responsive */
 @media (max-width: 600px) {
     .rescue-content {
@@ -1449,6 +1746,11 @@ onUnmounted(() => {
     
     .secondary-btn {
         width: 100%;
+    }
+    
+    .media-grid {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
     }
 }
 

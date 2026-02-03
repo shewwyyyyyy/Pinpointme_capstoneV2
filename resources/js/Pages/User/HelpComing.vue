@@ -77,25 +77,31 @@
                         </div>
                         
                         <!-- Progress Steps -->
-                        <div class="progress-steps">
-                            <div class="progress-step" :class="{ active: getProgressValue(rescue.status) >= 20, completed: getProgressValue(rescue.status) > 20 }">
-                                <div class="step-dot"></div>
-                                <span>Pending</span>
+                        <div class="progress-steps-container">
+                            <div class="progress-track">
+                                <div class="progress-fill" :style="{ width: getProgressWidth(rescue.status) }"></div>
                             </div>
-                            <div class="progress-line" :class="{ filled: getProgressValue(rescue.status) >= 40 }"></div>
-                            <div class="progress-step" :class="{ active: getProgressValue(rescue.status) >= 40, completed: getProgressValue(rescue.status) > 40 }">
-                                <div class="step-dot"></div>
-                                <span>Assigned</span>
-                            </div>
-                            <div class="progress-line" :class="{ filled: getProgressValue(rescue.status) >= 60 }"></div>
-                            <div class="progress-step" :class="{ active: getProgressValue(rescue.status) >= 60, completed: getProgressValue(rescue.status) > 60 }">
-                                <div class="step-dot"></div>
-                                <span>En Route</span>
-                            </div>
-                            <div class="progress-line" :class="{ filled: getProgressValue(rescue.status) >= 80 }"></div>
-                            <div class="progress-step" :class="{ active: getProgressValue(rescue.status) >= 80, completed: getProgressValue(rescue.status) >= 100 }">
-                                <div class="step-dot"></div>
-                                <span>Rescued</span>
+                            <div class="progress-steps">
+                                <div class="progress-step" :class="{ active: isStepActive(rescue.status, 'pending'), completed: isStepCompleted(rescue.status, 'pending') }">
+                                    <div class="step-dot">
+                                        <v-icon v-if="isStepCompleted(rescue.status, 'pending')" size="14" color="white">mdi-check</v-icon>
+                                        <v-icon v-else-if="isStepActive(rescue.status, 'pending')" size="12" color="white">mdi-clock-outline</v-icon>
+                                    </div>
+                                    <span>Pending</span>
+                                </div>
+                                <div class="progress-step" :class="{ active: isStepActive(rescue.status, 'in_progress'), completed: isStepCompleted(rescue.status, 'in_progress') }">
+                                    <div class="step-dot">
+                                        <v-icon v-if="isStepCompleted(rescue.status, 'in_progress')" size="14" color="white">mdi-check</v-icon>
+                                        <v-icon v-else-if="isStepActive(rescue.status, 'in_progress')" size="12" color="white">mdi-run-fast</v-icon>
+                                    </div>
+                                    <span>In Progress</span>
+                                </div>
+                                <div class="progress-step" :class="{ active: isStepActive(rescue.status, 'rescued'), completed: isStepCompleted(rescue.status, 'rescued') }">
+                                    <div class="step-dot">
+                                        <v-icon v-if="isStepCompleted(rescue.status, 'rescued') || isStepActive(rescue.status, 'rescued')" size="14" color="white">mdi-check-circle</v-icon>
+                                    </div>
+                                    <span>Rescued</span>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -137,6 +143,18 @@
                                         </div>
                                     </div>
                                 </div>
+                                <!-- View Map Button -->
+                                <v-btn
+                                    variant="tonal"
+                                    color="primary"
+                                    size="small"
+                                    class="mt-3 view-map-btn"
+                                    block
+                                    @click="viewMap"
+                                >
+                                    <v-icon start size="18">mdi-map</v-icon>
+                                    View Floor Map
+                                </v-btn>
                             </v-card-text>
                         </v-card>
 
@@ -755,15 +773,58 @@ const getStatusText = (status) => {
 
 const getProgressValue = (status) => {
     const progress = {
-        pending: 15,
-        open: 25,
-        assigned: 40,
-        en_route: 60,
-        on_scene: 80,
+        pending: 0,
+        open: 0,
+        assigned: 50,
+        accepted: 50,
+        in_progress: 50,
+        en_route: 50,
+        on_scene: 50,
         rescued: 100,
         safe: 100,
+        completed: 100,
     };
     return progress[status] || 0;
+};
+
+// Get progress bar width percentage
+const getProgressWidth = (status) => {
+    const widths = {
+        pending: '0%',
+        open: '0%',
+        assigned: '50%',
+        accepted: '50%',
+        in_progress: '50%',
+        en_route: '50%',
+        on_scene: '50%',
+        rescued: '100%',
+        safe: '100%',
+        completed: '100%',
+    };
+    return widths[status] || '0%';
+};
+
+// Check if a step is active
+const isStepActive = (status, step) => {
+    const stepStatuses = {
+        pending: ['pending', 'open'],
+        in_progress: ['assigned', 'accepted', 'in_progress', 'en_route', 'on_scene'],
+        rescued: ['rescued', 'safe', 'completed'],
+    };
+    return stepStatuses[step]?.includes(status) || false;
+};
+
+// Check if a step is completed
+const isStepCompleted = (status, step) => {
+    const completedOrder = ['pending', 'in_progress', 'rescued'];
+    const currentStepIndex = completedOrder.findIndex(s => {
+        if (s === 'pending') return ['pending', 'open'].includes(status);
+        if (s === 'in_progress') return ['assigned', 'accepted', 'in_progress', 'en_route', 'on_scene'].includes(status);
+        if (s === 'rescued') return ['rescued', 'safe', 'completed'].includes(status);
+        return false;
+    });
+    const targetStepIndex = completedOrder.indexOf(step);
+    return currentStepIndex > targetStepIndex;
 };
 
 const getUrgencyColor = (urgency) => {
@@ -870,6 +931,16 @@ const openChat = () => {
         toastMessage.value = 'No rescuer assigned yet';
         toastColor.value = 'warning';
         showToast.value = true;
+    }
+};
+
+const viewMap = () => {
+    // Navigate to the map view with the rescue code
+    const code = rescue.value?.rescue_code || rescueCode.value;
+    if (code) {
+        router.visit(`/user/map/${code}`);
+    } else {
+        router.visit('/user/map');
     }
 };
 
@@ -1047,64 +1118,109 @@ const handleGoBack = () => {
     font-weight: 600;
 }
 
+/* Progress Steps Container */
+.progress-steps-container {
+    position: relative;
+    margin-top: 24px;
+    padding: 0 20px;
+    z-index: 1;
+}
+
+/* Progress Track */
+.progress-track {
+    position: absolute;
+    top: 18px;
+    left: 60px;
+    right: 60px;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.25);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, rgba(255, 255, 255, 0.9) 0%, white 100%);
+    border-radius: 4px;
+    transition: width 0.5s ease-in-out;
+    box-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+}
+
 /* Progress Steps */
 .progress-steps {
     display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-top: 20px;
-    padding: 0 8px;
+    align-items: flex-start;
+    justify-content: space-between;
     position: relative;
-    z-index: 1;
 }
 
 .progress-step {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
+    flex: 1;
+    max-width: 100px;
 }
 
 .progress-step span {
-    color: rgba(255, 255, 255, 0.6);
-    font-size: 0.65rem;
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 0.7rem;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    font-weight: 500;
+    font-weight: 600;
+    text-align: center;
+    transition: all 0.3s ease;
 }
 
-.progress-step.active span,
-.progress-step.completed span {
+.progress-step.active span {
     color: white;
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+}
+
+.progress-step.completed span {
+    color: rgba(255, 255, 255, 0.85);
 }
 
 .step-dot {
-    width: 12px;
-    height: 12px;
+    width: 36px;
+    height: 36px;
     border-radius: 50%;
-    background: rgba(255, 255, 255, 0.3);
-    transition: all 0.3s ease;
+    background: rgba(255, 255, 255, 0.2);
+    border: 3px solid rgba(255, 255, 255, 0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
 }
 
 .progress-step.active .step-dot {
     background: white;
-    box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.3);
+    border-color: white;
+    box-shadow: 0 0 0 6px rgba(255, 255, 255, 0.25), 0 4px 15px rgba(0, 0, 0, 0.2);
+    transform: scale(1.1);
+    animation: pulse-step 2s infinite;
 }
 
 .progress-step.completed .step-dot {
-    background: white;
+    background: rgba(255, 255, 255, 0.9);
+    border-color: rgba(255, 255, 255, 0.9);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
-.progress-line {
-    flex: 1;
-    height: 3px;
-    background: rgba(255, 255, 255, 0.2);
-    margin: 0 8px 24px;
-    border-radius: 2px;
+.progress-step.active .step-dot .v-icon,
+.progress-step.completed .step-dot .v-icon {
+    color: #3674B5 !important;
 }
 
-.progress-line.filled {
-    background: rgba(255, 255, 255, 0.8);
+@keyframes pulse-step {
+    0%, 100% {
+        box-shadow: 0 0 0 6px rgba(255, 255, 255, 0.25), 0 4px 15px rgba(0, 0, 0, 0.2);
+    }
+    50% {
+        box-shadow: 0 0 0 10px rgba(255, 255, 255, 0.15), 0 4px 20px rgba(0, 0, 0, 0.25);
+    }
 }
 
 /* Content Area */
@@ -1175,6 +1291,13 @@ const handleGoBack = () => {
     font-size: 0.9rem;
     font-weight: 500;
     color: #333;
+}
+
+/* View Map Button */
+.view-map-btn {
+    border-radius: 12px !important;
+    text-transform: none;
+    font-weight: 500;
 }
 
 /* Rescuer Card */
@@ -1309,17 +1432,23 @@ const handleGoBack = () => {
         font-size: 1.25rem;
     }
     
-    .progress-steps {
+    .progress-steps-container {
         margin-top: 16px;
+        padding: 0 12px;
+    }
+    
+    .progress-track {
+        left: 45px;
+        right: 45px;
     }
     
     .progress-step span {
-        font-size: 0.55rem;
+        font-size: 0.6rem;
     }
     
     .step-dot {
-        width: 10px;
-        height: 10px;
+        width: 32px;
+        height: 32px;
     }
     
     .content-area {
@@ -1360,9 +1489,29 @@ const handleGoBack = () => {
         height: 28px !important;
     }
     
-    .progress-steps {
+    .progress-steps-container {
         margin-top: 12px;
-        transform: scale(0.9);
+        padding: 0 8px;
+    }
+    
+    .progress-track {
+        left: 35px;
+        right: 35px;
+        top: 14px;
+    }
+    
+    .step-dot {
+        width: 28px;
+        height: 28px;
+        border-width: 2px;
+    }
+    
+    .step-dot .v-icon {
+        font-size: 12px !important;
+    }
+    
+    .progress-step span {
+        font-size: 0.55rem;
     }
     
     .pulse-ring {

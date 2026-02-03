@@ -111,6 +111,11 @@ Route::middleware(['auth'])->prefix('user')->name('user.')->group(function () {
     Route::get('/help-coming/{code?}', function ($code = null) {
         return Inertia::render('User/HelpComing', ['code' => $code]);
     })->name('help-coming');
+    
+    // Map View - Floor plan showing user's location
+    Route::get('/map/{code?}', function ($code = null) {
+        return Inertia::render('User/MapView', ['code' => $code]);
+    })->name('map');
 
     // Location History
     Route::get('/history', function () {
@@ -237,6 +242,9 @@ Route::get('/admin/login', function () {
 
 Route::middleware(['auth'])->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
+
+    // Floor plan view - accessible to all authenticated users
+    Route::get('floor-plans/{floorId}', [FloorPlanController::class, 'show']);
 
     Route::get('/errors', function () {
         return Inertia::render('Error', [

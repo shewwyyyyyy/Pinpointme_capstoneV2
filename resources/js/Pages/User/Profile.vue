@@ -82,108 +82,103 @@
 
                 <!-- Personal Information -->
                 <v-card class="mb-3 mb-sm-4 rounded-xl section-card" elevation="0" color="white">
-                    <v-expansion-panels flat v-model="personalInfoPanel">
-                        <v-expansion-panel>
-                            <v-expansion-panel-title class="panel-title-mobile">
-                                <div class="d-flex align-center">
-                                    <v-avatar color="primary" size="32" class="mr-3">
-                                        <v-icon color="white" size="18">mdi-account</v-icon>
-                                    </v-avatar>
-                                    <span class="text-body-1 text-sm-subtitle-1 font-weight-bold">Personal Information</span>
-                                </div>
-                            </v-expansion-panel-title>
-                            <v-expansion-panel-text class="panel-content-mobile">
-                                <v-form ref="formRef" v-model="formValid">
-                                    <v-row dense>
-                                        <v-col cols="12" sm="6">
-                                            <v-text-field
-                                                v-model="editData.first_name"
-                                                label="First Name"
-                                                :rules="[rules.required]"
-                                                variant="outlined"
-                                                density="comfortable"
-                                                hide-details="auto"
-                                                class="mb-3 mobile-input"
-                                            ></v-text-field>
-                                        </v-col>
-                                        <v-col cols="12" sm="6">
-                                            <v-text-field
-                                                v-model="editData.last_name"
-                                                label="Last Name"
-                                                :rules="[rules.required]"
-                                                variant="outlined"
-                                                density="comfortable"
-                                                hide-details="auto"
-                                                class="mb-3 mobile-input"
-                                            ></v-text-field>
-                                        </v-col>
-                                        <v-col cols="12">
-                                            <v-text-field
-                                                v-model="user.email"
-                                                label="Email"
-                                                readonly
-                                                disabled
-                                                variant="outlined"
-                                                density="comfortable"
-                                                hide-details="auto"
-                                                class="mb-3 non-editable-field mobile-input"
-                                                prepend-inner-icon="mdi-email-outline"
-                                                bg-color="grey-lighten-3"
-                                            ></v-text-field>
-                                        </v-col>
-                                        <v-col cols="12">
-                                            <v-text-field
-                                                v-model="editData.phone_number"
-                                                label="Phone Number"
-                                                variant="outlined"
-                                                density="comfortable"
-                                                hide-details="auto"
-                                                class="mb-3 mobile-input"
-                                                prepend-inner-icon="mdi-phone-outline"
-                                            ></v-text-field>
-                                        </v-col>
-                                        <v-col cols="12">
-                                            <v-text-field
-                                                :model-value="formatDate(user?.created_at)"
-                                                label="Member Since"
-                                                readonly
-                                                disabled
-                                                variant="outlined"
-                                                density="comfortable"
-                                                hide-details="auto"
-                                                class="non-editable-field mobile-input"
-                                                prepend-inner-icon="mdi-calendar-outline"
-                                                bg-color="grey-lighten-3"
-                                            ></v-text-field>
-                                        </v-col>
-                                    </v-row>
-                                </v-form>
-                                
-                                <div v-if="hasPersonalChanges" class="d-flex flex-column flex-sm-row gap-2 mt-3">
-                                    <v-btn
-                                        color="grey"
+                    <div class="pa-4">
+                        <div class="d-flex align-center mb-4">
+                            <v-avatar color="primary" size="32" class="mr-3">
+                                <v-icon color="white" size="18">mdi-account</v-icon>
+                            </v-avatar>
+                            <span class="text-body-1 text-sm-subtitle-1 font-weight-bold">Personal Information</span>
+                        </div>
+                        
+                        <v-form ref="formRef" v-model="formValid">
+                            <v-row dense>
+                                <v-col cols="12" sm="6">
+                                    <v-text-field
+                                        v-model="editData.first_name"
+                                        label="First Name"
+                                        :rules="[rules.required]"
                                         variant="outlined"
-                                        @click="cancelEdit"
-                                        class="rounded-lg flex-grow-1 mobile-btn"
-                                        size="large"
-                                    >
-                                        Cancel
-                                    </v-btn>
-                                    <v-btn
-                                        color="primary"
-                                        variant="flat"
-                                        :loading="saving"
-                                        :disabled="!formValid"
-                                        @click="saveProfile"
-                                        class="rounded-lg flex-grow-1 mobile-btn"
-                                        size="large"
-                                    >
-                                        Save Changes
-                                    </v-btn>
-                                </div>
-                            </v-expansion-panel-text>
-                        </v-expansion-panel>
-                    </v-expansion-panels>
+                                        density="comfortable"
+                                        hide-details="auto"
+                                        class="mb-3 mobile-input"
+                                    ></v-text-field>
+                                </v-col>
+                                <v-col cols="12" sm="6">
+                                    <v-text-field
+                                        v-model="editData.last_name"
+                                        label="Last Name"
+                                        :rules="[rules.required]"
+                                        variant="outlined"
+                                        density="comfortable"
+                                        hide-details="auto"
+                                        class="mb-3 mobile-input"
+                                    ></v-text-field>
+                                </v-col>
+                                <v-col cols="12">
+                                    <v-text-field
+                                        v-model="user.email"
+                                        label="Email"
+                                        readonly
+                                        disabled
+                                        variant="outlined"
+                                        density="comfortable"
+                                        hide-details="auto"
+                                        class="mb-3 non-editable-field mobile-input"
+                                        prepend-inner-icon="mdi-email-outline"
+                                        bg-color="grey-lighten-3"
+                                    ></v-text-field>
+                                </v-col>
+                                <v-col cols="12">
+                                    <v-text-field
+                                        v-model="editData.phone_number"
+                                        label="Phone Number"
+                                        variant="outlined"
+                                        density="comfortable"
+                                        hide-details="auto"
+                                        class="mb-3 mobile-input"
+                                        prepend-inner-icon="mdi-phone-outline"
+                                    ></v-text-field>
+                                </v-col>
+                                <v-col cols="12">
+                                    <v-text-field
+                                        :model-value="formatDate(user?.created_at)"
+                                        label="Member Since"
+                                        readonly
+                                        disabled
+                                        variant="outlined"
+                                        density="comfortable"
+                                        hide-details="auto"
+                                        class="non-editable-field mobile-input"
+                                        prepend-inner-icon="mdi-calendar-outline"
+                                        bg-color="grey-lighten-3"
+                                    ></v-text-field>
+                                </v-col>
+                            </v-row>
+                        </v-form>
+                        
+                        <div v-if="hasPersonalChanges" class="d-flex flex-column flex-sm-row gap-2 mt-3">
+                            <v-btn
+                                color="grey"
+                                variant="outlined"
+                                @click="cancelEdit"
+                                class="rounded-lg flex-grow-1 mobile-btn"
+                                size="large"
+                            >
+                                Cancel
+                            </v-btn>
+                            <v-btn
+                                color="primary"
+                                variant="flat"
+                                :loading="saving"
+                                :disabled="!formValid"
+                                @click="saveProfile"
+                                class="rounded-lg flex-grow-1 mobile-btn"
+                                size="large"
+                            >
+                                Save Changes
+                            </v-btn>
+                        </div>
+                    </div>
                 </v-card>
 
                 <!-- Emergency Contact -->
@@ -1018,7 +1013,6 @@ const savingEmergency = ref(false);
 const savingMedical = ref(false);
 
 // Panel states
-const personalInfoPanel = ref(null);
 const emergencyPanel = ref(null);
 const medicalPanel = ref(null);
 const historyPanel = ref(null);

@@ -291,22 +291,20 @@
                             </v-card-text>
                         </v-card>
 
-                        <!-- Manual Location Selection (Collapsible) -->
-                        <v-expansion-panels class="mb-4" variant="accordion">
-                            <v-expansion-panel elevation="0" class="rounded-xl">
-                                <v-expansion-panel-title class="py-3">
-                                    <div class="d-flex align-center">
-                                        <v-avatar color="grey-lighten-2" size="40" class="mr-3">
-                                            <v-icon color="grey-darken-1" size="20">mdi-map-marker-plus</v-icon>
-                                        </v-avatar>
-                                        <div>
-                                            <h3 class="text-subtitle-1 font-weight-bold mb-0">Manual Location</h3>
-                                            <p class="text-caption text-grey mb-0">Select your location manually</p>
-                                        </div>
-                                    </div>
-                                </v-expansion-panel-title>
-                                <v-expansion-panel-text>
-                                    <div class="manual-select-grid">
+                        <!-- Manual Location Selection -->
+                        <v-card class="mb-4 rounded-xl manual-location-card" elevation="0">
+                            <div class="manual-location-header">
+                                <v-avatar color="grey-lighten-2" size="40" class="mr-3">
+                                    <v-icon color="grey-darken-1" size="20">mdi-map-marker-plus</v-icon>
+                                </v-avatar>
+                                <div>
+                                    <h3 class="text-subtitle-1 font-weight-bold mb-0">Manual Location</h3>
+                                    <p class="text-caption text-grey mb-0">Select your location manually</p>
+                                </div>
+                            </div>
+                            <v-card-text class="pt-3">
+                                <v-row dense>
+                                    <v-col cols="12" sm="4">
                                         <v-select
                                             v-model="selectedBuilding"
                                             :items="buildings"
@@ -318,8 +316,10 @@
                                             :loading="isLoadingBuildings"
                                             @update:model-value="onBuildingChange"
                                             hide-details
-                                            class="mb-3"
+                                            prepend-inner-icon="mdi-office-building"
                                         />
+                                    </v-col>
+                                    <v-col cols="12" sm="4">
                                         <v-select
                                             v-model="selectedFloor"
                                             :items="availableFloors"
@@ -331,8 +331,10 @@
                                             :disabled="!selectedBuilding"
                                             @update:model-value="onFloorChange"
                                             hide-details
-                                            class="mb-3"
+                                            prepend-inner-icon="mdi-stairs"
                                         />
+                                    </v-col>
+                                    <v-col cols="12" sm="4">
                                         <v-select
                                             v-model="selectedRoom"
                                             :items="availableRooms"
@@ -343,11 +345,12 @@
                                             return-object
                                             :disabled="!selectedFloor"
                                             hide-details
+                                            prepend-inner-icon="mdi-door"
                                         />
-                                    </div>
-                                </v-expansion-panel-text>
-                            </v-expansion-panel>
-                        </v-expansion-panels>
+                                    </v-col>
+                                </v-row>
+                            </v-card-text>
+                        </v-card>
 
                         <!-- Evacuation Path (Collapsible) -->
                         <v-expansion-panels v-if="selectedRoom && hasFloorPlan" class="mb-4" variant="accordion">
@@ -2782,33 +2785,28 @@ const showNotification = (message, color = 'info') => {
 </script>
 
 <style scoped>
-/* App Container - Prevent all unwanted scrolling/dragging */
+/* App Container - Allow proper scrolling */
 .app-container {
-    position: fixed !important;
-    top: 0 !important;
-    left: 0 !important;
-    right: 0 !important;
-    bottom: 0 !important;
-    width: 100vw !important;
-    height: 100vh !important;
-    overflow: hidden !important;
-    touch-action: none;
+    position: relative;
+    width: 100%;
+    min-height: 100vh;
+    height: 100%;
+    background: #f5f7fa;
 }
 
 .app-container :deep(.v-application__wrap) {
-    min-height: 100vh !important;
-    max-height: 100vh !important;
-    overflow: hidden !important;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
 }
 
 /* Main Container */
 .main-container {
-    background: linear-gradient(180deg, #e8f5f3 0%, #f5f9f8 50%, #ffffff 100%);
-    height: 100vh !important;
-    max-height: 100vh !important;
-    overflow: hidden !important;
+    background: linear-gradient(180deg, #e3f0f7 0%, #f5f9fb 50%, #ffffff 100%);
+    flex: 1;
     display: flex;
     flex-direction: column;
+    min-height: 0;
 }
 
 /* Content Wrapper - Scrollable Area */
@@ -2817,8 +2815,7 @@ const showNotification = (message, color = 'info') => {
     overflow-y: auto;
     overflow-x: hidden;
     -webkit-overflow-scrolling: touch;
-    touch-action: pan-y;
-    overscroll-behavior: contain;
+    scroll-behavior: smooth;
 }
 
 /* Header Styling - Matches Rescuer Dashboard */
@@ -2893,7 +2890,11 @@ const showNotification = (message, color = 'info') => {
     
     /* Add padding for bottom nav on mobile/tablet */
     .content-wrapper {
-        padding-bottom: 80px;
+        padding-bottom: 100px;
+    }
+    
+    .scanner-content {
+        padding-bottom: 24px;
     }
 }
 
@@ -2905,7 +2906,7 @@ const showNotification = (message, color = 'info') => {
     
     /* No bottom padding needed on desktop */
     .content-wrapper {
-        padding-bottom: 20px;
+        padding-bottom: 40px;
     }
 }
 
@@ -3035,7 +3036,7 @@ const showNotification = (message, color = 'info') => {
 
 /* Active Rescue Display */
 .active-rescue-display {
-    min-height: 100vh;
+    /* Removed min-height to allow proper scrolling */
 }
 
 .active-hero {
@@ -3195,22 +3196,20 @@ const showNotification = (message, color = 'info') => {
 .scanner-content {
     margin-top: -24px;
     border-radius: 24px 24px 0 0;
-    background: #f5f5f5;
+    background: #f8fafb;
     position: relative;
     z-index: 2;
-    min-height: calc(100vh - 200px);
-    padding: 24px 16px;
+    padding: 20px 16px 40px;
 }
 
 /* Active Content */
 .active-content {
     margin-top: -20px;
     border-radius: 24px 24px 0 0;
-    background: #f5f5f5;
+    background: #f8fafb;
     position: relative;
     z-index: 2;
-    min-height: calc(100vh - 240px);
-    padding: 24px 16px;
+    padding: 20px 16px 40px;
 }
 
 /* Constrain content width on larger screens */
@@ -3501,7 +3500,8 @@ const showNotification = (message, color = 'info') => {
 
 /* Location Status Card */
 .location-status-card {
-    border: 2px solid #e0e0e0;
+    border: 2px solid rgba(54, 116, 181, 0.2);
+    background: white;
 }
 
 .location-status-card.scanned {
@@ -3514,7 +3514,8 @@ const showNotification = (message, color = 'info') => {
     padding: 12px 16px;
     gap: 8px;
     font-weight: 600;
-    color: #333;
+    color: #1a3a5c;
+    background: rgba(54, 116, 181, 0.05);
 }
 
 .location-status-header.success {
@@ -3528,24 +3529,117 @@ const showNotification = (message, color = 'info') => {
     gap: 8px;
 }
 
-/* Manual Selection */
-.manual-select-grid {
+/* Manual Location Card */
+.manual-location-card {
+    border: 1px solid rgba(54, 116, 181, 0.15);
+    overflow: hidden;
+    background: white;
+}
+
+.manual-location-header {
     display: flex;
-    flex-direction: column;
+    align-items: center;
+    padding: 14px 16px;
+    background: linear-gradient(135deg, rgba(54, 116, 181, 0.08) 0%, rgba(54, 116, 181, 0.03) 100%);
+    border-bottom: 1px solid rgba(54, 116, 181, 0.1);
+}
+
+.manual-location-header .v-avatar {
+    background: linear-gradient(135deg, #3674B5 0%, #2196F3 100%) !important;
+}
+
+.manual-location-header .v-avatar .v-icon {
+    color: white !important;
+}
+
+.manual-location-header h3 {
+    color: #1a3a5c;
+}
+
+.manual-location-header p {
+    color: #6b8299;
+}
+
+/* Responsive adjustments for manual location */
+@media (max-width: 599px) {
+    .manual-location-header {
+        padding: 12px 14px;
+    }
+    
+    .manual-location-header .v-avatar {
+        width: 36px !important;
+        height: 36px !important;
+        min-width: 36px !important;
+    }
+    
+    .manual-location-header h3 {
+        font-size: 0.9rem !important;
+    }
+    
+    .manual-location-card :deep(.v-card-text) {
+        padding: 12px 14px !important;
+    }
+    
+    .manual-location-card :deep(.v-field) {
+        min-height: 48px;
+    }
+    
+    .manual-location-card :deep(.v-row) {
+        margin: 0 -4px;
+    }
+    
+    .manual-location-card :deep(.v-col) {
+        padding: 4px;
+        margin-bottom: 8px;
+    }
+    
+    .manual-location-card :deep(.v-col:last-child) {
+        margin-bottom: 0;
+    }
+}
+
+@media (min-width: 600px) {
+    .manual-location-card :deep(.v-row) {
+        margin: -6px;
+    }
+    
+    .manual-location-card :deep(.v-col) {
+        padding: 6px;
+    }
+    
+    .manual-location-card :deep(.v-card-text) {
+        padding: 16px !important;
+    }
 }
 
 /* Emergency Form Card */
 .emergency-form-card {
-    border: 2px solid #e0e0e0;
+    border: 2px solid rgba(211, 47, 47, 0.2);
+    background: white;
+    overflow: hidden;
 }
 
 .emergency-form-header {
     display: flex;
     align-items: center;
-    padding: 16px;
-    background: linear-gradient(135deg, #D32F2F 0%, #F44336 100%);
+    padding: 14px 16px;
+    background: linear-gradient(135deg, #c62828 0%, #d32f2f 100%);
     color: white;
     font-weight: 600;
+}
+
+.emergency-form-card :deep(.v-card-text) {
+    padding: 16px !important;
+}
+
+@media (max-width: 599px) {
+    .emergency-form-card :deep(.v-card-text) {
+        padding: 12px !important;
+    }
+    
+    .emergency-form-header {
+        padding: 12px 14px;
+    }
 }
 
 .submit-btn {

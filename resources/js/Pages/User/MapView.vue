@@ -7,7 +7,7 @@
                     <v-icon color="white">mdi-arrow-left</v-icon>
                 </v-btn>
                 <div class="header-info">
-                    <h1>Floor Map</h1>
+                    <h1>Your Location Map</h1>
                     <p v-if="rescueRequest?.building?.name">{{ rescueRequest.building.name }}</p>
                 </div>
                 <v-btn icon variant="text" @click="resetZoom" class="header-action-btn">
@@ -15,6 +15,9 @@
                 </v-btn>
             </div>
         </div>
+
+        <!-- Navigation Drawer -->
+        <UserMenu v-model="drawer" />
 
         <!-- Main Content -->
         <v-main class="map-main">
@@ -26,17 +29,33 @@
                 </div>
             </div>
 
+            <div v-else-if="!rescueRequest" class="empty-state">
+                <v-icon size="64" color="grey-lighten-1">mdi-map-marker-off</v-icon>
+                <h3>No Active Rescue</h3>
+                <p>Unable to load map data</p>
+                <v-btn color="primary" class="mt-4" @click="goBack">Go Back</v-btn>
+            </div>
+
             <div v-else class="map-container">
-                <!-- Target Location Banner -->
-                <div class="target-banner">
-                    <div class="target-banner-content">
-                        <div class="target-icon">
-                            <v-icon color="white" size="24">mdi-map-marker-alert</v-icon>
+                <!-- Your Location Banner -->
+                <div class="location-banner">
+                    <div class="location-banner-content">
+                        <div class="location-icon">
+                            <v-icon color="white" size="24">mdi-map-marker-radius</v-icon>
                         </div>
-                        <div class="target-info">
-                            <span class="target-label">Target Location</span>
-                            <span class="target-name">{{ rescueRequest?.room?.room_name || rescueRequest?.room?.name || 'Unknown Room' }}</span>
+                        <div class="location-info">
+                            <span class="location-label">Your Location</span>
+                            <span class="location-name">{{ rescueRequest?.room?.room_name || rescueRequest?.room?.name || 'Unknown Room' }}</span>
                         </div>
+                        <v-chip 
+                            v-if="rescueRequest?.status" 
+                            :color="getStatusColor(rescueRequest.status)"
+                            variant="flat" 
+                            size="small"
+                            class="status-chip"
+                        >
+                            {{ formatStatus(rescueRequest.status) }}
+                        </v-chip>
                     </div>
                 </div>
 
@@ -84,8 +103,8 @@
                                     :key="'room-' + idx"
                                     class="room-annotation"
                                     :class="{ 
-                                        'target-room': isTargetRoom(room),
-                                        'selected': selectedRoom?.id === room.room_id || selectedRoom?.room_name === room.room_name
+                                        'your-room': isYourRoom(room),
+                                        'selected': selectedRoom?.room_name === room.room_name
                                     }"
                                     :style="getRoomAnnotationStyle(room)"
                                     @click="selectRoomAnnotation(room)"
@@ -93,8 +112,8 @@
                                     <div class="room-annotation-label">
                                         {{ room.room_name }}
                                     </div>
-                                    <div v-if="isTargetRoom(room)" class="target-indicator">
-                                        <v-icon color="white" size="16">mdi-alert</v-icon>
+                                    <div v-if="isYourRoom(room)" class="your-location-indicator">
+                                        <v-icon color="white" size="14">mdi-account</v-icon>
                                     </div>
                                 </div>
                             </template>
@@ -128,19 +147,19 @@
                                     :key="room.id"
                                     class="room-cell"
                                     :class="{
-                                        'target-room': room.id === rescueRequest?.room_id,
+                                        'your-room': room.id === rescueRequest?.room_id,
                                         'selected': selectedRoom?.id === room.id,
                                     }"
                                     @click="selectRoom(room)"
                                 >
                                     <div class="room-icon">
-                                        <v-icon v-if="room.id === rescueRequest?.room_id" color="error" size="24">mdi-alert-circle</v-icon>
+                                        <v-icon v-if="room.id === rescueRequest?.room_id" color="primary" size="24">mdi-account-circle</v-icon>
                                         <v-icon v-else color="grey" size="20">mdi-door</v-icon>
                                     </div>
                                     <div class="room-label">{{ room.room_name || room.name }}</div>
-                                    <div v-if="room.id === rescueRequest?.room_id" class="target-badge">
-                                        <v-icon size="10" color="white">mdi-alert</v-icon>
-                                        Target
+                                    <div v-if="room.id === rescueRequest?.room_id" class="your-badge">
+                                        <v-icon size="10" color="white">mdi-account</v-icon>
+                                        You
                                     </div>
                                 </div>
                             </div>
@@ -173,26 +192,21 @@
                 <v-slide-y-reverse-transition>
                     <div v-if="selectedRoom" class="room-info-panel">
                         <div class="room-info-header">
-                            <div class="room-info-icon" :class="{ 'target': selectedRoom.id === rescueRequest?.room_id }">
+                            <div class="room-info-icon" :class="{ 'yours': selectedRoom.id === rescueRequest?.room_id || selectedRoom.room_name === (rescueRequest?.room?.room_name || rescueRequest?.room?.name) }">
                                 <v-icon color="white" size="20">
-                                    {{ selectedRoom.id === rescueRequest?.room_id ? 'mdi-alert' : 'mdi-door' }}
+                                    {{ (selectedRoom.id === rescueRequest?.room_id || selectedRoom.room_name === (rescueRequest?.room?.room_name || rescueRequest?.room?.name)) ? 'mdi-account' : 'mdi-door' }}
                                 </v-icon>
                             </div>
                             <div class="room-info-details">
                                 <h3>{{ selectedRoom.room_name || selectedRoom.name }}</h3>
-                                <p>{{ selectedRoom.room_type || 'Room' }}</p>
+                                <p v-if="selectedRoom.id === rescueRequest?.room_id || selectedRoom.room_name === (rescueRequest?.room?.room_name || rescueRequest?.room?.name)">
+                                    <v-icon size="14" color="primary">mdi-map-marker</v-icon>
+                                    Your current location
+                                </p>
+                                <p v-else>{{ selectedRoom.room_type || 'Room' }}</p>
                             </div>
                             <v-btn icon size="small" variant="text" @click="selectedRoom = null">
                                 <v-icon>mdi-close</v-icon>
-                            </v-btn>
-                        </div>
-                        <div v-if="selectedRoom.description" class="room-info-description">
-                            {{ selectedRoom.description }}
-                        </div>
-                        <div v-if="selectedRoom.id === rescueRequest?.room_id" class="room-info-actions">
-                            <v-btn color="error" variant="flat" block size="large" rounded="lg" @click="navigateToRoom">
-                                <v-icon start>mdi-navigation</v-icon>
-                                Navigate to Target
                             </v-btn>
                         </div>
                     </div>
@@ -206,11 +220,11 @@
                     </div>
                     <div class="legend-items">
                         <div class="legend-item">
-                            <div class="legend-dot error"></div>
-                            <span>Target Location</span>
+                            <div class="legend-dot primary"></div>
+                            <span>Your Location</span>
                         </div>
                         <div class="legend-item">
-                            <div class="legend-dot primary"></div>
+                            <div class="legend-dot secondary"></div>
                             <span>Selected Room</span>
                         </div>
                         <div class="legend-item">
@@ -220,18 +234,14 @@
                     </div>
                 </div>
 
-                <!-- Directions Card -->
-                <div v-if="directions.length" class="directions-card">
-                    <div class="directions-header">
-                        <v-icon size="20" color="primary">mdi-directions</v-icon>
-                        <span>Directions</span>
+                <!-- Help Info Card -->
+                <div class="help-card">
+                    <div class="help-icon">
+                        <v-icon color="white" size="20">mdi-information</v-icon>
                     </div>
-                    <div class="directions-steps">
-                        <div v-for="(step, index) in directions" :key="index" class="direction-step">
-                            <div class="step-number">{{ index + 1 }}</div>
-                            <v-icon :icon="step.icon" size="18" color="grey-darken-1" />
-                            <span>{{ step.text }}</span>
-                        </div>
+                    <div class="help-content">
+                        <h4>Help is on the way!</h4>
+                        <p>Stay at your location. The rescuer will find you using this map.</p>
                     </div>
                 </div>
             </div>
@@ -243,22 +253,34 @@
         </v-snackbar>
         
         <!-- Bottom Navigation (Mobile/Tablet only) -->
-        <RescuerBottomNav :notification-count="0" :message-count="unreadMessageCount" />
+        <UserBottomNav :notification-count="1" :message-count="unreadCount" />
     </v-app>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue';
 import { router } from '@inertiajs/vue3';
-import { getUnreadMessageCount } from '@/Composables/useApi';
-import RescuerBottomNav from '@/Components/Pages/Rescuer/Menu/RescuerBottomNav.vue';
+import { getRescueRequestByCode, getRescueRequestById } from '@/Composables/useApi';
+import { useUnreadMessages } from '@/Composables/useUnreadMessages';
+import UserMenu from '@/Components/Pages/User/Menu/UserMenu.vue';
+import UserBottomNav from '@/Components/Pages/User/Menu/UserBottomNav.vue';
 
 const props = defineProps({
+    code: {
+        type: String,
+        default: null,
+    },
     rescueId: {
         type: [String, Number],
         default: null,
     },
 });
+
+// Navigation drawer
+const drawer = ref(false);
+
+// Unread messages count for bottom nav
+const { unreadCount } = useUnreadMessages();
 
 // State
 const loading = ref(true);
@@ -271,7 +293,6 @@ const mapContainer = ref(null);
 const floorPlanImage = ref(null);
 const imageLoaded = ref(false);
 const imageError = ref(false);
-const unreadMessageCount = ref(0);
 const hasInteracted = ref(false);
 const imageNaturalWidth = ref(0);
 const imageNaturalHeight = ref(0);
@@ -316,39 +337,8 @@ const svgViewBox = computed(() => {
     return `0 0 ${imageNaturalWidth.value} ${imageNaturalHeight.value}`;
 });
 
-const directions = computed(() => {
-    if (!rescueRequest.value) return [];
-    
-    const steps = [];
-    
-    if (rescueRequest.value.building) {
-        steps.push({
-            icon: 'mdi-office-building',
-            text: `Go to ${rescueRequest.value.building.name}`,
-        });
-    }
-    
-    if (rescueRequest.value.floor) {
-        const floorName = rescueRequest.value.floor.floor_name || rescueRequest.value.floor.name;
-        steps.push({
-            icon: 'mdi-stairs',
-            text: `Navigate to ${floorName}`,
-        });
-    }
-    
-    if (rescueRequest.value.room) {
-        const roomName = rescueRequest.value.room.room_name || rescueRequest.value.room.name;
-        steps.push({
-            icon: 'mdi-door',
-            text: `Find ${roomName}`,
-        });
-    }
-    
-    return steps;
-});
-
-// Helper functions for room annotations
-const isTargetRoom = (room) => {
+// Helper functions
+const isYourRoom = (room) => {
     return room.room_id === rescueRequest.value?.room_id || 
            room.room_name === (rescueRequest.value?.room?.room_name || rescueRequest.value?.room?.name);
 };
@@ -361,8 +351,8 @@ const getRoomAnnotationStyle = (room) => {
         top: `${(room.y / imageNaturalHeight.value) * 100}%`,
         width: `${(room.width / imageNaturalWidth.value) * 100}%`,
         height: `${(room.height / imageNaturalHeight.value) * 100}%`,
-        backgroundColor: isTargetRoom(room) ? 'rgba(244, 67, 54, 0.3)' : (room.color || 'rgba(33, 150, 243, 0.15)'),
-        borderColor: isTargetRoom(room) ? '#f44336' : (room.color || 'rgba(33, 150, 243, 0.5)'),
+        backgroundColor: isYourRoom(room) ? 'rgba(54, 116, 181, 0.3)' : (room.color || 'rgba(158, 158, 158, 0.15)'),
+        borderColor: isYourRoom(room) ? '#3674B5' : (room.color || 'rgba(158, 158, 158, 0.5)'),
     };
 };
 
@@ -375,74 +365,106 @@ const getPathD = (path) => {
 
 const selectRoomAnnotation = (room) => {
     hasInteracted.value = true;
-    const fullRoom = rooms.value.find(r => r.id === room.room_id) || {
-        id: room.room_id,
+    selectedRoom.value = {
         room_name: room.room_name,
         name: room.room_name,
+        id: room.room_id,
     };
-    selectedRoom.value = fullRoom;
+};
+
+const getStatusColor = (status) => {
+    const colors = {
+        pending: 'warning',
+        open: 'warning',
+        assigned: 'info',
+        accepted: 'info',
+        in_progress: 'primary',
+        en_route: 'primary',
+        on_scene: 'primary',
+        rescued: 'success',
+        safe: 'success',
+        completed: 'success',
+        cancelled: 'error',
+    };
+    return colors[status] || 'grey';
+};
+
+const formatStatus = (status) => {
+    const texts = {
+        pending: 'Pending',
+        open: 'Pending',
+        assigned: 'Rescuer Assigned',
+        accepted: 'Help Coming',
+        in_progress: 'In Progress',
+        en_route: 'Rescuer En Route',
+        on_scene: 'Rescuer Arrived',
+        rescued: 'Rescued',
+        safe: 'Safe',
+        completed: 'Completed',
+        cancelled: 'Cancelled',
+    };
+    return texts[status] || status;
 };
 
 // Methods
 const fetchData = async () => {
     try {
+        const code = props.code || localStorage.getItem('lastRescueCode');
         const id = props.rescueId || localStorage.getItem('lastRescueRequestId');
-        if (!id) {
-            showSnackbar('No rescue ID found', 'error');
-            setTimeout(() => router.visit('/rescuer/dashboard'), 2000);
+        
+        let data;
+        if (code) {
+            data = await getRescueRequestByCode(code);
+        } else if (id) {
+            data = await getRescueRequestById(id);
+        } else {
+            showSnackbar('No rescue request found', 'error');
+            setTimeout(() => router.visit('/user/dashboard'), 2000);
             return;
         }
-
-        // Fetch rescue request details
-        const rescueResponse = await fetch(`/api/rescue-requests/${id}`);
-        const rescueData = await rescueResponse.json();
         
-        if (rescueData.data) {
-            rescueRequest.value = rescueData.data;
-            
-            // Fetch building floors with floor_plan_data
-            if (rescueRequest.value.building_id) {
-                try {
-                    const buildingResponse = await fetch('/api/buildings');
-                    const buildings = await buildingResponse.json();
-                    const building = buildings?.find(b => b.id === rescueRequest.value.building_id);
-                    
-                    if (building?.floors) {
-                        const floorsData = [];
-                        for (const floor of building.floors) {
-                            // Fetch full floor data including floor_plan_data
-                            try {
-                                const floorResponse = await fetch(`/floor-plans/${floor.id}`);
-                                const floorData = await floorResponse.json();
-                                if (floorData.success && floorData.data) {
-                                    floorsData.push({
-                                        ...floor,
-                                        floor_plan_url: floorData.data.floor_plan_url,
-                                        floor_plan_data: floorData.data.floor_plan_data,
-                                    });
-                                } else {
-                                    floorsData.push(floor);
-                                }
-                            } catch {
+        const rescueData = data.data || data;
+        rescueRequest.value = rescueData;
+        
+        // Fetch building floors with floor_plan_data
+        if (rescueData.building_id) {
+            try {
+                const response = await fetch('/api/buildings');
+                const buildings = await response.json();
+                const building = buildings?.find(b => b.id === rescueData.building_id);
+                
+                if (building?.floors) {
+                    const floorsData = [];
+                    for (const floor of building.floors) {
+                        try {
+                            const floorResponse = await fetch(`/floor-plans/${floor.id}`);
+                            const floorData = await floorResponse.json();
+                            if (floorData.success && floorData.data) {
+                                floorsData.push({
+                                    ...floor,
+                                    floor_plan_url: floorData.data.floor_plan_url,
+                                    floor_plan_data: floorData.data.floor_plan_data,
+                                });
+                            } else {
                                 floorsData.push(floor);
                             }
+                        } catch {
+                            floorsData.push(floor);
                         }
-                        floors.value = floorsData;
-                        
-                        // Also get rooms from the building
-                        rooms.value = building.floors.flatMap(f => f.rooms || []);
                     }
-                    
-                    // Set initial floor to target floor
-                    const targetFloorIndex = floors.value.findIndex(
-                        f => f.id === rescueRequest.value.floor_id
-                    );
-                    if (targetFloorIndex !== -1) {
-                        selectedFloorIndex.value = targetFloorIndex;
-                    }
-                } catch (error) {
-                    console.error('Error fetching floor data:', error);
+                    floors.value = floorsData;
+                    rooms.value = building.floors.flatMap(f => f.rooms || []);
                 }
+                
+                // Set initial floor to user's floor
+                const targetFloorIndex = floors.value.findIndex(
+                    f => f.id === rescueData.floor_id
+                );
+                if (targetFloorIndex !== -1) {
+                    selectedFloorIndex.value = targetFloorIndex;
+                }
+            } catch (error) {
+                console.error('Error fetching floor data:', error);
             }
         }
     } catch (error) {
@@ -454,11 +476,11 @@ const fetchData = async () => {
 };
 
 const goBack = () => {
-    const rescueId = props.rescueId || localStorage.getItem('lastRescueRequestId');
-    if (rescueId) {
-        router.visit(`/rescuer/active/${rescueId}`);
+    const code = props.code || localStorage.getItem('lastRescueCode');
+    if (code) {
+        router.visit(`/user/help-coming/${code}`);
     } else {
-        router.visit('/rescuer/dashboard');
+        router.visit('/user/dashboard');
     }
 };
 
@@ -556,10 +578,6 @@ const selectRoom = (room) => {
     selectedRoom.value = room;
 };
 
-const navigateToRoom = () => {
-    showSnackbar('Navigation started - Follow the directions above', 'info');
-};
-
 const onImageLoad = () => {
     imageLoaded.value = true;
     imageError.value = false;
@@ -587,22 +605,9 @@ watch(selectedFloorIndex, () => {
     resetZoom();
 });
 
-// Fetch unread message count
-const fetchUnreadMessageCount = async () => {
-    const userData = JSON.parse(localStorage.getItem('userData') || '{}');
-    const userId = userData?.id;
-    if (!userId) return;
-    try {
-        unreadMessageCount.value = await getUnreadMessageCount(userId);
-    } catch (error) {
-        console.error('Failed to fetch unread message count:', error);
-    }
-};
-
 // Lifecycle
 onMounted(async () => {
     await fetchData();
-    await fetchUnreadMessageCount();
 });
 </script>
 
@@ -679,19 +684,38 @@ onMounted(async () => {
     text-align: center;
 }
 
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 60vh;
+    text-align: center;
+    padding: 24px;
+}
+
+.empty-state h3 {
+    margin-top: 16px;
+    color: #333;
+}
+
+.empty-state p {
+    color: #666;
+}
+
 /* Map Container */
 .map-container {
     padding: 0 0 100px;
 }
 
-/* Target Banner */
-.target-banner {
-    background: linear-gradient(135deg, #f44336 0%, #e91e63 100%);
+/* Location Banner */
+.location-banner {
+    background: linear-gradient(135deg, #3674B5 0%, #2196F3 100%);
     margin: 0;
     padding: 12px 16px;
 }
 
-.target-banner-content {
+.location-banner-content {
     display: flex;
     align-items: center;
     gap: 12px;
@@ -699,7 +723,7 @@ onMounted(async () => {
     margin: 0 auto;
 }
 
-.target-icon {
+.location-icon {
     width: 40px;
     height: 40px;
     background: rgba(255, 255, 255, 0.2);
@@ -707,19 +731,13 @@ onMounted(async () => {
     display: flex;
     align-items: center;
     justify-content: center;
-    animation: pulse-target 2s infinite;
 }
 
-@keyframes pulse-target {
-    0%, 100% { transform: scale(1); }
-    50% { transform: scale(1.1); }
-}
-
-.target-info {
+.location-info {
     flex: 1;
 }
 
-.target-label {
+.location-label {
     display: block;
     color: rgba(255, 255, 255, 0.8);
     font-size: 0.7rem;
@@ -727,10 +745,15 @@ onMounted(async () => {
     letter-spacing: 0.5px;
 }
 
-.target-name {
+.location-name {
     display: block;
     color: white;
     font-size: 1rem;
+    font-weight: 600;
+}
+
+.status-chip {
+    font-size: 0.7rem;
     font-weight: 600;
 }
 
@@ -803,15 +826,15 @@ onMounted(async () => {
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
-.room-annotation.target-room {
-    border-color: #f44336;
+.room-annotation.your-room {
+    border-color: #3674B5;
     z-index: 5;
 }
 
 .room-annotation.selected {
-    border-color: #1976d2;
+    border-color: #9c27b0;
     border-width: 3px;
-    box-shadow: 0 4px 12px rgba(25, 118, 210, 0.4);
+    box-shadow: 0 4px 12px rgba(156, 39, 176, 0.4);
 }
 
 .room-annotation-label {
@@ -833,13 +856,13 @@ onMounted(async () => {
     -webkit-box-orient: vertical;
 }
 
-.target-indicator {
+.your-location-indicator {
     position: absolute;
     top: -8px;
     right: -8px;
     width: 20px;
     height: 20px;
-    background: #f44336;
+    background: #3674B5;
     border-radius: 50%;
     display: flex;
     align-items: center;
@@ -900,14 +923,14 @@ onMounted(async () => {
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
-.room-cell.target-room {
-    border-color: #f44336;
-    background: rgba(244, 67, 54, 0.05);
+.room-cell.your-room {
+    border-color: #3674B5;
+    background: rgba(54, 116, 181, 0.05);
 }
 
 .room-cell.selected {
-    border-color: #1976d2;
-    background: rgba(25, 118, 210, 0.05);
+    border-color: #9c27b0;
+    background: rgba(156, 39, 176, 0.05);
 }
 
 .room-icon {
@@ -920,8 +943,8 @@ onMounted(async () => {
     justify-content: center;
 }
 
-.room-cell.target-room .room-icon {
-    background: rgba(244, 67, 54, 0.1);
+.room-cell.your-room .room-icon {
+    background: rgba(54, 116, 181, 0.1);
 }
 
 .room-label {
@@ -932,11 +955,11 @@ onMounted(async () => {
     word-break: break-word;
 }
 
-.target-badge {
+.your-badge {
     position: absolute;
     top: -6px;
     right: -6px;
-    background: #f44336;
+    background: #3674B5;
     color: white;
     font-size: 0.6rem;
     padding: 2px 6px;
@@ -1028,15 +1051,15 @@ onMounted(async () => {
 .room-info-icon {
     width: 40px;
     height: 40px;
-    background: #1976d2;
+    background: #9e9e9e;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
 }
 
-.room-info-icon.target {
-    background: #f44336;
+.room-info-icon.yours {
+    background: #3674B5;
 }
 
 .room-info-details {
@@ -1054,19 +1077,9 @@ onMounted(async () => {
     font-size: 0.8rem;
     color: #666;
     margin: 0;
-}
-
-.room-info-description {
-    margin-top: 12px;
-    padding: 12px;
-    background: #f5f5f5;
-    border-radius: 8px;
-    font-size: 0.85rem;
-    color: #555;
-}
-
-.room-info-actions {
-    margin-top: 16px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
 }
 
 /* Legend Card */
@@ -1109,8 +1122,8 @@ onMounted(async () => {
     border-radius: 50%;
 }
 
-.legend-dot.error { background-color: #f44336; }
-.legend-dot.primary { background-color: #1976d2; }
+.legend-dot.primary { background-color: #3674B5; }
+.legend-dot.secondary { background-color: #9c27b0; }
 .legend-dot.success { background-color: #4caf50; }
 
 .legend-line {
@@ -1129,49 +1142,40 @@ onMounted(async () => {
     );
 }
 
-/* Directions Card */
-.directions-card {
-    background: linear-gradient(135deg, #E3F2FD 0%, #BBDEFB 100%);
+/* Help Card */
+.help-card {
+    background: linear-gradient(135deg, #E8F5E9 0%, #C8E6C9 100%);
     margin: 0 16px 16px;
     padding: 16px;
     border-radius: 12px;
-    border-left: 4px solid #1976d2;
-}
-
-.directions-header {
+    border-left: 4px solid #4CAF50;
     display: flex;
     align-items: center;
-    gap: 8px;
-    font-weight: 600;
-    color: #1976d2;
-    margin-bottom: 12px;
+    gap: 12px;
 }
 
-.directions-steps {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-}
-
-.direction-step {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    font-size: 0.85rem;
-    color: #333;
-}
-
-.step-number {
-    width: 22px;
-    height: 22px;
-    background: #1976d2;
-    color: white;
+.help-icon {
+    width: 40px;
+    height: 40px;
+    background: #4CAF50;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 0.7rem;
+    flex-shrink: 0;
+}
+
+.help-content h4 {
+    font-size: 0.9rem;
     font-weight: 600;
+    color: #2E7D32;
+    margin: 0 0 4px;
+}
+
+.help-content p {
+    font-size: 0.8rem;
+    color: #388E3C;
+    margin: 0;
 }
 
 /* Responsive */
@@ -1182,7 +1186,7 @@ onMounted(async () => {
     }
     
     .legend-card,
-    .directions-card {
+    .help-card {
         margin-left: 24px;
         margin-right: 24px;
     }
