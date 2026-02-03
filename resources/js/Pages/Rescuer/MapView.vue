@@ -77,41 +77,43 @@
                                 <p>Loading floor plan...</p>
                             </div>
                             
-                            <!-- Room Annotations from floor_plan_data -->
-                            <template v-if="imageLoaded && floorPlanRooms.length > 0">
+                            <!-- Only show target location -->
+                            <template v-if="imageLoaded && targetRoomAnnotation">
                                 <div
-                                    v-for="(room, idx) in floorPlanRooms"
-                                    :key="'room-' + idx"
-                                    class="room-annotation"
-                                    :class="{ 
-                                        'target-room': isTargetRoom(room),
-                                        'selected': selectedRoom?.id === room.room_id || selectedRoom?.room_name === room.room_name
-                                    }"
-                                    :style="getRoomAnnotationStyle(room)"
-                                    @click="selectRoomAnnotation(room)"
+                                    class="room-annotation target-room"
+                                    :style="getRoomAnnotationStyle(targetRoomAnnotation)"
                                 >
                                     <div class="room-annotation-label">
-                                        {{ room.room_name }}
+                                        {{ targetRoomAnnotation.room_name }}
                                     </div>
-                                    <div v-if="isTargetRoom(room)" class="target-indicator">
+                                    <div class="target-indicator">
                                         <v-icon color="white" size="16">mdi-alert</v-icon>
                                     </div>
+                                    <div class="pulse-ring"></div>
                                 </div>
                             </template>
                             
-                            <!-- Evacuation Paths -->
-                            <svg v-if="imageLoaded && evacuationPaths.length > 0" class="evacuation-svg" :viewBox="svgViewBox">
+                            <!-- Evacuation Path from target location only -->
+                            <svg v-if="imageLoaded && targetEvacuationPath" class="evacuation-svg" :viewBox="svgViewBox">
                                 <path
-                                    v-for="(path, idx) in evacuationPaths"
-                                    :key="'path-' + idx"
-                                    :d="getPathD(path)"
-                                    :stroke="path.color || '#4CAF50'"
+                                    :d="getPathD(targetEvacuationPath)"
+                                    :stroke="targetEvacuationPath.color || '#4CAF50'"
                                     stroke-width="5"
                                     fill="none"
                                     stroke-dasharray="15,8"
                                     stroke-linecap="round"
                                     stroke-linejoin="round"
                                     class="evacuation-path"
+                                />
+                                <!-- Exit marker at the end of path -->
+                                <circle 
+                                    v-if="targetEvacuationPath.points && targetEvacuationPath.points.length > 0"
+                                    :cx="targetEvacuationPath.points[targetEvacuationPath.points.length - 1].x"
+                                    :cy="targetEvacuationPath.points[targetEvacuationPath.points.length - 1].y"
+                                    r="12"
+                                    fill="#4CAF50"
+                                    stroke="white"
+                                    stroke-width="3"
                                 />
                             </svg>
                         </div>
@@ -210,12 +212,12 @@
                             <span>Target Location</span>
                         </div>
                         <div class="legend-item">
-                            <div class="legend-dot primary"></div>
-                            <span>Selected Room</span>
-                        </div>
-                        <div class="legend-item">
                             <div class="legend-line success"></div>
                             <span>Evacuation Path</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-dot exit"></div>
+                            <span>Exit Point</span>
                         </div>
                     </div>
                 </div>
@@ -306,9 +308,50 @@ const floorPlanRooms = computed(() => {
     return selectedFloor.value.floor_plan_data.rooms || [];
 });
 
+// Only get the target room annotation
+const targetRoomAnnotation = computed(() => {
+    if (!floorPlanRooms.value.length) return null;
+    const targetRoomName = rescueRequest.value?.room?.room_name || rescueRequest.value?.room?.name;
+    const targetRoomId = rescueRequest.value?.room_id;
+    
+    return floorPlanRooms.value.find(room => 
+        room.room_id === targetRoomId || room.room_name === targetRoomName
+    );
+});
+
 const evacuationPaths = computed(() => {
     if (!selectedFloor.value?.floor_plan_data) return [];
     return selectedFloor.value.floor_plan_data.evacuation_paths || [];
+});
+
+// Only get evacuation path from target location
+const targetEvacuationPath = computed(() => {
+    if (!evacuationPaths.value.length || !targetRoomAnnotation.value) return null;
+    
+    // Find path that starts from or near target's room
+    const targetRoom = targetRoomAnnotation.value;
+    const targetCenterX = targetRoom.x + (targetRoom.width / 2);
+    const targetCenterY = targetRoom.y + (targetRoom.height / 2);
+    
+    // Find the path closest to target's room or the first path if only one exists
+    let closestPath = evacuationPaths.value[0];
+    let minDistance = Infinity;
+    
+    for (const path of evacuationPaths.value) {
+        if (path.points && path.points.length > 0) {
+            const startPoint = path.points[0];
+            const distance = Math.sqrt(
+                Math.pow(startPoint.x - targetCenterX, 2) + 
+                Math.pow(startPoint.y - targetCenterY, 2)
+            );
+            if (distance < minDistance) {
+                minDistance = distance;
+                closestPath = path;
+            }
+        }
+    }
+    
+    return closestPath;
 });
 
 const svgViewBox = computed(() => {
@@ -361,8 +404,8 @@ const getRoomAnnotationStyle = (room) => {
         top: `${(room.y / imageNaturalHeight.value) * 100}%`,
         width: `${(room.width / imageNaturalWidth.value) * 100}%`,
         height: `${(room.height / imageNaturalHeight.value) * 100}%`,
-        backgroundColor: isTargetRoom(room) ? 'rgba(244, 67, 54, 0.3)' : (room.color || 'rgba(33, 150, 243, 0.15)'),
-        borderColor: isTargetRoom(room) ? '#f44336' : (room.color || 'rgba(33, 150, 243, 0.5)'),
+        backgroundColor: 'rgba(244, 67, 54, 0.35)',
+        borderColor: '#f44336',
     };
 };
 
@@ -615,8 +658,8 @@ onMounted(async () => {
 /* Header Styling */
 .map-header {
     background: linear-gradient(135deg, #3674B5 0%, #2196F3 100%);
-    padding: 16px;
-    padding-top: calc(env(safe-area-inset-top) + 16px);
+    padding: 12px 16px;
+    padding-top: calc(env(safe-area-inset-top) + 12px);
     position: sticky;
     top: 0;
     z-index: 100;
@@ -637,19 +680,19 @@ onMounted(async () => {
 .header-info {
     flex: 1;
     text-align: center;
-    margin: 0 12px;
+    margin: 0 8px;
 }
 
 .header-info h1 {
     color: white;
-    font-size: 1.2rem;
+    font-size: 1.1rem;
     font-weight: 600;
     margin: 0;
 }
 
 .header-info p {
     color: rgba(255, 255, 255, 0.8);
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     margin: 0;
 }
 
@@ -664,7 +707,7 @@ onMounted(async () => {
 
 /* Main Content */
 .map-main {
-    padding-bottom: 80px !important;
+    min-height: 100vh;
 }
 
 .loading-container {
@@ -681,27 +724,28 @@ onMounted(async () => {
 
 /* Map Container */
 .map-container {
-    padding: 0 0 100px;
+    padding: 0;
 }
 
 /* Target Banner */
 .target-banner {
     background: linear-gradient(135deg, #f44336 0%, #e91e63 100%);
     margin: 0;
-    padding: 12px 16px;
+    padding: 10px 12px;
 }
 
 .target-banner-content {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 10px;
     max-width: 800px;
     margin: 0 auto;
 }
 
 .target-icon {
-    width: 40px;
-    height: 40px;
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
     background: rgba(255, 255, 255, 0.2);
     border-radius: 50%;
     display: flex;
@@ -717,12 +761,13 @@ onMounted(async () => {
 
 .target-info {
     flex: 1;
+    min-width: 0;
 }
 
 .target-label {
     display: block;
     color: rgba(255, 255, 255, 0.8);
-    font-size: 0.7rem;
+    font-size: 0.65rem;
     text-transform: uppercase;
     letter-spacing: 0.5px;
 }
@@ -730,18 +775,22 @@ onMounted(async () => {
 .target-name {
     display: block;
     color: white;
-    font-size: 1rem;
+    font-size: 0.9rem;
     font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 /* Map Area */
 .map-area {
     position: relative;
-    margin: 16px;
-    border-radius: 16px;
+    margin: 12px;
+    border-radius: 12px;
     overflow: hidden;
     background: #e8ecef;
-    min-height: 400px;
+    min-height: 250px;
+    max-height: 50vh;
     touch-action: none;
     cursor: grab;
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
@@ -753,7 +802,7 @@ onMounted(async () => {
 
 .map-content {
     width: 100%;
-    min-height: 400px;
+    min-height: 250px;
     position: relative;
     transition: transform 0.1s ease-out;
 }
@@ -762,7 +811,7 @@ onMounted(async () => {
 .floor-plan-container {
     position: relative;
     width: 100%;
-    min-height: 400px;
+    min-height: 250px;
 }
 
 .floor-plan-image {
@@ -788,39 +837,32 @@ onMounted(async () => {
 /* Room Annotations */
 .room-annotation {
     position: absolute;
-    border: 2px solid rgba(158, 158, 158, 0.5);
-    border-radius: 4px;
-    cursor: pointer;
-    transition: all 0.2s ease;
+    border: 3px solid #f44336;
+    border-radius: 6px;
     display: flex;
     align-items: center;
     justify-content: center;
-    overflow: hidden;
-}
-
-.room-annotation:hover {
-    border-color: rgba(158, 158, 158, 0.8);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    overflow: visible;
+    box-shadow: 0 4px 12px rgba(244, 67, 54, 0.4);
 }
 
 .room-annotation.target-room {
-    border-color: #f44336;
     z-index: 5;
+    animation: glow-target 2s ease-in-out infinite;
 }
 
-.room-annotation.selected {
-    border-color: #1976d2;
-    border-width: 3px;
-    box-shadow: 0 4px 12px rgba(25, 118, 210, 0.4);
+@keyframes glow-target {
+    0%, 100% { box-shadow: 0 4px 12px rgba(244, 67, 54, 0.4); }
+    50% { box-shadow: 0 4px 20px rgba(244, 67, 54, 0.7); }
 }
 
 .room-annotation-label {
-    font-size: 9px;
-    font-weight: 600;
-    color: #333;
+    font-size: 10px;
+    font-weight: 700;
+    color: #b71c1c;
     background: rgba(255, 255, 255, 0.95);
-    padding: 3px 5px;
-    border-radius: 3px;
+    padding: 4px 8px;
+    border-radius: 4px;
     text-align: center;
     word-break: break-word;
     line-height: 1.2;
@@ -831,19 +873,47 @@ onMounted(async () => {
     -webkit-line-clamp: 3;
     line-clamp: 3;
     -webkit-box-orient: vertical;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .target-indicator {
     position: absolute;
-    top: -8px;
-    right: -8px;
-    width: 20px;
-    height: 20px;
+    top: -10px;
+    right: -10px;
+    width: 24px;
+    height: 24px;
     background: #f44336;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
+    border: 2px solid white;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    z-index: 10;
+}
+
+.pulse-ring {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 100%;
+    height: 100%;
+    border: 3px solid #f44336;
+    border-radius: 6px;
+    animation: pulse 2s ease-out infinite;
+    pointer-events: none;
+}
+
+@keyframes pulse {
+    0% {
+        transform: translate(-50%, -50%) scale(1);
+        opacity: 0.8;
+    }
+    100% {
+        transform: translate(-50%, -50%) scale(1.3);
+        opacity: 0;
+    }
 }
 
 /* Evacuation SVG */
@@ -1112,6 +1182,7 @@ onMounted(async () => {
 .legend-dot.error { background-color: #f44336; }
 .legend-dot.primary { background-color: #1976d2; }
 .legend-dot.success { background-color: #4caf50; }
+.legend-dot.exit { background-color: #4caf50; border: 2px solid white; box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
 
 .legend-line {
     width: 20px;
@@ -1175,10 +1246,174 @@ onMounted(async () => {
 }
 
 /* Responsive */
-@media (min-width: 600px) {
+
+/* Mobile Small (< 360px) */
+@media (max-width: 359px) {
+    .map-header {
+        padding: 10px 12px;
+    }
+    
+    .header-info h1 {
+        font-size: 0.95rem;
+    }
+    
+    .header-info p {
+        font-size: 0.6rem;
+    }
+    
     .map-area {
-        margin: 0 24px;
-        max-height: 600px;
+        margin: 8px;
+        min-height: 200px;
+        max-height: 45vh;
+    }
+    
+    .target-banner {
+        padding: 8px 10px;
+    }
+    
+    .target-icon {
+        width: 32px;
+        height: 32px;
+        min-width: 32px;
+    }
+    
+    .target-label {
+        font-size: 0.55rem;
+    }
+    
+    .target-name {
+        font-size: 0.75rem;
+    }
+    
+    .room-annotation-label {
+        font-size: 8px;
+        padding: 2px 4px;
+    }
+    
+    .legend-card,
+    .directions-card {
+        margin: 8px;
+        padding: 10px;
+    }
+    
+    .legend-header {
+        font-size: 0.65rem;
+    }
+    
+    .legend-items {
+        gap: 8px;
+    }
+    
+    .legend-item {
+        font-size: 0.65rem;
+    }
+    
+    .directions-header {
+        font-size: 0.8rem;
+    }
+    
+    .direction-step {
+        font-size: 0.75rem;
+    }
+    
+    .step-number {
+        width: 18px;
+        height: 18px;
+        font-size: 0.6rem;
+    }
+    
+    .room-info-panel {
+        left: 8px;
+        right: 8px;
+        bottom: 72px;
+        padding: 12px;
+    }
+    
+    .room-info-details h3 {
+        font-size: 0.85rem;
+    }
+    
+    .room-info-details p {
+        font-size: 0.65rem;
+    }
+    
+    .zoom-level {
+        font-size: 0.6rem;
+    }
+    
+    .map-instructions {
+        font-size: 0.65rem;
+        padding: 6px 12px;
+    }
+}
+
+/* Mobile (360px - 599px) */
+@media (min-width: 360px) and (max-width: 599px) {
+    .header-info h1 {
+        font-size: 1rem;
+    }
+    
+    .header-info p {
+        font-size: 0.65rem;
+    }
+    
+    .map-area {
+        min-height: 250px;
+        max-height: 50vh;
+    }
+    
+    .target-label {
+        font-size: 0.6rem;
+    }
+    
+    .target-name {
+        font-size: 0.85rem;
+    }
+    
+    .room-annotation-label {
+        font-size: 9px;
+    }
+    
+    .legend-item {
+        font-size: 0.7rem;
+    }
+    
+    .directions-header {
+        font-size: 0.85rem;
+    }
+    
+    .direction-step {
+        font-size: 0.8rem;
+    }
+}
+
+/* Tablet (600px - 1023px) */
+@media (min-width: 600px) and (max-width: 1023px) {
+    .header-info h1 {
+        font-size: 1.15rem;
+    }
+    
+    .header-info p {
+        font-size: 0.75rem;
+    }
+    
+    .map-area {
+        margin: 16px 24px;
+        min-height: 350px;
+        max-height: 55vh;
+    }
+    
+    .target-label {
+        font-size: 0.7rem;
+    }
+    
+    .target-name {
+        font-size: 1rem;
+    }
+    
+    .room-annotation-label {
+        font-size: 11px;
+        padding: 5px 10px;
     }
     
     .legend-card,
@@ -1186,11 +1421,144 @@ onMounted(async () => {
         margin-left: 24px;
         margin-right: 24px;
     }
+    
+    .legend-header {
+        font-size: 0.75rem;
+    }
+    
+    .legend-item {
+        font-size: 0.8rem;
+    }
+    
+    .directions-header {
+        font-size: 0.9rem;
+    }
+    
+    .direction-step {
+        font-size: 0.85rem;
+    }
+    
+    .room-info-panel {
+        left: 24px;
+        right: 24px;
+        bottom: 90px;
+    }
+    
+    .room-info-details h3 {
+        font-size: 1rem;
+    }
+    
+    .room-info-details p {
+        font-size: 0.8rem;
+    }
+    
+    .map-main {
+        padding-bottom: 90px;
+    }
 }
 
+/* Desktop (1024px+) */
 @media (min-width: 1024px) {
+    .map-header {
+        padding: 14px 20px;
+    }
+    
+    .header-info h1 {
+        font-size: 1.25rem;
+    }
+    
+    .header-info p {
+        font-size: 0.8rem;
+    }
+    
     .map-main {
-        margin-left: 200px;
+        padding-bottom: 40px;
+    }
+    
+    .map-container {
+        max-width: 900px;
+        margin: 0 auto;
+        padding-bottom: 24px;
+    }
+    
+    .map-area {
+        margin: 20px 24px;
+        min-height: 400px;
+        max-height: 60vh;
+    }
+    
+    .target-label {
+        font-size: 0.7rem;
+    }
+    
+    .target-name {
+        font-size: 1.05rem;
+    }
+    
+    .room-annotation-label {
+        font-size: 12px;
+        padding: 6px 12px;
+    }
+    
+    .legend-card,
+    .directions-card {
+        margin-left: 24px;
+        margin-right: 24px;
+    }
+    
+    .legend-header {
+        font-size: 0.8rem;
+    }
+    
+    .legend-item {
+        font-size: 0.85rem;
+    }
+    
+    .directions-header {
+        font-size: 1rem;
+    }
+    
+    .direction-step {
+        font-size: 0.9rem;
+    }
+    
+    .room-info-panel {
+        bottom: 24px;
+        left: 50%;
+        right: auto;
+        transform: translateX(-50%);
+        width: 400px;
+    }
+    
+    .room-info-details h3 {
+        font-size: 1.1rem;
+    }
+    
+    .room-info-details p {
+        font-size: 0.85rem;
+    }
+    
+    .target-banner-content {
+        max-width: 850px;
+    }
+    
+    .zoom-level {
+        font-size: 0.75rem;
+    }
+    
+    .map-instructions {
+        font-size: 0.8rem;
+    }
+}
+
+/* Bottom nav padding for mobile */
+@media (max-width: 1023px) {
+    .map-main {
+        padding-bottom: 80px;
+    }
+    
+    .map-container {
+        padding-bottom: 20px;
     }
 }
 </style>

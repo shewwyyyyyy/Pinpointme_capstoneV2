@@ -50,7 +50,7 @@
             </div>
 
             <!-- Chat Container -->
-            <div v-else class="chat-container d-flex flex-column" style="height: calc(100vh - 64px);">
+            <div v-else class="chat-container d-flex flex-column">
                 <!-- Messages Area -->
                 <div 
                     ref="messagesContainer"
@@ -1046,10 +1046,20 @@ watch(() => conversation.value?.id, (newId) => {
 <style scoped>
 .chat-container {
     background-color: #f5f5f5;
+    height: calc(100vh - 56px);
+    height: calc(100dvh - 56px);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
 }
 
 .messages-area {
     background: linear-gradient(to bottom, #f8f0f0 0%, #ffffff 40%, #f8f8f8 50%, #d1f8ef 80%, #a1e3f9 100%);
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: env(safe-area-inset-bottom, 0);
 }
 
 .message-wrapper {
@@ -1068,6 +1078,7 @@ watch(() => conversation.value?.id, (newId) => {
     max-width: 75%;
     border-radius: 16px;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+    word-break: break-word;
 }
 
 .own-message .message-bubble {
@@ -1082,11 +1093,13 @@ watch(() => conversation.value?.id, (newId) => {
 .message-content {
     word-break: break-word;
     white-space: pre-wrap;
+    font-size: 0.9rem;
+    line-height: 1.4;
 }
 
 .message-meta {
     opacity: 0.7;
-    font-size: 11px;
+    font-size: 10px;
 }
 
 .own-message .message-meta {
@@ -1190,6 +1203,8 @@ watch(() => conversation.value?.id, (newId) => {
 
 .input-area {
     border-top: 1px solid rgba(0, 0, 0, 0.08);
+    flex-shrink: 0;
+    padding-bottom: env(safe-area-inset-bottom, 8px);
 }
 
 .cursor-pointer {
@@ -1207,5 +1222,138 @@ watch(() => conversation.value?.id, (newId) => {
     max-height: 400px;
     object-fit: cover;
     background-color: #000;
+}
+
+/* Mobile Small (< 360px) */
+@media (max-width: 359px) {
+    .chat-container {
+        height: calc(100vh - 48px);
+        height: calc(100dvh - 48px);
+    }
+    
+    .messages-area {
+        padding: 8px 10px;
+    }
+    
+    .message-bubble {
+        max-width: 85%;
+        padding: 8px 10px !important;
+    }
+    
+    .message-content {
+        font-size: 0.8rem;
+    }
+    
+    .message-meta {
+        font-size: 9px;
+    }
+    
+    .input-area {
+        padding: 8px !important;
+    }
+    
+    .input-area .v-text-field {
+        font-size: 0.85rem;
+    }
+}
+
+/* Mobile (360px - 599px) */
+@media (min-width: 360px) and (max-width: 599px) {
+    .chat-container {
+        height: calc(100vh - 52px);
+        height: calc(100dvh - 52px);
+    }
+    
+    .messages-area {
+        padding: 12px;
+    }
+    
+    .message-bubble {
+        max-width: 80%;
+    }
+    
+    .message-content {
+        font-size: 0.85rem;
+    }
+    
+    .message-meta {
+        font-size: 10px;
+    }
+    
+    .input-area {
+        padding: 10px !important;
+    }
+}
+
+/* Tablet (600px - 1023px) */
+@media (min-width: 600px) and (max-width: 1023px) {
+    .chat-container {
+        height: calc(100vh - 56px);
+        height: calc(100dvh - 56px);
+    }
+    
+    .messages-area {
+        padding: 16px 20px;
+    }
+    
+    .message-bubble {
+        max-width: 70%;
+    }
+    
+    .message-content {
+        font-size: 0.9rem;
+    }
+    
+    .message-meta {
+        font-size: 11px;
+    }
+}
+
+/* Desktop (1024px+) */
+@media (min-width: 1024px) {
+    .chat-container {
+        height: calc(100vh - 64px);
+        max-width: 800px;
+        margin: 0 auto;
+    }
+    
+    .messages-area {
+        padding: 20px 24px;
+    }
+    
+    .message-bubble {
+        max-width: 60%;
+    }
+    
+    .message-content {
+        font-size: 0.95rem;
+    }
+    
+    .message-meta {
+        font-size: 11px;
+    }
+    
+    .input-area {
+        padding: 16px !important;
+    }
+}
+
+/* Fix for keyboards on mobile */
+@supports (height: 100dvh) {
+    .chat-container {
+        height: calc(100dvh - 56px);
+    }
+    
+    @media (max-width: 359px) {
+        .chat-container {
+            height: calc(100dvh - 48px);
+        }
+    }
+    
+    @media (min-width: 360px) and (max-width: 599px) {
+        .chat-container {
+            height: calc(100dvh - 52px);
+        }
+    }
 }
 </style>

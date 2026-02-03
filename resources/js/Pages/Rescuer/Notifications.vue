@@ -39,9 +39,7 @@
                     <v-icon size="64" color="grey-lighten-1">mdi-bell-off-outline</v-icon>
                 </div>
                 <h3>No notifications</h3>
-                <p v-if="activeFilter === 'all'">You're all caught up! New rescue requests will appear here.</p>
-                <p v-else-if="activeFilter === 'pending'">No pending rescue requests at the moment.</p>
-                <p v-else>No active rescues in progress.</p>
+                <p>You're all caught up! New rescue requests will appear here.</p>
                 <v-btn 
                     variant="tonal" 
                     color="primary" 
@@ -162,7 +160,6 @@ const { playNotificationSound, vibrate } = useNotificationAlert();
 const drawer = ref(false);
 const loading = ref(true);
 const refreshing = ref(false);
-const activeFilter = ref('all');
 const rescueRequests = ref([]);
 const processingId = ref(null);
 const unreadMessageCount = ref(0);
@@ -186,6 +183,10 @@ const inProgressRequests = computed(() =>
     rescueRequests.value.filter(r => r.status === 'assigned' || r.status === 'in_progress')
 );
 
+const rescuedRequests = computed(() => 
+    rescueRequests.value.filter(r => r.status === 'rescued' || r.status === 'safe' || r.status === 'completed')
+);
+
 // Check if rescuer has an active assignment (assigned or in_progress)
 const hasActiveAssignment = computed(() => {
     const rescuerId = authUser.value?.id;
@@ -200,14 +201,8 @@ const allNotifications = computed(() => rescueRequests.value);
 const pendingCount = computed(() => pendingRequests.value.length);
 
 const filteredNotifications = computed(() => {
-    switch (activeFilter.value) {
-        case 'pending':
-            return pendingRequests.value;
-        case 'in_progress':
-            return inProgressRequests.value;
-        default:
-            return allNotifications.value;
-    }
+    // Show all notifications (pending and in-progress primarily)
+    return allNotifications.value;
 });
 
 // Methods
@@ -462,73 +457,9 @@ onUnmounted(() => {
 
 /* Main Content */
 .notifications-main {
-    padding-bottom: 80px;
-}
-
-/* Filter Section */
-.filter-section {
-    padding: 16px;
-    position: sticky;
-    top: 60px;
-    z-index: 50;
-    background: rgba(255, 255, 255, 0.8);
-    backdrop-filter: blur(10px);
-}
-
-.filter-tabs {
-    display: flex;
-    gap: 8px;
-    background: rgba(255, 255, 255, 0.9);
-    padding: 6px;
-    border-radius: 16px;
-    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
-}
-
-.filter-tab {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    padding: 10px 12px;
-    border: none;
-    background: transparent;
-    border-radius: 12px;
-    font-size: 0.8rem;
-    font-weight: 600;
-    color: #78909c;
-    cursor: pointer;
-    transition: all 0.3s ease;
-}
-
-.filter-tab:active {
-    transform: scale(0.95);
-}
-
-.filter-tab.active {
-    background: linear-gradient(135deg, #1976D2, #42A5F5);
-    color: white;
-    box-shadow: 0 4px 12px rgba(25, 118, 210, 0.3);
-}
-
-.tab-count {
-    background: rgba(0, 0, 0, 0.1);
-    padding: 2px 8px;
-    border-radius: 10px;
-    font-size: 0.7rem;
-}
-
-.filter-tab.active .tab-count {
-    background: rgba(255, 255, 255, 0.2);
-}
-
-.tab-count.urgent {
-    background: #f44336;
-    color: white;
-}
-
-.filter-tab.active .tab-count.urgent {
-    background: rgba(255, 255, 255, 0.3);
+    padding-bottom: calc(100px + env(safe-area-inset-bottom, 0px));
+    min-height: 100vh;
+    background: linear-gradient(180deg, #e8f5f3 0%, #f5f9f8 50%, #ffffff 100%);
 }
 
 /* Loading State */
@@ -805,14 +736,6 @@ onUnmounted(() => {
 
 /* Responsive */
 @media (max-width: 600px) {
-    .filter-tab span:not(.tab-count) {
-        display: none;
-    }
-    
-    .filter-tab {
-        padding: 10px 16px;
-    }
-    
     .card-header {
         flex-wrap: wrap;
     }
@@ -823,15 +746,31 @@ onUnmounted(() => {
         margin-top: 8px;
         justify-content: flex-start;
     }
+    
+    .notifications-main {
+        padding-bottom: calc(100px + env(safe-area-inset-bottom, 0px));
+    }
 }
 
 @media (max-width: 360px) {
     .notification-title {
-        font-size: 0.9rem;
+        font-size: 0.85rem;
     }
     
     .meta-item {
-        font-size: 0.7rem;
+        font-size: 0.65rem;
+    }
+    
+    .header-title h1 {
+        font-size: 1.1rem;
+    }
+    
+    .header-title p {
+        font-size: 0.65rem;
+    }
+    
+    .notifications-main {
+        padding-bottom: calc(90px + env(safe-area-inset-bottom, 0px));
     }
 }
 </style>

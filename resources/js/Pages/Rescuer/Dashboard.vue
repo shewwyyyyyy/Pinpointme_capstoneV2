@@ -217,12 +217,70 @@
 
                     <!-- Rescued Tab -->
                     <div v-if="selectedTab === 'rescued'">
-                        <div v-if="rescuedRequests.length === 0" class="empty-state">
+                        <!-- Search and Date Filter -->
+                        <div class="rescued-filter-section">
+                            <v-text-field
+                                v-model="rescuedSearchQuery"
+                                placeholder="Search by name..."
+                                variant="outlined"
+                                density="compact"
+                                hide-details
+                                clearable
+                                prepend-inner-icon="mdi-magnify"
+                                class="rescued-search-input"
+                            />
+                            <v-menu
+                                v-model="showRescuedDatePicker"
+                                :close-on-content-click="false"
+                                location="bottom"
+                            >
+                                <template v-slot:activator="{ props }">
+                                    <v-btn
+                                        v-bind="props"
+                                        variant="outlined"
+                                        class="rescued-date-btn"
+                                        :color="rescuedSelectedDate ? 'primary' : 'grey'"
+                                    >
+                                        <v-icon start size="18">mdi-calendar</v-icon>
+                                        <span class="date-btn-text">{{ rescuedSelectedDate ? formatSelectedDate(rescuedSelectedDate) : 'Date' }}</span>
+                                    </v-btn>
+                                </template>
+                                <v-date-picker
+                                    v-model="rescuedSelectedDate"
+                                    @update:model-value="showRescuedDatePicker = false"
+                                    color="primary"
+                                />
+                            </v-menu>
+                            <v-btn
+                                v-if="rescuedSelectedDate || rescuedSearchQuery"
+                                icon
+                                variant="text"
+                                size="small"
+                                color="grey"
+                                @click="clearRescuedFilters"
+                            >
+                                <v-icon>mdi-close</v-icon>
+                            </v-btn>
+                        </div>
+
+                        <div v-if="filteredRescuedRequests.length === 0" class="empty-state">
                             <v-icon size="64" color="grey-lighten-1">mdi-check-circle-outline</v-icon>
-                            <p class="text-grey mt-2">No rescued users yet</p>
+                            <p class="text-grey mt-2">
+                                {{ rescuedSearchQuery || rescuedSelectedDate ? 'No rescued persons match your filters.' : 'No rescued users yet' }}
+                            </p>
+                            <v-btn 
+                                v-if="rescuedSearchQuery || rescuedSelectedDate"
+                                variant="tonal" 
+                                color="primary" 
+                                class="mt-4"
+                                @click="clearRescuedFilters"
+                            >
+                                <v-icon start>mdi-filter-off</v-icon>
+                                Clear Filters
+                            </v-btn>
                         </div>
                         <div
-                            v-for="request in rescuedRequests"
+                            v-for="request in filteredRescuedRequests"
                             :key="request.id"
                             class="request-card rescued"
                             @click="viewRescuedRequest(request)"
@@ -233,7 +291,7 @@
                                         {{ request.firstName || 'User Name' }} {{ request.lastName || '' }}
                                     </h3>
                                     <p class="request-location">
-                                        Scanned at {{ getLocationDisplay(request) }} on ...
+                                        Scanned at {{ getLocationDisplay(request) }} on {{ formatRescuedDate(request.created_at) }}
                                     </p>
                                 </div>
                                 <div class="request-status">
@@ -320,6 +378,11 @@ const userData = ref(null);
 const showNotificationPanel = ref(false);
 const unreadMessageCount = ref(0);
 
+// Rescued tab filter state
+const rescuedSearchQuery = ref('');
+const rescuedSelectedDate = ref(null);
+const showRescuedDatePicker = ref(false);
+
 // Computed property for user's profile picture
 const userProfilePicture = computed(() => {
     const picturePath = userData.value?.profile_picture || userData.value?.avatar;
@@ -354,6 +417,33 @@ const inProgressRequests = computed(() =>
 const rescuedRequests = computed(() =>
     rescueRequests.value.filter((r) => r.status === 'rescued' || r.status === 'safe' || r.status === 'completed')
 );
+
+// Filtered rescued requests with search and date filter
+const filteredRescuedRequests = computed(() => {
+    let results = rescuedRequests.value;
+    
+    // Apply search filter
+    if (rescuedSearchQuery.value) {
+        const query = rescuedSearchQuery.value.toLowerCase();
+        results = results.filter(r => {
+            const firstName = (r.firstName || r.first_name || '').toLowerCase();
+            const lastName = (r.lastName || r.last_name || '').toLowerCase();
+            const fullName = `${firstName} ${lastName}`.trim();
+            return firstName.includes(query) || lastName.includes(query) || fullName.includes(query);
+        });
+    }
+    
+    // Apply date filter
+    if (rescuedSelectedDate.value) {
+        const filterDate = new Date(rescuedSelectedDate.value);
+        results = results.filter(r => {
+            const createdDate = new Date(r.created_at);
+            return createdDate.toDateString() === filterDate.toDateString();
+        });
+    }
+    
+    return results;
+});
 
 // Check if rescuer has an active assignment (assigned or in_progress)
 const hasActiveAssignment = computed(() => {
@@ -711,6 +801,26 @@ const formatTimeAgo = (timestamp) => {
     return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
 };
 
+// Format date for rescued filter display
+const formatSelectedDate = (date) => {
+    if (!date) return '';
+    const d = new Date(date);
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+};
+
+// Format rescued date for card display
+const formatRescuedDate = (timestamp) => {
+    if (!timestamp) return '';
+    const date = new Date(timestamp);
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+};
+
+// Clear rescued filters
+const clearRescuedFilters = () => {
+    rescuedSearchQuery.value = '';
+    rescuedSelectedDate.value = null;
+};
+
 const handleNotificationClick = (request) => {
     showNotificationPanel.value = false;
     // Go to pending tab and highlight this request
@@ -985,6 +1095,64 @@ const showNotification = (message, color = 'info') => {
 .request-card.rescued {
     border-left-color: #66bb6a;
     background: linear-gradient(90deg, #f1f8f4 0%, white 20%);
+}
+
+/* Rescued Filter Section */
+.rescued-filter-section {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+    align-items: center;
+    padding: 0 4px;
+}
+
+.rescued-search-input {
+    flex: 1;
+    min-width: 0;
+}
+
+.rescued-search-input :deep(.v-field) {
+    border-radius: 12px;
+    font-size: 0.85rem;
+    background: white;
+}
+
+.rescued-date-btn {
+    border-radius: 12px;
+    text-transform: none;
+    font-weight: 600;
+    font-size: 0.75rem;
+    height: 40px;
+    min-width: auto;
+    padding: 0 12px;
+    flex-shrink: 0;
+}
+
+.date-btn-text {
+    max-width: 80px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Responsive rescued filter */
+@media (max-width: 400px) {
+    .rescued-filter-section {
+        flex-wrap: wrap;
+    }
+    
+    .rescued-search-input {
+        flex: 1 1 100%;
+        margin-bottom: 8px;
+    }
+    
+    .rescued-date-btn {
+        flex: 1;
+    }
+    
+    .date-btn-text {
+        max-width: 60px;
+    }
 }
 
 /* Empty State */

@@ -406,7 +406,8 @@ const totalUnreadCount = computed(() => {
 
 /* Main Content */
 .messages-main {
-    padding-bottom: 80px;
+    background: #f8fafb;
+    min-height: 100vh;
 }
 
 /* Desktop only visibility */
@@ -418,6 +419,11 @@ const totalUnreadCount = computed(() => {
     .desktop-only {
         display: none !important;
     }
+    
+    /* Mobile: adequate padding for bottom nav */
+    .messages-main {
+        padding-bottom: 100px !important;
+    }
 }
 
 @media (min-width: 1024px) {
@@ -426,9 +432,9 @@ const totalUnreadCount = computed(() => {
         display: flex;
     }
     
-    /* No bottom padding needed on desktop */
+    /* Desktop: less bottom padding */
     .messages-main {
-        padding-bottom: 20px;
+        padding-bottom: 40px;
     }
 }
 
@@ -436,15 +442,24 @@ const totalUnreadCount = computed(() => {
 .v-list {
     max-width: 800px;
     margin: 0 auto;
+    background: transparent;
 }
 
 .v-list-item {
     min-height: 72px;
+    background: white;
+    margin: 0 12px 8px;
+    border-radius: 12px;
+}
+
+.v-list-item:last-child {
+    margin-bottom: 16px;
 }
 
 /* Empty state and loading centered */
 .pa-4 {
     max-width: 800px;
     margin: 0 auto;
+    padding-bottom: 100px !important;
 }
 </style>

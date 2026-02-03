@@ -96,41 +96,43 @@
                                 <p>Loading floor plan...</p>
                             </div>
                             
-                            <!-- Room Annotations from floor_plan_data -->
-                            <template v-if="imageLoaded && floorPlanRooms.length > 0">
+                            <!-- Only show current user's location -->
+                            <template v-if="imageLoaded && userRoomAnnotation">
                                 <div
-                                    v-for="(room, idx) in floorPlanRooms"
-                                    :key="'room-' + idx"
-                                    class="room-annotation"
-                                    :class="{ 
-                                        'your-room': isYourRoom(room),
-                                        'selected': selectedRoom?.room_name === room.room_name
-                                    }"
-                                    :style="getRoomAnnotationStyle(room)"
-                                    @click="selectRoomAnnotation(room)"
+                                    class="room-annotation your-room"
+                                    :style="getRoomAnnotationStyle(userRoomAnnotation)"
                                 >
                                     <div class="room-annotation-label">
-                                        {{ room.room_name }}
+                                        {{ userRoomAnnotation.room_name }}
                                     </div>
-                                    <div v-if="isYourRoom(room)" class="your-location-indicator">
+                                    <div class="your-location-indicator">
                                         <v-icon color="white" size="14">mdi-account</v-icon>
                                     </div>
+                                    <div class="pulse-ring"></div>
                                 </div>
                             </template>
                             
-                            <!-- Evacuation Paths -->
-                            <svg v-if="imageLoaded && evacuationPaths.length > 0" class="evacuation-svg" :viewBox="svgViewBox">
+                            <!-- Evacuation Path from user's location only -->
+                            <svg v-if="imageLoaded && userEvacuationPath" class="evacuation-svg" :viewBox="svgViewBox">
                                 <path
-                                    v-for="(path, idx) in evacuationPaths"
-                                    :key="'path-' + idx"
-                                    :d="getPathD(path)"
-                                    :stroke="path.color || '#4CAF50'"
+                                    :d="getPathD(userEvacuationPath)"
+                                    :stroke="userEvacuationPath.color || '#4CAF50'"
                                     stroke-width="5"
                                     fill="none"
                                     stroke-dasharray="15,8"
                                     stroke-linecap="round"
                                     stroke-linejoin="round"
                                     class="evacuation-path"
+                                />
+                                <!-- Exit marker at the end of path -->
+                                <circle 
+                                    v-if="userEvacuationPath.points && userEvacuationPath.points.length > 0"
+                                    :cx="userEvacuationPath.points[userEvacuationPath.points.length - 1].x"
+                                    :cy="userEvacuationPath.points[userEvacuationPath.points.length - 1].y"
+                                    r="12"
+                                    fill="#4CAF50"
+                                    stroke="white"
+                                    stroke-width="3"
                                 />
                             </svg>
                         </div>
@@ -224,12 +226,12 @@
                             <span>Your Location</span>
                         </div>
                         <div class="legend-item">
-                            <div class="legend-dot secondary"></div>
-                            <span>Selected Room</span>
-                        </div>
-                        <div class="legend-item">
                             <div class="legend-line success"></div>
                             <span>Evacuation Path</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-dot exit"></div>
+                            <span>Exit Point</span>
                         </div>
                     </div>
                 </div>
@@ -327,9 +329,50 @@ const floorPlanRooms = computed(() => {
     return selectedFloor.value.floor_plan_data.rooms || [];
 });
 
+// Only get the user's current room annotation
+const userRoomAnnotation = computed(() => {
+    if (!floorPlanRooms.value.length) return null;
+    const userRoomName = rescueRequest.value?.room?.room_name || rescueRequest.value?.room?.name;
+    const userRoomId = rescueRequest.value?.room_id;
+    
+    return floorPlanRooms.value.find(room => 
+        room.room_id === userRoomId || room.room_name === userRoomName
+    );
+});
+
 const evacuationPaths = computed(() => {
     if (!selectedFloor.value?.floor_plan_data) return [];
     return selectedFloor.value.floor_plan_data.evacuation_paths || [];
+});
+
+// Only get evacuation path from user's location
+const userEvacuationPath = computed(() => {
+    if (!evacuationPaths.value.length || !userRoomAnnotation.value) return null;
+    
+    // Find path that starts from or near user's room
+    const userRoom = userRoomAnnotation.value;
+    const userCenterX = userRoom.x + (userRoom.width / 2);
+    const userCenterY = userRoom.y + (userRoom.height / 2);
+    
+    // Find the path closest to user's room or the first path if only one exists
+    let closestPath = evacuationPaths.value[0];
+    let minDistance = Infinity;
+    
+    for (const path of evacuationPaths.value) {
+        if (path.points && path.points.length > 0) {
+            const startPoint = path.points[0];
+            const distance = Math.sqrt(
+                Math.pow(startPoint.x - userCenterX, 2) + 
+                Math.pow(startPoint.y - userCenterY, 2)
+            );
+            if (distance < minDistance) {
+                minDistance = distance;
+                closestPath = path;
+            }
+        }
+    }
+    
+    return closestPath;
 });
 
 const svgViewBox = computed(() => {
@@ -351,8 +394,8 @@ const getRoomAnnotationStyle = (room) => {
         top: `${(room.y / imageNaturalHeight.value) * 100}%`,
         width: `${(room.width / imageNaturalWidth.value) * 100}%`,
         height: `${(room.height / imageNaturalHeight.value) * 100}%`,
-        backgroundColor: isYourRoom(room) ? 'rgba(54, 116, 181, 0.3)' : (room.color || 'rgba(158, 158, 158, 0.15)'),
-        borderColor: isYourRoom(room) ? '#3674B5' : (room.color || 'rgba(158, 158, 158, 0.5)'),
+        backgroundColor: 'rgba(54, 116, 181, 0.35)',
+        borderColor: '#3674B5',
     };
 };
 
@@ -620,8 +663,8 @@ onMounted(async () => {
 /* Header Styling */
 .map-header {
     background: linear-gradient(135deg, #3674B5 0%, #2196F3 100%);
-    padding: 16px;
-    padding-top: calc(env(safe-area-inset-top) + 16px);
+    padding: 12px 16px;
+    padding-top: calc(env(safe-area-inset-top) + 12px);
     position: sticky;
     top: 0;
     z-index: 100;
@@ -642,19 +685,19 @@ onMounted(async () => {
 .header-info {
     flex: 1;
     text-align: center;
-    margin: 0 12px;
+    margin: 0 8px;
 }
 
 .header-info h1 {
     color: white;
-    font-size: 1.2rem;
+    font-size: 1.1rem;
     font-weight: 600;
     margin: 0;
 }
 
 .header-info p {
     color: rgba(255, 255, 255, 0.8);
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     margin: 0;
 }
 
@@ -669,7 +712,7 @@ onMounted(async () => {
 
 /* Main Content */
 .map-main {
-    padding-bottom: 80px !important;
+    min-height: 100vh;
 }
 
 .loading-container {
@@ -705,27 +748,28 @@ onMounted(async () => {
 
 /* Map Container */
 .map-container {
-    padding: 0 0 100px;
+    padding: 0;
 }
 
 /* Location Banner */
 .location-banner {
     background: linear-gradient(135deg, #3674B5 0%, #2196F3 100%);
     margin: 0;
-    padding: 12px 16px;
+    padding: 10px 12px;
 }
 
 .location-banner-content {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 10px;
     max-width: 800px;
     margin: 0 auto;
 }
 
 .location-icon {
-    width: 40px;
-    height: 40px;
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
     background: rgba(255, 255, 255, 0.2);
     border-radius: 50%;
     display: flex;
@@ -735,12 +779,13 @@ onMounted(async () => {
 
 .location-info {
     flex: 1;
+    min-width: 0;
 }
 
 .location-label {
     display: block;
     color: rgba(255, 255, 255, 0.8);
-    font-size: 0.7rem;
+    font-size: 0.65rem;
     text-transform: uppercase;
     letter-spacing: 0.5px;
 }
@@ -748,23 +793,28 @@ onMounted(async () => {
 .location-name {
     display: block;
     color: white;
-    font-size: 1rem;
+    font-size: 0.9rem;
     font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .status-chip {
-    font-size: 0.7rem;
+    font-size: 0.65rem;
     font-weight: 600;
+    flex-shrink: 0;
 }
 
 /* Map Area */
 .map-area {
     position: relative;
-    margin: 16px;
-    border-radius: 16px;
+    margin: 12px;
+    border-radius: 12px;
     overflow: hidden;
     background: #e8ecef;
-    min-height: 400px;
+    min-height: 250px;
+    max-height: 50vh;
     touch-action: none;
     cursor: grab;
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
@@ -776,7 +826,7 @@ onMounted(async () => {
 
 .map-content {
     width: 100%;
-    min-height: 400px;
+    min-height: 250px;
     position: relative;
     transition: transform 0.1s ease-out;
 }
@@ -785,7 +835,7 @@ onMounted(async () => {
 .floor-plan-container {
     position: relative;
     width: 100%;
-    min-height: 400px;
+    min-height: 250px;
 }
 
 .floor-plan-image {
@@ -811,39 +861,32 @@ onMounted(async () => {
 /* Room Annotations */
 .room-annotation {
     position: absolute;
-    border: 2px solid rgba(158, 158, 158, 0.5);
-    border-radius: 4px;
-    cursor: pointer;
-    transition: all 0.2s ease;
+    border: 3px solid #3674B5;
+    border-radius: 6px;
     display: flex;
     align-items: center;
     justify-content: center;
-    overflow: hidden;
-}
-
-.room-annotation:hover {
-    border-color: rgba(158, 158, 158, 0.8);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    overflow: visible;
+    box-shadow: 0 4px 12px rgba(54, 116, 181, 0.4);
 }
 
 .room-annotation.your-room {
-    border-color: #3674B5;
     z-index: 5;
+    animation: glow 2s ease-in-out infinite;
 }
 
-.room-annotation.selected {
-    border-color: #9c27b0;
-    border-width: 3px;
-    box-shadow: 0 4px 12px rgba(156, 39, 176, 0.4);
+@keyframes glow {
+    0%, 100% { box-shadow: 0 4px 12px rgba(54, 116, 181, 0.4); }
+    50% { box-shadow: 0 4px 20px rgba(54, 116, 181, 0.7); }
 }
 
 .room-annotation-label {
-    font-size: 9px;
-    font-weight: 600;
-    color: #333;
+    font-size: 10px;
+    font-weight: 700;
+    color: #1a4a7a;
     background: rgba(255, 255, 255, 0.95);
-    padding: 3px 5px;
-    border-radius: 3px;
+    padding: 4px 8px;
+    border-radius: 4px;
     text-align: center;
     word-break: break-word;
     line-height: 1.2;
@@ -854,19 +897,47 @@ onMounted(async () => {
     -webkit-line-clamp: 3;
     line-clamp: 3;
     -webkit-box-orient: vertical;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .your-location-indicator {
     position: absolute;
-    top: -8px;
-    right: -8px;
-    width: 20px;
-    height: 20px;
+    top: -10px;
+    right: -10px;
+    width: 24px;
+    height: 24px;
     background: #3674B5;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
+    border: 2px solid white;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    z-index: 10;
+}
+
+.pulse-ring {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 100%;
+    height: 100%;
+    border: 3px solid #3674B5;
+    border-radius: 6px;
+    animation: pulse 2s ease-out infinite;
+    pointer-events: none;
+}
+
+@keyframes pulse {
+    0% {
+        transform: translate(-50%, -50%) scale(1);
+        opacity: 0.8;
+    }
+    100% {
+        transform: translate(-50%, -50%) scale(1.3);
+        opacity: 0;
+    }
 }
 
 /* Evacuation SVG */
@@ -1031,11 +1102,11 @@ onMounted(async () => {
 .room-info-panel {
     position: fixed;
     bottom: 80px;
-    left: 16px;
-    right: 16px;
+    left: 12px;
+    right: 12px;
     background: white;
     border-radius: 16px;
-    padding: 16px;
+    padding: 14px;
     box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15);
     z-index: 50;
     max-width: 500px;
@@ -1045,12 +1116,13 @@ onMounted(async () => {
 .room-info-header {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 10px;
 }
 
 .room-info-icon {
-    width: 40px;
-    height: 40px;
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
     background: #9e9e9e;
     border-radius: 50%;
     display: flex;
@@ -1064,17 +1136,18 @@ onMounted(async () => {
 
 .room-info-details {
     flex: 1;
+    min-width: 0;
 }
 
 .room-info-details h3 {
-    font-size: 1rem;
+    font-size: 0.95rem;
     font-weight: 600;
     margin: 0;
     color: #333;
 }
 
 .room-info-details p {
-    font-size: 0.8rem;
+    font-size: 0.75rem;
     color: #666;
     margin: 0;
     display: flex;
@@ -1085,8 +1158,8 @@ onMounted(async () => {
 /* Legend Card */
 .legend-card {
     background: white;
-    margin: 16px;
-    padding: 12px 16px;
+    margin: 12px;
+    padding: 10px 14px;
     border-radius: 12px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
@@ -1095,39 +1168,40 @@ onMounted(async () => {
     display: flex;
     align-items: center;
     gap: 6px;
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     color: #666;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    margin-bottom: 10px;
+    margin-bottom: 8px;
 }
 
 .legend-items {
     display: flex;
     flex-wrap: wrap;
-    gap: 16px;
+    gap: 12px;
 }
 
 .legend-item {
     display: flex;
     align-items: center;
-    gap: 6px;
-    font-size: 0.8rem;
+    gap: 5px;
+    font-size: 0.75rem;
     color: #555;
 }
 
 .legend-dot {
-    width: 12px;
-    height: 12px;
+    width: 10px;
+    height: 10px;
     border-radius: 50%;
 }
 
 .legend-dot.primary { background-color: #3674B5; }
 .legend-dot.secondary { background-color: #9c27b0; }
 .legend-dot.success { background-color: #4caf50; }
+.legend-dot.exit { background-color: #4caf50; border: 2px solid white; box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
 
 .legend-line {
-    width: 20px;
+    width: 18px;
     height: 3px;
     border-radius: 2px;
 }
@@ -1145,18 +1219,19 @@ onMounted(async () => {
 /* Help Card */
 .help-card {
     background: linear-gradient(135deg, #E8F5E9 0%, #C8E6C9 100%);
-    margin: 0 16px 16px;
-    padding: 16px;
+    margin: 0 12px 12px;
+    padding: 12px;
     border-radius: 12px;
     border-left: 4px solid #4CAF50;
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 10px;
 }
 
 .help-icon {
-    width: 40px;
-    height: 40px;
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
     background: #4CAF50;
     border-radius: 50%;
     display: flex;
@@ -1166,23 +1241,183 @@ onMounted(async () => {
 }
 
 .help-content h4 {
-    font-size: 0.9rem;
+    font-size: 0.85rem;
     font-weight: 600;
     color: #2E7D32;
-    margin: 0 0 4px;
+    margin: 0 0 2px;
 }
 
 .help-content p {
-    font-size: 0.8rem;
+    font-size: 0.75rem;
     color: #388E3C;
     margin: 0;
 }
 
-/* Responsive */
-@media (min-width: 600px) {
+/* Mobile Small (< 360px) */
+@media (max-width: 359px) {
+    .map-header {
+        padding: 10px 12px;
+    }
+    
+    .header-info h1 {
+        font-size: 0.95rem;
+    }
+    
+    .header-info p {
+        font-size: 0.6rem;
+    }
+    
     .map-area {
-        margin: 0 24px;
-        max-height: 600px;
+        margin: 8px;
+        min-height: 200px;
+        max-height: 45vh;
+    }
+    
+    .location-banner {
+        padding: 8px 10px;
+    }
+    
+    .location-icon {
+        width: 32px;
+        height: 32px;
+        min-width: 32px;
+    }
+    
+    .location-label {
+        font-size: 0.55rem;
+    }
+    
+    .location-name {
+        font-size: 0.75rem;
+    }
+    
+    .status-chip {
+        font-size: 0.55rem;
+    }
+    
+    .room-annotation-label {
+        font-size: 8px;
+        padding: 2px 4px;
+    }
+    
+    .legend-card,
+    .help-card {
+        margin: 8px;
+        padding: 10px;
+    }
+    
+    .legend-header {
+        font-size: 0.6rem;
+    }
+    
+    .legend-items {
+        gap: 8px;
+    }
+    
+    .legend-item {
+        font-size: 0.65rem;
+    }
+    
+    .help-content h4 {
+        font-size: 0.75rem;
+    }
+    
+    .help-content p {
+        font-size: 0.65rem;
+    }
+    
+    .room-info-panel {
+        left: 8px;
+        right: 8px;
+        bottom: 72px;
+        padding: 12px;
+    }
+    
+    .room-info-details h3 {
+        font-size: 0.85rem;
+    }
+    
+    .room-info-details p {
+        font-size: 0.65rem;
+    }
+    
+    .zoom-level {
+        font-size: 0.6rem;
+    }
+    
+    .map-instructions {
+        font-size: 0.65rem;
+        padding: 6px 12px;
+    }
+}
+
+/* Mobile (360px - 599px) */
+@media (min-width: 360px) and (max-width: 599px) {
+    .header-info h1 {
+        font-size: 1rem;
+    }
+    
+    .header-info p {
+        font-size: 0.65rem;
+    }
+    
+    .map-area {
+        min-height: 250px;
+        max-height: 50vh;
+    }
+    
+    .location-label {
+        font-size: 0.6rem;
+    }
+    
+    .location-name {
+        font-size: 0.85rem;
+    }
+    
+    .room-annotation-label {
+        font-size: 9px;
+    }
+    
+    .legend-item {
+        font-size: 0.7rem;
+    }
+    
+    .help-content h4 {
+        font-size: 0.8rem;
+    }
+    
+    .help-content p {
+        font-size: 0.7rem;
+    }
+}
+
+/* Tablet (600px - 1023px) */
+@media (min-width: 600px) and (max-width: 1023px) {
+    .header-info h1 {
+        font-size: 1.15rem;
+    }
+    
+    .header-info p {
+        font-size: 0.75rem;
+    }
+    
+    .map-area {
+        margin: 16px 24px;
+        min-height: 350px;
+        max-height: 55vh;
+    }
+    
+    .location-label {
+        font-size: 0.7rem;
+    }
+    
+    .location-name {
+        font-size: 1rem;
+    }
+    
+    .room-annotation-label {
+        font-size: 11px;
+        padding: 5px 10px;
     }
     
     .legend-card,
@@ -1190,11 +1425,143 @@ onMounted(async () => {
         margin-left: 24px;
         margin-right: 24px;
     }
+    
+    .legend-header {
+        font-size: 0.75rem;
+    }
+    
+    .legend-item {
+        font-size: 0.8rem;
+    }
+    
+    .help-content h4 {
+        font-size: 0.9rem;
+    }
+    
+    .help-content p {
+        font-size: 0.8rem;
+    }
+    
+    .room-info-panel {
+        left: 24px;
+        right: 24px;
+        bottom: 90px;
+    }
+    
+    .room-info-details h3 {
+        font-size: 1rem;
+    }
+    
+    .room-info-details p {
+        font-size: 0.8rem;
+    }
+    
+    .map-main {
+        padding-bottom: 90px;
+    }
 }
 
+/* Desktop (1024px+) */
 @media (min-width: 1024px) {
+    .map-header {
+        padding: 14px 20px;
+    }
+    
+    .header-info h1 {
+        font-size: 1.25rem;
+    }
+    
+    .header-info p {
+        font-size: 0.8rem;
+    }
+    
     .map-main {
-        margin-left: 200px;
+        padding-bottom: 40px;
+    }
+    
+    .map-container {
+        max-width: 900px;
+        margin: 0 auto;
+    }
+    
+    .map-area {
+        margin: 20px 24px;
+        min-height: 400px;
+        max-height: 60vh;
+    }
+    
+    .location-label {
+        font-size: 0.7rem;
+    }
+    
+    .location-name {
+        font-size: 1.05rem;
+    }
+    
+    .room-annotation-label {
+        font-size: 12px;
+        padding: 6px 12px;
+    }
+    
+    .legend-card,
+    .help-card {
+        margin-left: 24px;
+        margin-right: 24px;
+    }
+    
+    .legend-header {
+        font-size: 0.8rem;
+    }
+    
+    .legend-item {
+        font-size: 0.85rem;
+    }
+    
+    .help-content h4 {
+        font-size: 0.95rem;
+    }
+    
+    .help-content p {
+        font-size: 0.85rem;
+    }
+    
+    .room-info-panel {
+        bottom: 24px;
+        left: 50%;
+        right: auto;
+        transform: translateX(-50%);
+        width: 400px;
+    }
+    
+    .room-info-details h3 {
+        font-size: 1.1rem;
+    }
+    
+    .room-info-details p {
+        font-size: 0.85rem;
+    }
+    
+    .location-banner-content {
+        max-width: 850px;
+    }
+    
+    .zoom-level {
+        font-size: 0.75rem;
+    }
+    
+    .map-instructions {
+        font-size: 0.8rem;
+    }
+}
+
+/* Bottom nav padding for mobile */
+@media (max-width: 1023px) {
+    .map-main {
+        padding-bottom: 80px;
+    }
+    
+    .map-container {
+        padding-bottom: 20px;
     }
 }
 </style>
