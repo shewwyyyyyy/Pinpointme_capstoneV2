@@ -43,6 +43,7 @@ Route::middleware(['guest'])->group(function () {
 });
 
 Route::post('/login', [AuthController::class, 'login']);
+Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);
 
 // Forced password change page (requires auth but allows force_password_change users)
 Route::middleware(['auth'])->group(function () {
@@ -142,6 +143,11 @@ Route::middleware(['auth'])->prefix('user')->name('user.')->group(function () {
         return Inertia::render('User/Profile');
     })->name('profile');
     
+    // Notifications / Alerts
+    Route::get('/notifications', function () {
+        return Inertia::render('User/Notifications');
+    })->name('notifications');
+    
     // Preventive Measures - Educational content
     Route::get('/preventive-measures', [PreventiveMeasureController::class, 'userIndex'])->name('preventive-measures');
 });
@@ -192,6 +198,11 @@ Route::middleware(['auth'])->prefix('rescuer')->name('rescuer.')->group(function
     Route::get('/chats', function () {
         return Inertia::render('Rescuer/Chats');
     })->name('chats');
+
+    // Notifications / Alerts
+    Route::get('/notifications', function () {
+        return Inertia::render('Rescuer/Notifications');
+    })->name('notifications');
 
     // Individual Chat - Unified Chat Component
     Route::get('/chat/{conversationId}', function ($conversationId) {

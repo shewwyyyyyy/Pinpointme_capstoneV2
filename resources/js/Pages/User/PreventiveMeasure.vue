@@ -1,18 +1,25 @@
 <template>
-    <v-app>
-        <v-app-bar color="primary" density="compact">
-            <v-app-bar-nav-icon @click="drawer = !drawer" />
-            <v-app-bar-title>Preventive Measures</v-app-bar-title>
-            <v-spacer />
-            <v-btn icon @click="fetchMeasures">
-                <v-icon>mdi-refresh</v-icon>
-            </v-btn>
-        </v-app-bar>
+    <v-app class="app-container">
+        <!-- Header - matches Dashboard style -->
+        <div class="page-header">
+            <div class="header-content">
+                <v-btn icon variant="text" @click="drawer = !drawer" class="menu-btn desktop-only">
+                    <v-icon>mdi-menu</v-icon>
+                </v-btn>
+                <div class="header-title">
+                    <h1>Preventive Measures</h1>
+                    <p>Stay Safe</p>
+                </div>
+                <v-btn icon variant="text" @click="fetchMeasures" class="refresh-btn">
+                    <v-icon>mdi-refresh</v-icon>
+                </v-btn>
+            </div>
+        </div>
 
         <!-- Navigation Drawer -->
         <UserMenu v-model="drawer" />
 
-        <v-main class="bg-user-gradient-light">
+        <v-main class="main-content">
             <v-container fluid class="pa-4">
                 <!-- Header -->
                 <div class="mb-6">
@@ -247,13 +254,18 @@
                 </template>
             </v-snackbar>
         </v-main>
+        
+        <!-- Bottom Navigation for Mobile -->
+        <UserBottomNav :notification-count="0" :message-count="unreadCount" />
     </v-app>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue';
 import { useDisplay } from 'vuetify';
+import { useUnreadMessages } from '@/Composables/useUnreadMessages';
 import UserMenu from '@/Components/Pages/User/Menu/UserMenu.vue';
+import UserBottomNav from '@/Components/Pages/User/Menu/UserBottomNav.vue';
 
 // Props from Inertia
 const props = defineProps({
@@ -264,6 +276,9 @@ const props = defineProps({
 });
 
 const display = useDisplay();
+
+// Unread messages count for bottom nav
+const { unreadCount } = useUnreadMessages();
 
 // Navigation
 const drawer = ref(false);
@@ -285,14 +300,27 @@ const showToast = ref(false);
 const toastMessage = ref('');
 const toastColor = ref('success');
 
-// Categories
-const categories = [
-    { value: 'fire', label: 'Fire Safety', icon: 'mdi-fire' },
-    { value: 'earthquake', label: 'Earthquake', icon: 'mdi-earth' },
-    { value: 'flood', label: 'Flood', icon: 'mdi-waves' },
-    { value: 'medical', label: 'Medical', icon: 'mdi-medical-bag' },
-    { value: 'general', label: 'General', icon: 'mdi-shield-check' },
-];
+// Category icons and colors mapping
+const categoryConfig = {
+    fire: { label: 'Fire Safety', icon: 'mdi-fire', color: 'deep-orange' },
+    earthquake: { label: 'Earthquake', icon: 'mdi-earth', color: 'brown' },
+    flood: { label: 'Flood', icon: 'mdi-waves', color: 'blue' },
+    medical: { label: 'Medical', icon: 'mdi-medical-bag', color: 'red' },
+    general: { label: 'General', icon: 'mdi-shield-check', color: 'teal' },
+    safety: { label: 'Safety', icon: 'mdi-shield-account', color: 'green' },
+    evacuation: { label: 'Evacuation', icon: 'mdi-exit-run', color: 'orange' },
+    first_aid: { label: 'First Aid', icon: 'mdi-heart-pulse', color: 'pink' },
+};
+
+// Dynamic categories from measures data
+const categories = computed(() => {
+    const uniqueCategories = [...new Set(measures.value.map(m => m.category).filter(Boolean))];
+    return uniqueCategories.map(cat => ({
+        value: cat,
+        label: categoryConfig[cat]?.label || formatCategory(cat),
+        icon: categoryConfig[cat]?.icon || 'mdi-tag',
+    }));
+});
 
 // Computed
 const filteredMeasures = computed(() => {
@@ -443,14 +471,7 @@ const handleVideoError = () => {
 };
 
 const getCategoryColor = (category) => {
-    const colors = {
-        fire: 'deep-orange',
-        earthquake: 'brown',
-        flood: 'blue',
-        medical: 'red',
-        general: 'teal',
-    };
-    return colors[category] || 'grey';
+    return categoryConfig[category]?.color || 'grey';
 };
 
 const formatCategory = (category) => {
@@ -527,5 +548,90 @@ onMounted(() => {
 
 .cursor-pointer {
     cursor: pointer;
+}
+
+/* App Container */
+.app-container {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    overflow: hidden !important;
+}
+
+/* Header - matches Dashboard style */
+.page-header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: #3674B5;
+    padding: env(safe-area-inset-top, 0) 0 0 0;
+    flex-shrink: 0;
+}
+
+.header-content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    gap: 12px;
+}
+
+.menu-btn, .refresh-btn {
+    color: white;
+}
+
+.header-title {
+    flex: 1;
+    text-align: center;
+}
+
+.header-title h1 {
+    font-size: 1.25rem;
+    font-weight: 700;
+    font-style: italic;
+    color: white;
+    margin: 0;
+}
+
+.header-title p {
+    font-size: 0.65rem;
+    letter-spacing: 2px;
+    color: rgba(255, 255, 255, 0.8);
+    margin: 0;
+    text-transform: uppercase;
+}
+
+/* Main Content */
+.main-content {
+    background: linear-gradient(180deg, #e8f5f3 0%, #f5f9f8 50%, #ffffff 100%);
+    height: 100%;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* Desktop-only elements */
+.desktop-only {
+    display: flex;
+}
+
+/* Responsive visibility */
+@media (max-width: 1023px) {
+    .desktop-only {
+        display: none !important;
+    }
+    
+    .main-content :deep(.v-container) {
+        padding-bottom: 80px !important;
+    }
+}
+
+@media (min-width: 1024px) {
+    .desktop-only {
+        display: flex;
+    }
 }
 </style>

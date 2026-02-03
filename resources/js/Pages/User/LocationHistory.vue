@@ -1,20 +1,25 @@
 <template>
-    <v-app>
-        <v-app-bar color="primary" density="compact">
-            <v-btn icon @click="drawer = true">
-                <v-icon>mdi-menu</v-icon>
-            </v-btn>
-            <v-app-bar-title>Location History</v-app-bar-title>
-            <v-spacer />
-            <v-btn icon @click="toggleSelectMode">
-                <v-icon>{{ selectMode ? 'mdi-close' : 'mdi-select-multiple' }}</v-icon>
-            </v-btn>
-        </v-app-bar>
+    <v-app class="app-container">
+        <!-- Header - matches Dashboard style -->
+        <div class="page-header">
+            <div class="header-content">
+                <v-btn icon variant="text" @click="drawer = !drawer" class="menu-btn desktop-only">
+                    <v-icon>mdi-menu</v-icon>
+                </v-btn>
+                <div class="header-title">
+                    <h1>Location History</h1>
+                    <p>Your Records</p>
+                </div>
+                <v-btn icon variant="text" @click="fetchLocationHistory" class="action-btn">
+                    <v-icon>mdi-refresh</v-icon>
+                </v-btn>
+            </div>
+        </div>
 
         <!-- Navigation Drawer -->
         <UserMenu v-model="drawer" />
 
-        <v-main class="bg-user-gradient-light">
+        <v-main class="main-content">
             <v-container fluid class="pa-4">
                
 
@@ -40,16 +45,6 @@
 
                 <!-- Location History List -->
                 <template v-else>
-                    <!-- Select Mode Actions -->
-                    <v-card v-if="selectMode && selectedItems.length > 0" class="mb-4 pa-3" elevation="2" rounded="lg">
-                        <div class="d-flex align-center justify-space-between">
-                            <span>{{ selectedItems.length }} selected</span>
-                            <v-btn color="error" variant="tonal" size="small" @click="showDeleteAlert = true">
-                                Delete Selected
-                            </v-btn>
-                        </div>
-                    </v-card>
-
                     <!-- History Cards -->
                     <v-card
                         v-for="location in filteredLocations"
@@ -57,20 +52,9 @@
                         class="mb-3"
                         elevation="2"
                         rounded="lg"
-                        @click="handleCardClick(location)"
-                        :class="{ 'border-primary': selectMode && selectedItems.includes(location.id) }"
+                        @click="viewLocation(location)"
                     >
                         <v-card-text class="d-flex align-start">
-                            <!-- Checkbox for Select Mode -->
-                            <v-checkbox
-                                v-if="selectMode"
-                                v-model="selectedItems"
-                                :value="location.id"
-                                hide-details
-                                class="mr-2 mt-0"
-                                @click.stop
-                            />
-
                             <!-- Status Icon -->
                             <v-avatar
                                 :color="getStatusColor(location.status)"
@@ -119,32 +103,13 @@
                             </div>
 
                             <!-- Arrow Icon -->
-                            <v-icon v-if="!selectMode" color="grey" class="ml-2">
+                            <v-icon color="grey" class="ml-2">
                                 mdi-chevron-right
                             </v-icon>
                         </v-card-text>
                     </v-card>
                 </template>
             </v-container>
-
-            <!-- Delete Confirmation Dialog -->
-            <v-dialog v-model="showDeleteAlert" max-width="400">
-                <v-card>
-                    <v-card-title class="d-flex align-center">
-                        <v-icon class="mr-2" color="error">mdi-delete-alert</v-icon>
-                        Delete Records
-                    </v-card-title>
-                    <v-card-text>
-                        Are you sure you want to delete {{ selectedItems.length }} selected record(s)?
-                        This action cannot be undone.
-                    </v-card-text>
-                    <v-card-actions>
-                        <v-spacer />
-                        <v-btn variant="text" @click="showDeleteAlert = false">Cancel</v-btn>
-                        <v-btn color="error" @click="deleteSelected">Delete</v-btn>
-                    </v-card-actions>
-                </v-card>
-            </v-dialog>
 
             <!-- Toast Notification -->
             <v-snackbar v-model="showToast" :color="toastColor" location="top">
@@ -154,6 +119,9 @@
                 </template>
             </v-snackbar>
         </v-main>
+        
+        <!-- Bottom Navigation for Mobile -->
+        <UserBottomNav :notification-count="0" :message-count="unreadCount" />
     </v-app>
 </template>
 
@@ -161,17 +129,19 @@
 import { ref, computed, onMounted } from 'vue';
 import { router } from '@inertiajs/vue3';
 import { getUserRescueHistory } from '@/Composables/useApi';
+import { useUnreadMessages } from '@/Composables/useUnreadMessages';
 import UserMenu from '@/Components/Pages/User/Menu/UserMenu.vue';
+import UserBottomNav from '@/Components/Pages/User/Menu/UserBottomNav.vue';
 
 // State
 const drawer = ref(false);
 const filter = ref('all');
-const selectMode = ref(false);
-const selectedItems = ref([]);
-const showDeleteAlert = ref(false);
 const locations = ref([]);
 const isLoading = ref(true);
 const error = ref('');
+
+// Unread messages count for bottom nav
+const { unreadCount } = useUnreadMessages();
 
 // Toast
 const showToast = ref(false);
@@ -292,58 +262,101 @@ const getStatusColor = (status) => {
     return colors[status] || 'grey';
 };
 
-const toggleSelectMode = () => {
-    selectMode.value = !selectMode.value;
-    selectedItems.value = [];
-};
-
-const handleCardClick = (location) => {
-    if (selectMode.value) {
-        toggleItemSelection(location.id);
+const viewLocation = (location) => {
+    // Navigate to help status page with the rescue code
+    if (location.rescue_code) {
+        router.visit(`/user/help-coming/${location.rescue_code}`);
     } else {
-        // Navigate to help status page with the rescue code
-        if (location.rescue_code) {
-            router.visit(`/user/help-coming/${location.rescue_code}`);
-        } else {
-            showToast.value = true;
-            toastMessage.value = 'No rescue code available';
-            toastColor.value = 'warning';
-        }
-    }
-};
-
-const toggleItemSelection = (id) => {
-    const index = selectedItems.value.indexOf(id);
-    if (index > -1) {
-        selectedItems.value.splice(index, 1);
-    } else {
-        selectedItems.value.push(id);
-    }
-};
-
-const deleteSelected = async () => {
-    try {
-        // In a real implementation, call API to delete records
-        locations.value = locations.value.filter((loc) => !selectedItems.value.includes(loc.id));
-        selectedItems.value = [];
-        showDeleteAlert.value = false;
-        selectMode.value = false;
-
-        toastMessage.value = 'Records deleted successfully';
-        toastColor.value = 'success';
         showToast.value = true;
-    } catch (err) {
-        console.error('Failed to delete records:', err);
-        toastMessage.value = 'Failed to delete records';
-        toastColor.value = 'error';
-        showToast.value = true;
+        toastMessage.value = 'No rescue code available';
+        toastColor.value = 'warning';
     }
 };
 </script>
 
 <style scoped>
-/* Background is now global via bg-user-gradient-light */
-.border-primary {
-    border: 2px solid rgb(var(--v-theme-primary)) !important;
+/* App Container */
+.app-container {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    overflow: hidden !important;
+}
+
+/* Header - matches Dashboard style */
+.page-header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: #3674B5;
+    padding: env(safe-area-inset-top, 0) 0 0 0;
+    flex-shrink: 0;
+}
+
+.header-content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    gap: 12px;
+}
+
+.menu-btn, .action-btn {
+    color: white;
+}
+
+.header-title {
+    flex: 1;
+    text-align: center;
+}
+
+.header-title h1 {
+    font-size: 1.25rem;
+    font-weight: 700;
+    font-style: italic;
+    color: white;
+    margin: 0;
+}
+
+.header-title p {
+    font-size: 0.65rem;
+    letter-spacing: 2px;
+    color: rgba(255, 255, 255, 0.8);
+    margin: 0;
+    text-transform: uppercase;
+}
+
+/* Main Content */
+.main-content {
+    background: linear-gradient(180deg, #e8f5f3 0%, #f5f9f8 50%, #ffffff 100%);
+    height: 100%;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* Desktop-only elements */
+.desktop-only {
+    display: flex;
+}
+
+/* Responsive visibility */
+@media (max-width: 1023px) {
+    .desktop-only {
+        display: none !important;
+    }
+    
+    .main-content :deep(.v-container) {
+        padding-bottom: 80px !important;
+    }
+}
+
+@media (min-width: 1024px) {
+    .desktop-only {
+        display: flex;
+    }
 }
 </style>

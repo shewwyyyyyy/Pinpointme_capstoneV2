@@ -35,14 +35,24 @@ export async function apiFetch(path, options = {}) {
 
     if (!resp.ok) {
         let text;
+        let jsonData = null;
         try {
             text = await resp.text();
+            // Try to parse as JSON to get structured error data
+            try {
+                jsonData = JSON.parse(text);
+            } catch {
+                // Not JSON, use text
+            }
         } catch {
             /* ignore */
         }
         let message = `HTTP ${resp.status}`;
         if (text) message += `: ${text.slice(0, 300)}`;
-        throw new Error(message);
+        const error = new Error(message);
+        error.status = resp.status;
+        error.data = jsonData;
+        throw error;
     }
 
     const ct = resp.headers.get('content-type') || '';
@@ -84,9 +94,18 @@ export async function getBuildingsFullStructure() {
 /**
  * Rescue Request API
  */
-export async function createRescueRequest(payload) {
-    const body = JSON.stringify(payload);
-    const data = await apiFetch('/api/rescue-requests', { method: 'POST', body });
+export async function createRescueRequest(payload, isFormData = false) {
+    let options = { method: 'POST' };
+    
+    if (isFormData) {
+        // For FormData (file uploads), don't set Content-Type - browser will set it with boundary
+        options.body = payload;
+        options.headers = {}; // Remove default JSON content-type
+    } else {
+        options.body = JSON.stringify(payload);
+    }
+    
+    const data = await apiFetch('/api/rescue-requests', options, isFormData);
     const rescueCode = data.rescue_code || data.rescueCode || data.code || '';
     const requestId = String(data.id || data.requestId || data.rescue_request_id || '');
     return { rescueCode, requestId, raw: data };
@@ -187,6 +206,28 @@ export async function getConversations(userId = null) {
         url += `?user_id=${userId}`;
     }
     return apiFetch(url, { method: 'GET' });
+}
+
+/**
+ * Get total unread message count for a user
+ * Returns the sum of unread_count across all conversations
+ */
+export async function getUnreadMessageCount(userId) {
+    try {
+        if (!userId) {
+            console.warn('getUnreadMessageCount: No userId provided');
+            return 0;
+        }
+        const response = await getConversations(userId);
+        // Handle nested data structure from API
+        const conversations = Array.isArray(response) ? response : (response?.data || []);
+        const total = conversations.reduce((acc, conv) => acc + (conv.unread_count || 0), 0);
+        console.log('Unread message count:', total, 'from', conversations.length, 'conversations');
+        return total;
+    } catch (error) {
+        console.error('Error getting unread message count:', error);
+        return 0;
+    }
 }
 
 export async function getConversation(id) {

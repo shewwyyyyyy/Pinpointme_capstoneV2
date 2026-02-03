@@ -347,6 +347,7 @@ import {
     markConversationRead,
     getProfilePictureUrl,
 } from '@/Composables/useApi';
+import { useNotificationAlert } from '@/Composables/useNotificationAlert';
 
 const props = defineProps({
     // Can pass either conversationId directly or rescueRequestId
@@ -398,6 +399,11 @@ const mediaRecorder = ref(null);
 const recordingChunks = ref([]);
 const recordingTimer = ref(null);
 const recordingSeconds = ref(0);
+
+// Notification alert
+const { playNotificationSound, vibrate, notify } = useNotificationAlert();
+const lastKnownMessageIds = ref(new Set());
+const isInitialLoad = ref(true);
 
 const snackbar = ref({
     show: false,
@@ -501,14 +507,23 @@ const initializeChat = async () => {
                 conversation.value = data;
                 rescueRequest.value = data.rescue_request;
                 await fetchMessages(data.id);
+            } else if (data.has_rescuer === false) {
+                // No rescuer assigned yet
+                showSnackbar('Please accept or start the rescue first before chatting', 'warning');
+                loading.value = false;
             } else {
-                // No conversation yet (no rescuer assigned)
+                // No conversation yet
                 loading.value = false;
             }
         }
     } catch (error) {
         console.error('Error initializing chat:', error);
-        showSnackbar('Failed to load chat', 'error');
+        // Check if error is due to no rescuer assigned
+        if (error.status === 400 || error.data?.has_rescuer === false) {
+            showSnackbar('Please accept or start the rescue first before chatting', 'warning');
+        } else {
+            showSnackbar('Failed to load chat', 'error');
+        }
         loading.value = false;
     }
 };
@@ -536,6 +551,34 @@ const fetchMessages = async (convId = null) => {
         const response = await getConversationMessages(conversationId);
         const data = response.data || response;
         const newMessages = Array.isArray(data) ? data : data.data || [];
+        
+        // Check for new messages from the other user (not initial load)
+        if (!isInitialLoad.value && newMessages.length > 0) {
+            const currentIds = new Set(lastKnownMessageIds.value);
+            let hasNewMessageFromOther = false;
+            
+            for (const msg of newMessages) {
+                // Check if this is a new message from the other user
+                if (!currentIds.has(msg.id) && msg.sender_id !== currentUserId.value) {
+                    hasNewMessageFromOther = true;
+                    break;
+                }
+            }
+            
+            // Play notification sound for new messages from other user
+            if (hasNewMessageFromOther) {
+                playNotificationSound('message');
+                vibrate('message');
+            }
+        }
+        
+        // Update the known message IDs
+        lastKnownMessageIds.value = new Set(newMessages.map(m => m.id));
+        
+        // Mark initial load as complete after first successful fetch
+        if (isInitialLoad.value) {
+            isInitialLoad.value = false;
+        }
         
         messages.value = newMessages;
         
@@ -859,7 +902,17 @@ const scrollToBottom = () => {
 };
 
 const goBack = () => {
-    if (props.userRole === 'rescuer') {
+    // Check if there's a 'from' query parameter to determine where to go back
+    const urlParams = new URLSearchParams(window.location.search);
+    const from = urlParams.get('from');
+    
+    if (from === 'dashboard-inprogress') {
+        // Go back to dashboard with inProgress tab selected
+        router.visit('/rescuer/dashboard?tab=inProgress');
+    } else if (from === 'active-rescue' && rescueRequest.value?.id) {
+        // Go back to active rescue page
+        router.visit(`/rescuer/active/${rescueRequest.value.id}`);
+    } else if (props.userRole === 'rescuer') {
         router.visit('/rescuer/chats');
     } else {
         router.visit('/user/inbox');

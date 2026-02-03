@@ -1,281 +1,289 @@
 <template>
     <v-app>
-        <v-app-bar color="primary" density="compact">
-            <v-app-bar-nav-icon @click="drawer = !drawer" />
-            <v-app-bar-title>Help Status</v-app-bar-title>
-            <v-spacer />
-            <v-btn icon @click="fetchRescueData">
-                <v-icon>mdi-refresh</v-icon>
-            </v-btn>
-        </v-app-bar>
+        <!-- Clean Header -->
+        <div class="help-page-header">
+            <div class="header-content">
+                <v-btn icon variant="text" class="back-btn" @click="handleGoBack">
+                    <v-icon color="white">mdi-arrow-left</v-icon>
+                </v-btn>
+                <div class="header-title">
+                    <h1>Help Status</h1>
+                    <p v-if="rescue">{{ rescue.rescue_code }}</p>
+                </div>
+                <v-btn icon variant="text" @click="fetchRescueData" class="refresh-btn">
+                    <v-icon color="white">mdi-refresh</v-icon>
+                </v-btn>
+            </div>
+        </div>
 
-        <!-- Navigation Drawer -->
+        <!-- Navigation Drawer - handles its own visibility -->
         <UserMenu v-model="drawer" />
 
-        <v-main class="bg-user-gradient-light">
-            <v-container fluid class="pa-4">
+        <v-main class="bg-grey-lighten-4">
+            <!-- Notification Alert Banner -->
+            <v-slide-y-transition>
+                <v-alert
+                    v-if="notificationBanner.show"
+                    :type="notificationBanner.type"
+                    :icon="notificationBanner.icon"
+                    variant="tonal"
+                    class="notification-banner ma-3 rounded-xl"
+                    closable
+                    @click:close="notificationBanner.show = false"
+                >
+                    <div class="d-flex align-center">
+                        <div class="flex-grow-1">
+                            <div class="text-subtitle-2 font-weight-bold">{{ notificationBanner.title }}</div>
+                            <div class="text-caption">{{ notificationBanner.message }}</div>
+                        </div>
+                    </div>
+                </v-alert>
+            </v-slide-y-transition>
+
+            <v-container fluid class="pa-0">
                 <!-- Loading State -->
-                <div v-if="loading" class="d-flex justify-center align-center" style="min-height: 60vh;">
-                    <v-progress-circular indeterminate color="primary" size="64" />
+                <div v-if="loading" class="d-flex flex-column justify-center align-center" style="min-height: 70vh;">
+                    <v-progress-circular indeterminate color="primary" size="64" width="5" />
+                    <p class="text-grey mt-4">Loading rescue status...</p>
                 </div>
 
                 <!-- Error State -->
-                <v-alert v-else-if="error" type="error" variant="tonal" class="mb-4">
-                    {{ error }}
-                    <template v-slot:append>
-                        <v-btn variant="text" @click="fetchRescueData">Retry</v-btn>
-                    </template>
-                </v-alert>
+                <div v-else-if="error" class="pa-4">
+                    <v-alert type="error" variant="tonal" class="mb-4 rounded-xl">
+                        {{ error }}
+                        <template v-slot:append>
+                            <v-btn variant="text" @click="fetchRescueData">Retry</v-btn>
+                        </template>
+                    </v-alert>
+                </div>
 
                 <!-- Rescue Status Display -->
                 <template v-else-if="rescue">
-                    <!-- Status Header -->
-                    <v-card class="mb-4 text-center" elevation="4" rounded="lg">
-                        <v-card-text class="pa-6">
-                            <v-avatar :color="getStatusColor(rescue.status)" size="80" class="mb-4">
-                                <v-icon size="40" color="white">
-                                    {{ getStatusIcon(rescue.status) }}
-                                </v-icon>
-                            </v-avatar>
-                            <h2 class="text-h5 font-weight-bold mb-2">
-                                {{ getStatusText(rescue.status) }}
-                            </h2>
-                            <v-chip :color="getStatusColor(rescue.status)" variant="tonal" size="large">
-                                {{ rescue.status?.toUpperCase() }}
-                            </v-chip>
-                        </v-card-text>
-
-                        <!-- Progress Indicator -->
-                        <v-progress-linear
-                            :model-value="getProgressValue(rescue.status)"
-                            :color="getStatusColor(rescue.status)"
-                            height="8"
-                            class="mb-0"
-                        />
-                    </v-card>
-
-                    <!-- Location Details -->
-                    <v-card class="mb-4" elevation="2" rounded="lg">
-                        <v-card-title class="d-flex align-center">
-                            <v-icon class="mr-2" color="primary">mdi-map-marker</v-icon>
-                            Your Location
-                        </v-card-title>
-                        <v-card-text>
-                            <v-list density="compact">
-                                <v-list-item>
-                                    <template v-slot:prepend>
-                                        <v-icon color="primary">mdi-office-building</v-icon>
-                                    </template>
-                                    <v-list-item-title>Building</v-list-item-title>
-                                    <v-list-item-subtitle>
-                                        {{ locationDetails.buildingName  }}
-                                    </v-list-item-subtitle>
-                                </v-list-item>
-                                <v-list-item>
-                                    <template v-slot:prepend>
-                                        <v-icon color="secondary">mdi-stairs</v-icon>
-                                    </template>
-                                    <v-list-item-title>Floor</v-list-item-title>
-                                    <v-list-item-subtitle>
-                                        {{ locationDetails.floorName || 'Loading...' }}
-                                    </v-list-item-subtitle>
-                                </v-list-item>
-                                <v-list-item>
-                                    <template v-slot:prepend>
-                                        <v-icon color="success">mdi-door</v-icon>
-                                    </template>
-                                    <v-list-item-title>Room</v-list-item-title>
-                                    <v-list-item-subtitle>
-                                        {{ locationDetails.roomName || 'Loading...' }}
-                                    </v-list-item-subtitle>
-                                </v-list-item>
-                            </v-list>
-                        </v-card-text>
-                    </v-card>
-
-                    <!-- Emergency Details -->
-                    <v-card v-if="rescue.description || (rescue.status === 'rescued' || rescue.status === 'safe')" class="mb-4" elevation="2" rounded="lg">
-                        <v-card-title class="d-flex align-center">
-                            <v-icon class="mr-2" color="error">mdi-alert-circle</v-icon>
-                            {{ rescue.status === 'rescued' || rescue.status === 'safe' ? 'Rescue Report Details' : 'Emergency Details' }}
-                        </v-card-title>
-                        <v-card-text>
-                            <!-- Rescue Code -->
-                            <div class="mb-3">
-                                <div class="text-caption text-grey mb-1">RESCUE CODE</div>
-                                <div class="text-h6 font-weight-bold text-primary">{{ rescue.rescue_code }}</div>
-                            </div>
-
-                            <!-- Person Being Reported/Rescued -->
-                            <div class="mb-3">
-                                <div class="text-caption text-grey mb-1">PERSON IN NEED</div>
-                                <div class="text-body-2 font-weight-medium">{{ getPersonInNeedName() }}</div>
-                            </div>
-
-                            <!-- Reporter Name (if different from user) -->
-                            <div v-if="getReporterName() && getReporterName() !== getUserName()" class="mb-3">
-                                <div class="text-caption text-grey mb-1">REPORTED BY</div>
-                                <div class="text-body-2 font-weight-medium">{{ getReporterName() }}</div>
-                                <div class="text-caption text-grey">Good Samaritan Report</div>
-                            </div>
-
-                            <!-- Description -->
-                            <div v-if="rescue.description" class="mb-3">
-                                <div class="text-caption text-grey mb-1">DESCRIPTION</div>
-                                <p class="text-body-2">{{ rescue.description }}</p>
-                            </div>
-
-                            <!-- Emergency Details Grid -->
-                            <div v-if="rescue.urgency_level || rescue.mobility_status || rescue.injuries || rescue.additional_info" class="mb-3">
-                                <div class="text-caption text-grey mb-2">EMERGENCY INFORMATION</div>
-                                <v-row dense>
-                                    <v-col cols="6" v-if="rescue.urgency_level">
-                                        <div class="text-caption text-grey">Urgency Level</div>
-                                        <v-chip
-                                            :color="getUrgencyColor(rescue.urgency_level)"
-                                            variant="tonal"
-                                            size="small"
-                                            class="mt-1"
-                                        >
-                                            {{ rescue.urgency_level }}
-                                        </v-chip>
-                                    </v-col>
-                                    <v-col cols="6" v-if="rescue.mobility_status">
-                                        <div class="text-caption text-grey">Mobility Status</div>
-                                        <v-chip
-                                            color="info"
-                                            variant="tonal"
-                                            size="small"
-                                            class="mt-1"
-                                        >
-                                            {{ rescue.mobility_status }}
-                                        </v-chip>
-                                    </v-col>
-                                </v-row>
-                            </div>
-
-                            <!-- Injuries -->
-                            <div v-if="rescue.injuries" class="mb-3">
-                                <div class="text-caption text-grey mb-1">INJURIES</div>
-                                <div class="text-body-2">{{ rescue.injuries }}</div>
-                            </div>
-
-                            <!-- Additional Information -->
-                            <div v-if="rescue.additional_info" class="mb-3">
-                                <div class="text-caption text-grey mb-1">ADDITIONAL INFORMATION</div>
-                                <div class="text-body-2">{{ rescue.additional_info }}</div>
-                            </div>
-
-                            <!-- Rescue Completion Time (for rescued status) -->
-                            <div v-if="(rescue.status === 'rescued' || rescue.status === 'safe') && rescue.updated_at" class="mb-3">
-                                <div class="text-caption text-grey mb-1">RESCUE COMPLETED</div>
-                                <div class="d-flex align-center">
-                                    <v-icon size="16" color="success" class="mr-1">mdi-clock-check</v-icon>
-                                    <div class="text-body-2">
-                                        {{ formatRescueDateTime(rescue.updated_at) }}
-                                    </div>
-                                </div>
-                            </div>
-                        </v-card-text>
-                    </v-card>
-
-                    <!-- Assigned Rescuer -->
-                    <v-card v-if="rescue.assigned_rescuer || rescue.rescuer" class="mb-4" elevation="2" rounded="lg">
-                        <v-card-title class="d-flex align-center">
-                            <v-icon class="mr-2" color="success">mdi-account-check</v-icon>
-                            {{ rescue.status === 'rescued' || rescue.status === 'safe' ? 'Rescuer Details' : 'Assigned Rescuer' }}
-                        </v-card-title>
-                        <v-card-text>
-                            <div class="d-flex align-center">
-                                <v-avatar 
-                                    color="success" 
-                                    class="mr-3" 
-                                    size="48"
-                                    :style="rescuerProfilePicture ? 'cursor: pointer' : ''"
-                                    @click="rescuerProfilePicture && openPhotoViewer(rescuerProfilePicture, getRescuerName())"
-                                >
-                                    <v-img 
-                                        v-if="rescuerProfilePicture" 
-                                        :src="rescuerProfilePicture" 
-                                        cover 
-                                    />
-                                    <span v-else class="text-subtitle-1 text-white">{{ getRescuerInitials() }}</span>
+                    <!-- Status Hero Card -->
+                    <div class="status-hero" :class="'status-' + rescue.status">
+                        <div class="status-hero-content">
+                            <div class="status-icon-wrapper">
+                                <v-avatar :color="getStatusColor(rescue.status)" size="100" class="status-avatar">
+                                    <v-icon size="50" color="white">
+                                        {{ getStatusIcon(rescue.status) }}
+                                    </v-icon>
                                 </v-avatar>
-                                <div class="flex-grow-1">
-                                    <div class="font-weight-bold">
-                                        {{ getRescuerName() }}
+                                <div v-if="rescue.status !== 'rescued' && rescue.status !== 'safe' && rescue.status !== 'cancelled'" class="pulse-ring"></div>
+                            </div>
+                            <h2 class="status-title">{{ getStatusText(rescue.status) }}</h2>
+                            <v-chip :color="getStatusColor(rescue.status)" variant="flat" size="large" class="status-chip">
+                                {{ rescue.status?.replace('_', ' ').toUpperCase() }}
+                            </v-chip>
+                        </div>
+                        
+                        <!-- Progress Steps -->
+                        <div class="progress-steps">
+                            <div class="progress-step" :class="{ active: getProgressValue(rescue.status) >= 20, completed: getProgressValue(rescue.status) > 20 }">
+                                <div class="step-dot"></div>
+                                <span>Pending</span>
+                            </div>
+                            <div class="progress-line" :class="{ filled: getProgressValue(rescue.status) >= 40 }"></div>
+                            <div class="progress-step" :class="{ active: getProgressValue(rescue.status) >= 40, completed: getProgressValue(rescue.status) > 40 }">
+                                <div class="step-dot"></div>
+                                <span>Assigned</span>
+                            </div>
+                            <div class="progress-line" :class="{ filled: getProgressValue(rescue.status) >= 60 }"></div>
+                            <div class="progress-step" :class="{ active: getProgressValue(rescue.status) >= 60, completed: getProgressValue(rescue.status) > 60 }">
+                                <div class="step-dot"></div>
+                                <span>En Route</span>
+                            </div>
+                            <div class="progress-line" :class="{ filled: getProgressValue(rescue.status) >= 80 }"></div>
+                            <div class="progress-step" :class="{ active: getProgressValue(rescue.status) >= 80, completed: getProgressValue(rescue.status) >= 100 }">
+                                <div class="step-dot"></div>
+                                <span>Rescued</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Content Area -->
+                    <div class="content-area pa-4">
+                        <!-- Location Card -->
+                        <v-card class="mb-3 rounded-xl" elevation="0">
+                            <div class="card-header-icon">
+                                <v-avatar color="primary" size="40">
+                                    <v-icon color="white" size="20">mdi-map-marker</v-icon>
+                                </v-avatar>
+                                <div class="card-header-text">
+                                    <h3>Your Location</h3>
+                                    <p>Where help is coming</p>
+                                </div>
+                            </div>
+                            <v-card-text class="pt-0">
+                                <div class="location-details">
+                                    <div class="location-item">
+                                        <v-icon color="primary" size="18">mdi-office-building</v-icon>
+                                        <div>
+                                            <span class="label">Building</span>
+                                            <span class="value">{{ locationDetails.buildingName }}</span>
+                                        </div>
                                     </div>
-                                    <div class="text-caption text-grey">
-                                        {{ rescue.status === 'rescued' || rescue.status === 'safe' ? 'Rescue completed' : 'Help is on the way' }}
+                                    <div class="location-item">
+                                        <v-icon color="secondary" size="18">mdi-stairs</v-icon>
+                                        <div>
+                                            <span class="label">Floor</span>
+                                            <span class="value">{{ locationDetails.floorName || 'Loading...' }}</span>
+                                        </div>
+                                    </div>
+                                    <div class="location-item">
+                                        <v-icon color="success" size="18">mdi-door</v-icon>
+                                        <div>
+                                            <span class="label">Room</span>
+                                            <span class="value">{{ locationDetails.roomName || 'Loading...' }}</span>
+                                        </div>
                                     </div>
                                 </div>
-                                <v-btn
-                                    icon
-                                    size="small"
-                                    variant="text"
-                                    @click="showRescuerProfile = true"
-                                >
-                                    <v-icon>mdi-information-outline</v-icon>
-                                </v-btn>
-                            </div>
-                        </v-card-text>
-                    </v-card>
+                            </v-card-text>
+                        </v-card>
 
-                    <!-- Action Buttons -->
-                    <v-row v-if="rescue.status !== 'rescued' && rescue.status !== 'safe'" class="mt-4">
-                        <v-col cols="12" sm="6">
+                        <!-- Rescuer Card (if assigned) -->
+                        <v-card v-if="rescue.assigned_rescuer || rescue.rescuer" class="mb-3 rounded-xl rescuer-card" elevation="0">
+                            <div class="card-header-icon">
+                                <v-avatar color="success" size="40">
+                                    <v-icon color="white" size="20">mdi-account-check</v-icon>
+                                </v-avatar>
+                                <div class="card-header-text">
+                                    <h3>{{ rescue.status === 'rescued' || rescue.status === 'safe' ? 'Your Rescuer' : 'Help is Coming' }}</h3>
+                                    <p>{{ rescue.status === 'rescued' || rescue.status === 'safe' ? 'Rescue completed' : 'Rescuer assigned to help you' }}</p>
+                                </div>
+                            </div>
+                            <v-card-text class="pt-0">
+                                <div class="rescuer-info" @click="showRescuerProfile = true">
+                                    <v-avatar 
+                                        size="60" 
+                                        color="success"
+                                        :style="rescuerProfilePicture ? 'cursor: pointer' : ''"
+                                    >
+                                        <v-img v-if="rescuerProfilePicture" :src="rescuerProfilePicture" cover />
+                                        <span v-else class="text-h6 text-white">{{ getRescuerInitials() }}</span>
+                                    </v-avatar>
+                                    <div class="rescuer-details">
+                                        <h4>{{ getRescuerName() }}</h4>
+                                        <p>Certified Rescuer</p>
+                                        <v-chip color="success" variant="tonal" size="x-small" v-if="rescue.status === 'en_route'">
+                                            <v-icon start size="12">mdi-run-fast</v-icon>
+                                            On the way
+                                        </v-chip>
+                                    </div>
+                                    <v-icon color="grey" size="20">mdi-chevron-right</v-icon>
+                                </div>
+                            </v-card-text>
+                        </v-card>
+
+                        <!-- Emergency Details (Collapsible) -->
+                        <v-expansion-panels v-if="rescue.description || rescue.urgency_level" class="mb-3" variant="accordion">
+                            <v-expansion-panel elevation="0" class="rounded-xl">
+                                <v-expansion-panel-title class="py-3">
+                                    <div class="d-flex align-center">
+                                        <v-avatar color="error" size="40" class="mr-3">
+                                            <v-icon color="white" size="20">mdi-alert-circle</v-icon>
+                                        </v-avatar>
+                                        <div>
+                                            <h3 class="text-subtitle-1 font-weight-bold">Emergency Details</h3>
+                                            <p class="text-caption text-grey mb-0">View request information</p>
+                                        </div>
+                                    </div>
+                                </v-expansion-panel-title>
+                                <v-expansion-panel-text>
+                                    <div class="emergency-details">
+                                        <div v-if="rescue.description" class="detail-item">
+                                            <span class="detail-label">Description</span>
+                                            <p class="detail-value">{{ rescue.description }}</p>
+                                        </div>
+                                        <div class="detail-row" v-if="rescue.urgency_level || rescue.mobility_status">
+                                            <div v-if="rescue.urgency_level" class="detail-item half">
+                                                <span class="detail-label">Urgency</span>
+                                                <v-chip :color="getUrgencyColor(rescue.urgency_level)" variant="tonal" size="small">
+                                                    {{ rescue.urgency_level }}
+                                                </v-chip>
+                                            </div>
+                                            <div v-if="rescue.mobility_status" class="detail-item half">
+                                                <span class="detail-label">Mobility</span>
+                                                <v-chip color="info" variant="tonal" size="small">
+                                                    {{ rescue.mobility_status }}
+                                                </v-chip>
+                                            </div>
+                                        </div>
+                                        <div v-if="rescue.injuries" class="detail-item">
+                                            <span class="detail-label">Injuries</span>
+                                            <p class="detail-value">{{ rescue.injuries }}</p>
+                                        </div>
+                                        <div v-if="(rescue.status === 'rescued' || rescue.status === 'safe') && rescue.updated_at" class="detail-item">
+                                            <span class="detail-label">Completed At</span>
+                                            <p class="detail-value">{{ formatRescueDateTime(rescue.updated_at) }}</p>
+                                        </div>
+                                    </div>
+                                </v-expansion-panel-text>
+                            </v-expansion-panel>
+                        </v-expansion-panels>
+
+                        <!-- Action Buttons -->
+                        <div v-if="rescue.status !== 'rescued' && rescue.status !== 'safe'" class="action-buttons pb-safe">
                             <v-btn
                                 color="primary"
-                                block
                                 size="large"
-                                prepend-icon="mdi-message"
+                                block
+                                class="mb-2 rounded-xl"
+                                elevation="2"
                                 @click="openChat"
                             >
+                                <v-icon start>mdi-message-text</v-icon>
                                 Chat with Rescuer
                             </v-btn>
-                        </v-col>
-                        <v-col cols="12" sm="6">
                             <v-btn
                                 color="success"
-                                block
                                 size="large"
-                                variant="tonal"
-                                prepend-icon="mdi-check-circle"
+                                block
+                                variant="flat"
+                                class="rounded-xl"
+                                elevation="2"
                                 @click="showConfirmSafe = true"
                             >
+                                <v-icon start>mdi-check-circle</v-icon>
                                 I'm Safe Now
                             </v-btn>
-                        </v-col>
-                    </v-row>
-
-
+                        </div>
+                        
+                        <!-- Completed State Actions -->
+                        <div v-else class="text-center py-4 pb-safe">
+                            <v-icon size="56" color="success" class="mb-2">mdi-check-circle</v-icon>
+                            <h3 class="text-h6 mb-1">Rescue Complete</h3>
+                            <p class="text-grey mb-3">Thank you for using PinPointMe. Stay safe!</p>
+                            <v-btn color="primary" variant="tonal" class="rounded-xl" @click="handleGoBack">
+                                Return to Dashboard
+                            </v-btn>
+                        </div>
+                    </div>
                 </template>
 
                 <!-- No Rescue Data -->
-                <v-card v-else class="text-center pa-8" elevation="4" rounded="lg">
-                    <v-icon size="64" color="grey">mdi-alert-circle-outline</v-icon>
-                    <h3 class="text-h6 mt-4">No Active Rescue Request</h3>
-                    <p class="text-grey mt-2">You don't have an active rescue request</p>
-                    <v-btn color="primary" class="mt-4" @click="handleGoBack">
+                <div v-else class="no-rescue-state">
+                    <v-icon size="80" color="grey-lighten-1">mdi-alert-circle-outline</v-icon>
+                    <h3>No Active Rescue Request</h3>
+                    <p>You don't have an active rescue request</p>
+                    <v-btn color="primary" class="mt-4 rounded-xl" @click="handleGoBack">
                         Go to Dashboard
                     </v-btn>
-                </v-card>
+                </div>
             </v-container>
 
             <!-- Confirm Safe Dialog -->
             <v-dialog v-model="showConfirmSafe" max-width="400">
-                <v-card>
-                    <v-card-title class="d-flex align-center">
-                        <v-icon class="mr-2" color="success">mdi-check-circle</v-icon>
-                        Confirm You're Safe
-                    </v-card-title>
-                    <v-card-text>
-                        Are you sure you want to mark yourself as safe? This will close your rescue request.
+                <v-card class="rounded-xl">
+                    <v-card-text class="text-center pt-6">
+                        <v-avatar color="success" size="64" class="mb-4">
+                            <v-icon size="32" color="white">mdi-check-circle</v-icon>
+                        </v-avatar>
+                        <h3 class="text-h6 mb-2">Confirm You're Safe</h3>
+                        <p class="text-grey">This will close your rescue request. Are you sure?</p>
                     </v-card-text>
-                    <v-card-actions>
-                        <v-spacer />
-                        <v-btn variant="text" @click="showConfirmSafe = false">Cancel</v-btn>
-                        <v-btn color="success" :loading="isMarkingSafe" @click="markAsSafe">
+                    <v-card-actions class="pa-4 pt-0">
+                        <v-btn variant="text" class="flex-grow-1" @click="showConfirmSafe = false">Cancel</v-btn>
+                        <v-btn color="success" variant="flat" class="flex-grow-1 rounded-lg" :loading="isMarkingSafe" @click="markAsSafe">
                             Yes, I'm Safe
                         </v-btn>
                     </v-card-actions>
@@ -284,55 +292,41 @@
 
             <!-- Rescuer Profile Dialog -->
             <v-dialog v-model="showRescuerProfile" max-width="400">
-                <v-card>
-                    <v-card-title class="d-flex align-center">
-                        <v-icon class="mr-2">mdi-account</v-icon>
-                        Rescuer Profile
-                    </v-card-title>
-                    <v-divider />
-                    <v-card-text class="text-center py-4">
+                <v-card class="rounded-xl">
+                    <v-card-text class="text-center py-6">
                         <v-avatar 
-                            size="80" 
+                            size="100" 
                             color="success" 
-                            class="mb-3"
+                            class="mb-4"
                             :style="rescuerProfilePicture ? 'cursor: pointer' : ''"
                             @click="rescuerProfilePicture && openPhotoViewer(rescuerProfilePicture, getRescuerName())"
                         >
                             <v-img v-if="rescuerProfilePicture" :src="rescuerProfilePicture" cover />
-                            <span v-else class="text-h5 text-white">{{ getRescuerInitials() }}</span>
+                            <span v-else class="text-h4 text-white">{{ getRescuerInitials() }}</span>
                         </v-avatar>
-                        <p v-if="rescuerProfilePicture" class="text-caption text-grey mb-2">Tap photo to enlarge</p>
-                        <h3 class="text-h6 mb-1">{{ getRescuerName() }}</h3>
-                        <p class="text-grey text-body-2 mb-3">Rescuer</p>
+                        <h3 class="text-h5 font-weight-bold mb-1">{{ getRescuerName() }}</h3>
+                        <p class="text-grey mb-4">Certified Rescuer</p>
                         
-                        <v-list density="compact" class="text-left">
-                            <v-list-item v-if="getRescuerContact()">
-                                <template v-slot:prepend>
-                                    <v-icon color="grey" size="20">mdi-phone</v-icon>
-                                </template>
-                                <v-list-item-title class="text-body-2">Contact</v-list-item-title>
-                                <v-list-item-subtitle>{{ getRescuerContact() }}</v-list-item-subtitle>
-                            </v-list-item>
-                            <v-list-item v-if="getRescuerEmail()">
-                                <template v-slot:prepend>
-                                    <v-icon color="grey" size="20">mdi-email</v-icon>
-                                </template>
-                                <v-list-item-title class="text-body-2">Email</v-list-item-title>
-                                <v-list-item-subtitle>{{ getRescuerEmail() }}</v-list-item-subtitle>
-                            </v-list-item>
-                        </v-list>
+                        <v-divider class="mb-4" />
+                        
+                        <div v-if="getRescuerContact()" class="d-flex align-center justify-center mb-3">
+                            <v-icon color="primary" class="mr-2">mdi-phone</v-icon>
+                            <span>{{ getRescuerContact() }}</span>
+                        </div>
+                        <div v-if="getRescuerEmail()" class="d-flex align-center justify-center">
+                            <v-icon color="primary" class="mr-2">mdi-email</v-icon>
+                            <span>{{ getRescuerEmail() }}</span>
+                        </div>
                     </v-card-text>
-                    <v-divider />
-                    <v-card-actions>
-                        <v-spacer />
-                        <v-btn variant="text" @click="showRescuerProfile = false">Close</v-btn>
+                    <v-card-actions class="pa-4 pt-0">
+                        <v-btn variant="text" block @click="showRescuerProfile = false">Close</v-btn>
                     </v-card-actions>
                 </v-card>
             </v-dialog>
 
             <!-- Photo Viewer Dialog -->
-            <v-dialog v-model="showPhotoViewer" max-width="500" content-class="photo-viewer-dialog">
-                <v-card class="bg-black">
+            <v-dialog v-model="showPhotoViewer" max-width="500">
+                <v-card class="bg-black rounded-xl">
                     <v-card-title class="d-flex align-center justify-space-between text-white">
                         <span>{{ photoViewerName }}</span>
                         <v-btn icon variant="text" color="white" @click="showPhotoViewer = false">
@@ -340,12 +334,7 @@
                         </v-btn>
                     </v-card-title>
                     <v-card-text class="pa-0 d-flex justify-center align-center" style="min-height: 300px;">
-                        <v-img
-                            :src="photoViewerUrl"
-                            max-height="400"
-                            contain
-                            class="bg-black"
-                        />
+                        <v-img :src="photoViewerUrl" max-height="400" contain class="bg-black" />
                     </v-card-text>
                 </v-card>
             </v-dialog>
@@ -369,6 +358,9 @@
                 @click="popupAlert.show = false"
             />
         </v-main>
+        
+        <!-- Bottom Navigation for Mobile -->
+        <UserBottomNav :notification-count="1" :message-count="unreadCount" />
     </v-app>
 </template>
 
@@ -383,7 +375,9 @@ import {
     getProfilePictureUrl,
 } from '@/Composables/useApi';
 import { useNotificationAlert } from '@/Composables/useNotificationAlert';
+import { useUnreadMessages } from '@/Composables/useUnreadMessages';
 import UserMenu from '@/Components/Pages/User/Menu/UserMenu.vue';
+import UserBottomNav from '@/Components/Pages/User/Menu/UserBottomNav.vue';
 import NotificationPopup from '@/Components/NotificationPopup.vue';
 
 // Props from Inertia
@@ -396,6 +390,9 @@ const props = defineProps({
 
 // Navigation drawer
 const drawer = ref(false);
+
+// Unread messages count for bottom nav
+const { unreadCount } = useUnreadMessages();
 
 // State
 const rescue = ref(null);
@@ -459,6 +456,16 @@ const toastColor = ref('success');
 
 // Notification Alert
 const { playNotificationSound, vibrate, notify } = useNotificationAlert();
+
+// Notification Banner State
+const notificationBanner = ref({
+    show: false,
+    title: '',
+    message: '',
+    type: 'info',
+    icon: 'mdi-information',
+});
+
 const popupAlert = ref({
     show: false,
     title: '',
@@ -470,18 +477,70 @@ const popupAlert = ref({
 // Track previous status for change detection
 const previousStatus = ref(null);
 
+// Show notification with sound and vibration
+const showNotification = (options) => {
+    const { title, message, type, icon, sound, vibratePattern } = options;
+    
+    // Play sound
+    if (sound) {
+        playNotificationSound(sound);
+    }
+    
+    // Vibrate
+    if (vibratePattern) {
+        vibrate(vibratePattern);
+    }
+    
+    // Show banner notification
+    notificationBanner.value = {
+        show: true,
+        title,
+        message,
+        type,
+        icon,
+    };
+    
+    // Show popup alert
+    popupAlert.value = {
+        show: true,
+        title,
+        message,
+        type,
+        icon,
+    };
+    
+    // Show browser notification
+    notify({
+        title,
+        body: message,
+        icon: '/images/logo.png'
+    });
+    
+    // Auto-hide banner after 5 seconds
+    setTimeout(() => {
+        notificationBanner.value.show = false;
+    }, 5000);
+    
+    // Auto-hide popup after 5 seconds
+    setTimeout(() => {
+        popupAlert.value.show = false;
+    }, 5000);
+};
+
 // Trigger notification on status change
 const triggerStatusNotification = (oldStatus, newStatus) => {
     let notificationData = null;
 
     switch (newStatus) {
         case 'accepted':
+        case 'assigned':
             notificationData = {
                 title: '🚨 Rescuer Assigned!',
                 message: 'A rescuer has been assigned to help you. Help is on the way!',
                 type: 'success',
                 icon: 'mdi-account-check',
-                sound: 'notification'
+                sound: 'notification',
+                vibratePattern: 'urgent'
             };
             break;
         case 'in_progress':
@@ -491,7 +550,18 @@ const triggerStatusNotification = (oldStatus, newStatus) => {
                 message: 'The rescuer is now on their way to your location. Stay calm.',
                 type: 'info',
                 icon: 'mdi-run-fast',
-                sound: 'notification'
+                sound: 'notification',
+                vibratePattern: 'standard'
+            };
+            break;
+        case 'on_scene':
+            notificationData = {
+                title: '📍 Rescuer Arrived!',
+                message: 'The rescuer has arrived at your location. Look for them nearby.',
+                type: 'success',
+                icon: 'mdi-map-marker-check',
+                sound: 'success',
+                vibratePattern: 'urgent'
             };
             break;
         case 'rescued':
@@ -502,36 +572,24 @@ const triggerStatusNotification = (oldStatus, newStatus) => {
                 message: 'You have been marked as safe. Thank you for using PinPointMe.',
                 type: 'success',
                 icon: 'mdi-check-circle',
-                sound: 'message'
+                sound: 'success',
+                vibratePattern: 'success'
+            };
+            break;
+        case 'cancelled':
+            notificationData = {
+                title: '❌ Request Cancelled',
+                message: 'Your rescue request has been cancelled.',
+                type: 'warning',
+                icon: 'mdi-close-circle',
+                sound: 'notification',
+                vibratePattern: 'standard'
             };
             break;
     }
 
     if (notificationData) {
-        // Play sound and vibrate
-        playNotificationSound(notificationData.sound);
-        vibrate('standard');
-
-        // Show popup
-        popupAlert.value = {
-            show: true,
-            title: notificationData.title,
-            message: notificationData.message,
-            type: notificationData.type,
-            icon: notificationData.icon
-        };
-
-        // Also show browser notification
-        notify({
-            title: notificationData.title,
-            body: notificationData.message,
-            icon: '/icons/icon-192x192.png'
-        });
-
-        // Auto-hide after 5 seconds
-        setTimeout(() => {
-            popupAlert.value.show = false;
-        }, 5000);
+        showNotification(notificationData);
     }
 };
 
@@ -771,6 +829,16 @@ const markAsSafe = async () => {
         rescue.value.status = 'safe';
         showConfirmSafe.value = false;
 
+        // Show notification with sound and vibration
+        showNotification({
+            title: '✅ Marked as Safe!',
+            message: 'You have been marked as safe. Stay safe!',
+            type: 'success',
+            icon: 'mdi-shield-check',
+            sound: 'success',
+            vibratePattern: 'success'
+        });
+
         toastMessage.value = 'You have been marked as safe!';
         toastColor.value = 'success';
         showToast.value = true;
@@ -794,6 +862,8 @@ const markAsSafe = async () => {
 
 const openChat = () => {
     if (rescue.value?.assigned_rescuer || rescue.value?.rescuer_id) {
+        // Play sound when opening chat
+        playNotificationSound('message');
         // Use rescue-chat route which will get or create conversation
         router.visit(`/user/rescue-chat/${rescue.value.id}`);
     } else {
@@ -810,5 +880,531 @@ const handleGoBack = () => {
 </script>
 
 <style scoped>
-/* Component-specific styles only - background is now global */
+/* Header Styling */
+.help-page-header {
+    background: linear-gradient(135deg, #3674B5 0%, #2196F3 100%);
+    padding: 16px;
+    padding-top: calc(env(safe-area-inset-top) + 16px);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+/* Notification Banner */
+.notification-banner {
+    position: sticky;
+    top: 70px;
+    z-index: 100;
+    animation: slideDown 0.3s ease-out;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+@keyframes slideDown {
+    from {
+        transform: translateY(-100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.notification-banner.v-alert--type-success {
+    background: linear-gradient(135deg, #E8F5E9 0%, #C8E6C9 100%) !important;
+    border-left: 4px solid #4CAF50;
+}
+
+.notification-banner.v-alert--type-info {
+    background: linear-gradient(135deg, #E3F2FD 0%, #BBDEFB 100%) !important;
+    border-left: 4px solid #2196F3;
+}
+
+.notification-banner.v-alert--type-warning {
+    background: linear-gradient(135deg, #FFF3E0 0%, #FFE0B2 100%) !important;
+    border-left: 4px solid #FF9800;
+}
+
+.notification-banner.v-alert--type-error {
+    background: linear-gradient(135deg, #FFEBEE 0%, #FFCDD2 100%) !important;
+    border-left: 4px solid #F44336;
+}
+
+.header-content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.header-title {
+    text-align: center;
+    flex: 1;
+}
+
+.header-title h1 {
+    color: white;
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin: 0;
+}
+
+.header-title p {
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 0.75rem;
+    margin: 0;
+}
+
+.back-btn, .refresh-btn {
+    background: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* Status Hero */
+.status-hero {
+    background: linear-gradient(135deg, #3674B5 0%, #2196F3 100%);
+    padding: 24px 16px 36px;
+    position: relative;
+    overflow: hidden;
+}
+
+.status-hero::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.05'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+    opacity: 0.3;
+}
+
+.status-hero.status-pending {
+    background: linear-gradient(135deg, #FF9800 0%, #FFC107 100%);
+}
+
+.status-hero.status-rescued,
+.status-hero.status-safe {
+    background: linear-gradient(135deg, #4CAF50 0%, #8BC34A 100%);
+}
+
+.status-hero-content {
+    position: relative;
+    z-index: 1;
+    text-align: center;
+}
+
+.status-icon-wrapper {
+    position: relative;
+    display: inline-block;
+    margin-bottom: 12px;
+}
+
+.status-avatar {
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+    width: 88px !important;
+    height: 88px !important;
+}
+
+.status-avatar .v-icon {
+    font-size: 44px !important;
+}
+
+.pulse-ring {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 88px;
+    height: 88px;
+    border-radius: 50%;
+    border: 3px solid currentColor;
+    animation: pulse 2s ease-out infinite;
+}
+
+@keyframes pulse {
+    0% {
+        transform: translate(-50%, -50%) scale(1);
+        opacity: 0.5;
+        border-color: rgba(255, 255, 255, 0.5);
+    }
+    100% {
+        transform: translate(-50%, -50%) scale(1.5);
+        opacity: 0;
+        border-color: rgba(255, 255, 255, 0);
+    }
+}
+
+.status-title {
+    color: white;
+    font-size: 1.35rem;
+    font-weight: 700;
+    margin-bottom: 10px;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.status-chip {
+    font-weight: 600;
+}
+
+/* Progress Steps */
+.progress-steps {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 20px;
+    padding: 0 8px;
+    position: relative;
+    z-index: 1;
+}
+
+.progress-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+}
+
+.progress-step span {
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 500;
+}
+
+.progress-step.active span,
+.progress-step.completed span {
+    color: white;
+}
+
+.step-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.3);
+    transition: all 0.3s ease;
+}
+
+.progress-step.active .step-dot {
+    background: white;
+    box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.3);
+}
+
+.progress-step.completed .step-dot {
+    background: white;
+}
+
+.progress-line {
+    flex: 1;
+    height: 3px;
+    background: rgba(255, 255, 255, 0.2);
+    margin: 0 8px 24px;
+    border-radius: 2px;
+}
+
+.progress-line.filled {
+    background: rgba(255, 255, 255, 0.8);
+}
+
+/* Content Area */
+.content-area {
+    margin-top: -20px;
+    border-radius: 24px 24px 0 0;
+    background: #f5f5f5;
+    position: relative;
+    z-index: 2;
+    padding-bottom: 100px !important; /* Space for bottom nav */
+}
+
+/* Safe area bottom padding for buttons */
+.pb-safe {
+    padding-bottom: calc(env(safe-area-inset-bottom) + 90px) !important;
+}
+
+/* Card Header with Icon */
+.card-header-icon {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 16px 8px;
+}
+
+.card-header-text h3 {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #333;
+    margin: 0;
+}
+
+.card-header-text p {
+    font-size: 0.75rem;
+    color: #888;
+    margin: 0;
+}
+
+/* Location Details */
+.location-details {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.location-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 12px;
+    background: #f8f9fa;
+    border-radius: 12px;
+}
+
+.location-item > div {
+    display: flex;
+    flex-direction: column;
+}
+
+.location-item .label {
+    font-size: 0.7rem;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.location-item .value {
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: #333;
+}
+
+/* Rescuer Card */
+.rescuer-card .rescuer-info {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 12px;
+    background: linear-gradient(135deg, #E8F5E9 0%, #C8E6C9 100%);
+    border-radius: 16px;
+    cursor: pointer;
+    transition: transform 0.2s ease;
+}
+
+.rescuer-card .rescuer-info:active {
+    transform: scale(0.98);
+}
+
+.rescuer-details {
+    flex: 1;
+}
+
+.rescuer-details h4 {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #333;
+    margin: 0 0 2px;
+}
+
+.rescuer-details p {
+    font-size: 0.8rem;
+    color: #666;
+    margin: 0 0 4px;
+}
+
+/* Emergency Details */
+.emergency-details {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.detail-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.detail-item.half {
+    flex: 1;
+}
+
+.detail-row {
+    display: flex;
+    gap: 16px;
+}
+
+.detail-label {
+    font-size: 0.7rem;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.detail-value {
+    font-size: 0.9rem;
+    color: #333;
+    margin: 0;
+}
+
+/* Action Buttons */
+.action-buttons {
+    margin-top: 8px;
+    position: relative;
+}
+
+.action-buttons .v-btn {
+    min-height: 48px;
+}
+
+/* No Rescue State */
+.no-rescue-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 60vh;
+    padding: 24px;
+    padding-bottom: 100px;
+    text-align: center;
+}
+
+.no-rescue-state h3 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #333;
+    margin: 16px 0 8px;
+}
+
+.no-rescue-state p {
+    color: #888;
+    margin: 0;
+}
+
+/* Mobile-responsive layout */
+@media (max-width: 1024px) {
+    .v-main :deep(.v-container) {
+        padding-bottom: 0 !important;
+    }
+    
+    .content-area {
+        padding-bottom: 100px !important;
+    }
+}
+
+/* Small mobile screens */
+@media (max-height: 700px) {
+    .status-hero {
+        padding: 20px 16px 32px;
+    }
+    
+    .status-avatar {
+        width: 80px !important;
+        height: 80px !important;
+    }
+    
+    .status-avatar .v-icon {
+        font-size: 40px !important;
+    }
+    
+    .status-title {
+        font-size: 1.25rem;
+    }
+    
+    .progress-steps {
+        margin-top: 16px;
+    }
+    
+    .progress-step span {
+        font-size: 0.55rem;
+    }
+    
+    .step-dot {
+        width: 10px;
+        height: 10px;
+    }
+    
+    .content-area {
+        margin-top: -16px;
+        padding-bottom: 100px !important;
+    }
+    
+    .card-header-icon {
+        padding: 12px 12px 6px;
+    }
+    
+    .location-item {
+        padding: 6px 10px;
+    }
+}
+
+/* Very small screens (iPhone SE, etc.) */
+@media (max-height: 600px) {
+    .status-hero {
+        padding: 16px 12px 24px;
+    }
+    
+    .status-avatar {
+        width: 64px !important;
+        height: 64px !important;
+    }
+    
+    .status-avatar .v-icon {
+        font-size: 32px !important;
+    }
+    
+    .status-title {
+        font-size: 1.1rem;
+        margin-bottom: 8px;
+    }
+    
+    .status-chip {
+        height: 28px !important;
+    }
+    
+    .progress-steps {
+        margin-top: 12px;
+        transform: scale(0.9);
+    }
+    
+    .pulse-ring {
+        width: 64px;
+        height: 64px;
+    }
+}
+
+/* Show side menu on laptop and up (1024px+) */
+@media (min-width: 1024px) {
+    .v-main {
+        margin-left: 256px !important;
+    }
+    
+    .content-area {
+        padding-bottom: 40px !important;
+    }
+    
+    .pb-safe {
+        padding-bottom: 20px !important;
+    }
+}
+
+@media (min-width: 600px) {
+    .content-area {
+        max-width: 600px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+    
+    .status-hero-content {
+        max-width: 600px;
+        margin: 0 auto;
+    }
+}
+
+/* Expansion Panel Customization */
+:deep(.v-expansion-panel-title) {
+    padding: 12px 16px !important;
+}
+
+:deep(.v-expansion-panel-text__wrapper) {
+    padding: 0 16px 16px !important;
+}
 </style>

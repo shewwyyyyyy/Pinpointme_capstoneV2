@@ -1,204 +1,244 @@
 <template>
     <v-app class="bg-user-gradient-light">
-        <!-- App Bar -->
-        <v-app-bar color="primary" density="comfortable">
-            <v-btn icon @click="goBack">
-                <v-icon>mdi-arrow-left</v-icon>
-            </v-btn>
-            <v-app-bar-title>Active Rescue</v-app-bar-title>
-            <v-spacer />
-            <v-chip
-                v-if="currentStatus"
-                :color="getStatusColor(currentStatus)"
-                variant="flat"
-                size="small"
-            >
-                {{ formatStatus(currentStatus) }}
-            </v-chip>
-        </v-app-bar>
+        <!-- Custom Header -->
+        <div class="rescue-header">
+            <div class="header-content">
+                <v-btn icon variant="text" class="back-btn" @click="goBack">
+                    <v-icon>mdi-arrow-left</v-icon>
+                </v-btn>
+                <div class="header-title">
+                    <h1>Active Rescue</h1>
+                    <p v-if="rescueRequest?.rescue_code">Code: {{ rescueRequest.rescue_code }}</p>
+                </div>
+                <v-chip
+                    v-if="currentStatus"
+                    :color="getStatusChipColor(currentStatus)"
+                    variant="flat"
+                    size="small"
+                    class="status-chip"
+                >
+                    <v-icon start size="14">{{ getStatusIcon(currentStatus) }}</v-icon>
+                    {{ formatStatus(currentStatus) }}
+                </v-chip>
+            </div>
+        </div>
 
         <!-- Main Content -->
-        <v-main>
-            <div v-if="loading" class="d-flex justify-center align-center" style="min-height: 60vh;">
+        <v-main class="rescue-main">
+            <!-- Loading State -->
+            <div v-if="loading" class="loading-container">
                 <v-progress-circular indeterminate color="primary" size="64" />
+                <p class="mt-4 text-grey">Loading rescue details...</p>
             </div>
 
-            <div v-else-if="!rescueRequest" class="pa-4">
-                <v-alert type="info" variant="tonal">
-                    No active rescue found. You will be redirected to the dashboard.
-                </v-alert>
+            <!-- No Rescue Found -->
+            <div v-else-if="!rescueRequest" class="empty-state">
+                <v-icon size="64" color="grey-lighten-1">mdi-alert-circle-outline</v-icon>
+                <h3>No Active Rescue</h3>
+                <p>You will be redirected to the dashboard.</p>
             </div>
 
-            <div v-else class="pa-4">
-                <!-- Emergency Info Card -->
-                <v-card class="mb-4" elevation="2">
-                    <v-card-item>
-                        <template v-slot:prepend>
-                            <v-avatar :color="getUrgencyColor(rescueRequest.urgency_level)" size="56">
-                                <v-icon size="28" color="white">{{ getUrgencyIcon(rescueRequest.urgency_level) }}</v-icon>
-                            </v-avatar>
-                        </template>
-                        <v-card-title class="text-h6">
-                            {{ rescueRequest.urgency_level || 'Emergency Request' }}
-                        </v-card-title>
-                        <v-card-subtitle>
-                            Code: {{ rescueRequest.rescue_code }} • {{ getElapsedTime(rescueRequest.created_at) }}
-                        </v-card-subtitle>
-                    </v-card-item>
+            <!-- Rescue Details -->
+            <div v-else class="rescue-content">
+                <!-- Urgency Banner -->
+                <div :class="['urgency-banner', `urgency-${rescueRequest.urgency_level?.toLowerCase() || 'medium'}`]">
+                    <div class="urgency-icon">
+                        <v-icon size="28" color="white">{{ getUrgencyIcon(rescueRequest.urgency_level) }}</v-icon>
+                    </div>
+                    <div class="urgency-info">
+                        <span class="urgency-label">{{ rescueRequest.urgency_level || 'Emergency' }} Priority</span>
+                        <span class="urgency-time">{{ getElapsedTime(rescueRequest.created_at) }}</span>
+                    </div>
+                </div>
 
-                    <v-divider />
-
-                    <v-card-text>
-                        <!-- Location Section -->
-                        <div class="mb-4">
-                            <div class="text-caption text-grey mb-1">LOCATION</div>
-                            <div class="d-flex align-center mb-2">
-                                <v-icon size="20" color="primary" class="mr-2">mdi-map-marker</v-icon>
-                                <span class="text-body-1 font-weight-medium">
-                                    {{ rescueRequest.room?.room_name || 'Unknown Room' }}
-                                </span>
-                            </div>
-                            <div class="text-body-2 text-grey-darken-1 ml-7">
-                                {{ rescueRequest.floor?.floor_name || 'Unknown Floor' }}, 
-                                {{ rescueRequest.building?.name || 'Unknown Building' }}
-                            </div>
+                <!-- Person Card -->
+                <div class="info-card person-card">
+                    <div class="card-header">
+                        <v-icon size="20" color="primary">mdi-account-alert</v-icon>
+                        <span>Person in Need</span>
+                    </div>
+                    <div class="person-info">
+                        <v-avatar 
+                            size="56" 
+                            :color="requesterProfilePicture && !isReportingForOthers ? 'transparent' : 'primary'"
+                            class="person-avatar"
+                            @click="requesterProfilePicture && !isReportingForOthers && openPhotoViewer(requesterProfilePicture, getRequesterFullName())"
+                        >
+                            <v-img 
+                                v-if="requesterProfilePicture && !isReportingForOthers" 
+                                :src="requesterProfilePicture" 
+                                cover 
+                            />
+                            <span v-else class="text-h6 text-white">{{ getPersonInNeedInitials() }}</span>
+                        </v-avatar>
+                        <div class="person-details">
+                            <h3 class="person-name">{{ getPersonInNeedName() }}</h3>
+                            <p v-if="isReportingForOthers" class="person-reporter">
+                                <v-icon size="14">mdi-account</v-icon>
+                                Reported by: {{ rescueRequest.requester?.first_name }} {{ rescueRequest.requester?.last_name }}
+                            </p>
+                            <p v-else class="person-contact">
+                                <v-icon size="14">mdi-phone</v-icon>
+                                {{ rescueRequest.requester?.phone || rescueRequest.contact_number || 'No contact' }}
+                            </p>
                         </div>
+                        <v-btn
+                            v-if="rescueRequest.requester || rescueRequest.user_id"
+                            icon
+                            size="small"
+                            variant="tonal"
+                            color="primary"
+                            @click="showUserProfile = true"
+                        >
+                            <v-icon size="20">mdi-information</v-icon>
+                        </v-btn>
+                    </div>
+                </div>
 
-                        <!-- Person In Need -->
-                        <div class="mb-4">
-                            <div class="text-caption text-grey mb-1">PERSON IN NEED</div>
-                            <div class="d-flex align-center">
-                                <v-avatar 
-                                    size="40" 
-                                    color="grey-lighten-2" 
-                                    class="mr-3"
-                                    :style="requesterProfilePicture && !isReportingForOthers ? 'cursor: pointer' : ''"
-                                    @click="requesterProfilePicture && !isReportingForOthers && openPhotoViewer(requesterProfilePicture, getRequesterFullName())"
-                                >
-                                    <v-img 
-                                        v-if="requesterProfilePicture && !isReportingForOthers" 
-                                        :src="requesterProfilePicture" 
-                                        cover 
-                                    />
-                                    <span v-else class="text-subtitle-1 text-grey-darken-1">
-                                        {{ getPersonInNeedInitials() }}
-                                    </span>
-                                </v-avatar>
-                                <div>
-                                    <div class="text-body-1 font-weight-medium">
-                                        {{ getPersonInNeedName() }}
-                                    </div>
-                                    <div v-if="isReportingForOthers" class="text-body-2 text-grey">
-                                        Reported by: {{ rescueRequest.requester?.first_name }} {{ rescueRequest.requester?.last_name }}
-                                    </div>
-                                    <div v-else class="text-body-2 text-grey">
-                                        {{ rescueRequest.requester?.phone || rescueRequest.contact_number || 'No contact' }}
-                                    </div>
-                                </div>
-                                <v-spacer />
-                                <v-btn
-                                    v-if="rescueRequest.requester || rescueRequest.user_id"
-                                    icon
-                                    size="small"
-                                    variant="text"
-                                    @click="showUserProfile = true"
-                                >
-                                    <v-icon>mdi-information-outline</v-icon>
-                                </v-btn>
-                            </div>
+                <!-- Location Card -->
+                <div class="info-card location-card">
+                    <div class="card-header">
+                        <v-icon size="20" color="error">mdi-map-marker</v-icon>
+                        <span>Location</span>
+                    </div>
+                    <div class="location-info">
+                        <div class="location-primary">
+                            <span class="room-name">{{ rescueRequest.room?.room_name || 'Unknown Room' }}</span>
                         </div>
-
-                        <!-- Description -->
-                        <div v-if="rescueRequest.description" class="mb-4">
-                            <div class="text-caption text-grey mb-1">DESCRIPTION</div>
-                            <div class="text-body-2">{{ rescueRequest.description }}</div>
+                        <div class="location-secondary">
+                            <span>{{ rescueRequest.floor?.floor_name || 'Unknown Floor' }}</span>
+                            <span class="separator">•</span>
+                            <span>{{ rescueRequest.building?.name || 'Unknown Building' }}</span>
                         </div>
-
-                        <!-- Additional Details -->
-                        <div v-if="rescueRequest.people_count || rescueRequest.mobility_status">
-                            <div class="text-caption text-grey mb-2">ADDITIONAL INFO</div>
-                            <div class="d-flex flex-wrap ga-2">
-                                <v-chip v-if="rescueRequest.people_count" size="small" variant="tonal" color="info">
-                                    <v-icon start size="16">mdi-account-group</v-icon>
-                                    {{ rescueRequest.people_count }} {{ rescueRequest.people_count > 1 ? 'people' : 'person' }}
-                                </v-chip>
-                                <v-chip v-if="rescueRequest.mobility_status" size="small" variant="tonal" :color="getMobilityColor(rescueRequest.mobility_status)">
-                                    <v-icon start size="16">mdi-wheelchair-accessibility</v-icon>
-                                    {{ formatMobility(rescueRequest.mobility_status) }}
-                                </v-chip>
-                            </div>
-                        </div>
-                    </v-card-text>
-                </v-card>
-
-                <!-- Status Progress -->
-                <!-- <v-card class="mb-4" elevation="2">
-                    <v-card-title class="text-subtitle-1">
-                        <v-icon start>mdi-progress-check</v-icon>
-                        Rescue Progress
-                    </v-card-title>
-                    <v-card-text>
-                        <v-timeline side="end" density="compact">
-                            <v-timeline-item
-                                v-for="status in statusSteps"
-                                :key="status.value"
-                                :dot-color="getStepColor(status.value)"
-                                :icon="getStepIcon(status.value)"
-                                size="small"
-                            >
-                                <div class="d-flex align-center justify-space-between">
-                                    <div>
-                                        <div :class="['text-body-2', isCurrentOrPastStatus(status.value) ? 'font-weight-medium' : 'text-grey']">
-                                            {{ status.label }}
-                                        </div>
-                                        <div v-if="statusTimestamps[status.value]" class="text-caption text-grey">
-                                            {{ formatTimestamp(statusTimestamps[status.value]) }}
-                                        </div>
-                                    </div>
-                                    <v-icon v-if="isCurrentOrPastStatus(status.value)" color="success" size="16">
-                                        mdi-check-circle
-                                    </v-icon>
-                                </div>
-                            </v-timeline-item>
-                        </v-timeline>
-                    </v-card-text>
-                </v-card> -->
-
-                <!-- Status Update Buttons -->
-                <div class="d-flex flex-column ga-3">
+                    </div>
                     <v-btn
-                        v-if="currentStatus === 'pending' || currentStatus === 'assigned'"
+                        variant="tonal"
                         color="primary"
-                        size="large"
-                        block
-                        @click="startRescue"
-                        :loading="updating"
+                        size="small"
+                        class="map-btn"
+                        @click="viewMap"
                     >
-                        <v-icon start>mdi-run</v-icon>
-                        Start Rescue
+                        <v-icon start size="18">mdi-map</v-icon>
+                        View Map
                     </v-btn>
+                </div>
 
-                    <v-btn
-                        v-if="currentStatus === 'in_progress'"
-                        color="success"
-                        size="large"
-                        block
-                        @click="showCompleteDialog = true"
-                        :loading="updating"
-                    >
-                        <v-icon start>mdi-check-circle</v-icon>
-                        Complete Rescue
-                    </v-btn>
+                <!-- Description Card (if exists) -->
+                <div v-if="rescueRequest.description" class="info-card description-card">
+                    <div class="card-header">
+                        <v-icon size="20" color="orange">mdi-text-box</v-icon>
+                        <span>Situation Details</span>
+                    </div>
+                    <p class="description-text">{{ rescueRequest.description }}</p>
+                </div>
+
+                <!-- Additional Info Card -->
+                <div v-if="rescueRequest.people_count || rescueRequest.mobility_status || rescueRequest.injuries" class="info-card additional-card">
+                    <div class="card-header">
+                        <v-icon size="20" color="info">mdi-clipboard-list</v-icon>
+                        <span>Additional Information</span>
+                    </div>
+                    <div class="chips-container">
+                        <v-chip v-if="rescueRequest.people_count" size="small" variant="tonal" color="info">
+                            <v-icon start size="16">mdi-account-group</v-icon>
+                            {{ rescueRequest.people_count }} {{ rescueRequest.people_count > 1 ? 'people' : 'person' }}
+                        </v-chip>
+                        <v-chip v-if="rescueRequest.mobility_status" size="small" variant="tonal" :color="getMobilityColor(rescueRequest.mobility_status)">
+                            <v-icon start size="16">mdi-wheelchair-accessibility</v-icon>
+                            {{ formatMobility(rescueRequest.mobility_status) }}
+                        </v-chip>
+                        <v-chip v-if="rescueRequest.injuries" size="small" variant="tonal" color="error">
+                            <v-icon start size="16">mdi-bandage</v-icon>
+                            {{ rescueRequest.injuries }}
+                        </v-chip>
+                    </div>
+                </div>
+
+              
+
+                <!-- Action Buttons -->
+                <div class="action-section">
+                    <!-- Pending or Assigned Status - Accept & Start in one action -->
+                    <div v-if="currentStatus === 'pending' || currentStatus === 'assigned'" class="action-buttons">
+                        <v-btn
+                            color="success"
+                            size="x-large"
+                            block
+                            rounded="lg"
+                            @click="acceptRescue"
+                            :loading="updating"
+                            class="main-action-btn"
+                        >
+                            <v-icon start size="24">mdi-run-fast</v-icon>
+                            Accept & Start Rescue
+                        </v-btn>
+                    </div>
+
+                    <!-- In Progress Status -->
+                    <div v-else-if="currentStatus === 'in_progress'" class="action-buttons">
+                        <v-btn
+                            color="success"
+                            size="x-large"
+                            block
+                            rounded="lg"
+                            @click="showCompleteDialog = true"
+                            :loading="updating"
+                            class="main-action-btn safe-btn"
+                        >
+                            <v-icon start size="24">mdi-shield-check</v-icon>
+                            Mark as Safe
+                        </v-btn>
+                        <div class="secondary-actions">
+                            <v-btn
+                                variant="outlined"
+                                color="primary"
+                                @click="openChat"
+                                class="secondary-btn"
+                            >
+                                <v-icon start>mdi-message-text</v-icon>
+                                Message User
+                            </v-btn>
+                            <v-btn
+                                variant="outlined"
+                                color="grey"
+                                @click="viewMap"
+                                class="secondary-btn"
+                            >
+                                <v-icon start>mdi-map-marker</v-icon>
+                                View Map
+                            </v-btn>
+                        </div>
+                    </div>
+
+                    <!-- Completed Status -->
+                    <div v-else-if="currentStatus === 'rescued' || currentStatus === 'safe' || currentStatus === 'completed'" class="action-buttons completed">
+                        <div class="completed-banner">
+                            <v-icon size="48" color="success">mdi-check-circle</v-icon>
+                            <h3>Rescue Completed</h3>
+                            <p>The person has been marked as safe.</p>
+                        </div>
+                        <v-btn
+                            color="primary"
+                            size="large"
+                            block
+                            variant="tonal"
+                            rounded="lg"
+                            @click="goBack"
+                        >
+                            <v-icon start>mdi-arrow-left</v-icon>
+                            Back to Dashboard
+                        </v-btn>
+                    </div>
                 </div>
             </div>
         </v-main>
 
-        <!-- Complete Rescue Dialog -->
+        <!-- Mark as Safe Dialog -->
         <v-dialog v-model="showCompleteDialog" max-width="400">
             <v-card>
-                <v-card-title class="text-h6">Complete Rescue</v-card-title>
+                <v-card-title class="text-h6">Mark as Safe</v-card-title>
                 <v-card-text>
-                    <p class="mb-4">Please confirm that the rescue operation has been completed successfully.</p>
+                    <p class="mb-4">Please confirm that the person has been rescued and is now safe.</p>
                     <v-textarea
                         v-model="completionNotes"
                         label="Notes (optional)"
@@ -217,7 +257,7 @@
                         @click="completeRescue"
                         :loading="updating"
                     >
-                        Confirm Complete
+                        Confirm Safe
                     </v-btn>
                 </v-card-actions>
             </v-card>
@@ -320,9 +360,13 @@
                             <v-list-item-title class="text-body-2">Emergency Contact</v-list-item-title>
                             <v-list-item-subtitle>
                                 {{ rescueRequest?.requester?.emergency_contact_name }}
-                                <span v-if="rescueRequest?.requester?.emergency_contact_phone">
-                                    ({{ rescueRequest?.requester?.emergency_contact_phone }})
+                                <span v-if="rescueRequest?.requester?.emergency_contact_relation" class="text-grey">
+                                    ({{ rescueRequest?.requester?.emergency_contact_relation }})
                                 </span>
+                            </v-list-item-subtitle>
+                            <v-list-item-subtitle v-if="rescueRequest?.requester?.emergency_contact_phone" class="mt-1">
+                                <v-icon size="12" class="mr-1">mdi-phone</v-icon>
+                                {{ rescueRequest?.requester?.emergency_contact_phone }}
                             </v-list-item-subtitle>
                         </v-list-item>
                     </v-list>
@@ -331,6 +375,16 @@
                 <v-card-actions>
                     <v-spacer />
                     <v-btn variant="text" @click="showUserProfile = false">Close</v-btn>
+                    <v-btn
+                        v-if="rescueRequest?.requester?.emergency_contact_phone"
+                        color="error"
+                        variant="tonal"
+                        prepend-icon="mdi-phone-alert"
+                        @click="callEmergencyContact"
+                        size="small"
+                    >
+                        Emergency
+                    </v-btn>
                     <v-btn
                         v-if="rescueRequest?.requester?.phone || rescueRequest?.contact_number"
                         color="success"
@@ -370,14 +424,14 @@
         </v-snackbar>
         
         <!-- Bottom Navigation (Mobile/Tablet only) -->
-        <RescuerBottomNav :notification-count="0" />
+        <RescuerBottomNav :notification-count="0" :message-count="unreadMessageCount" />
     </v-app>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { router } from '@inertiajs/vue3';
-import { apiFetch, getProfilePictureUrl } from '@/Composables/useApi';
+import { apiFetch, getProfilePictureUrl, getUnreadMessageCount } from '@/Composables/useApi';
 import RescuerBottomNav from '@/Components/Pages/Rescuer/Menu/RescuerBottomNav.vue';
 
 const props = defineProps({
@@ -401,6 +455,7 @@ const showUserProfile = ref(false);
 const completionNotes = ref('');
 const cancellationReason = ref('');
 const pollingInterval = ref(null);
+const unreadMessageCount = ref(0);
 
 const snackbar = ref({
     show: false,
@@ -425,6 +480,18 @@ const requesterProfilePicture = computed(() => {
     const picturePath = requester?.profile_picture || requester?.profile_photo;
     if (!picturePath) return null;
     return getProfilePictureUrl(picturePath);
+});
+
+// Check if there's medical information available
+const hasMedicalInfo = computed(() => {
+    const requester = rescueRequest.value?.requester;
+    return requester?.blood_type || requester?.allergies || requester?.medical_conditions;
+});
+
+// Check if there's emergency contact information available
+const hasEmergencyContact = computed(() => {
+    const requester = rescueRequest.value?.requester;
+    return requester?.emergency_contact_name || requester?.emergency_contact_phone;
 });
 
 // Check if the user is reporting for someone else (form has name filled in)
@@ -543,21 +610,41 @@ const acceptRescue = async () => {
             return;
         }
 
+        // Check if rescuer already has an active assignment
+        const checkResponse = await apiFetch(`/api/rescue-requests/rescuer/${rescuerId}`, { method: 'GET' });
+        const checkData = checkResponse.data || checkResponse;
+        const activeRequests = Array.isArray(checkData) ? checkData : [];
+        const hasOtherActiveAssignment = activeRequests.some((r) => 
+            (r.status === 'assigned' || r.status === 'in_progress') &&
+            r.id !== rescueRequest.value?.id &&
+            (String(r.assigned_rescuer) === String(rescuerId) || String(r.rescuer_id) === String(rescuerId))
+        );
+
+        if (hasOtherActiveAssignment) {
+            showSnackbar('You are only allowed to accept requests one at a time.', 'warning');
+            updating.value = false;
+            return;
+        }
+
+        // Accept and start rescue in one action - go directly to in_progress
         const response = await apiFetch(`/api/rescue-requests/${rescueRequest.value.id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
-                status: 'assigned',
+                status: 'in_progress',
                 assigned_rescuer: rescuerId 
             }),
         });
 
         const data = response.data || response;
+        console.log('Accept rescue response:', data); // Debug log
+        
         if (data) {
-            currentStatus.value = 'assigned';
-            rescueRequest.value = data;
-            statusTimestamps.value['assigned'] = new Date().toISOString();
-            showSnackbar('Rescue accepted successfully!', 'success');
+            // Set status to 'in_progress' - combining accept and start
+            currentStatus.value = 'in_progress';
+            rescueRequest.value = { ...rescueRequest.value, ...data, status: 'in_progress' };
+            statusTimestamps.value['in_progress'] = new Date().toISOString();
+            showSnackbar('Rescue accepted and started!', 'success');
             
             // Store the rescue ID for later reference
             localStorage.setItem('lastRescueRequestId', rescueRequest.value.id.toString());
@@ -642,21 +729,21 @@ const completeRescue = async () => {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                status: 'rescued',
+                status: 'safe',
                 additional_info: completionNotes.value,
             }),
         });
 
         const data = response.data || response;
         if (data) {
-            showSnackbar('Rescue completed successfully!', 'success');
+            showSnackbar('Person marked as safe!', 'success');
             showCompleteDialog.value = false;
             localStorage.removeItem('lastRescueRequestId');
             setTimeout(() => router.visit('/rescuer/dashboard'), 1500);
         }
     } catch (error) {
         console.error('Error completing rescue:', error);
-        showSnackbar('Failed to complete rescue', 'error');
+        showSnackbar('Failed to mark as safe', 'error');
     } finally {
         updating.value = false;
     }
@@ -701,7 +788,7 @@ const viewMap = () => {
 const openChat = () => {
     // Use rescue-chat route which will get or create conversation
     if (rescueRequest.value?.id) {
-        router.visit(`/rescuer/rescue-chat/${rescueRequest.value.id}`);
+        router.visit(`/rescuer/rescue-chat/${rescueRequest.value.id}?from=active-rescue`);
     } else {
         showSnackbar('No rescue request found', 'warning');
     }
@@ -710,6 +797,14 @@ const openChat = () => {
 const callUser = () => {
     if (rescueRequest.value?.user?.contact_number) {
         window.location.href = `tel:${rescueRequest.value.user.contact_number}`;
+    } else if (rescueRequest.value?.requester?.phone) {
+        window.location.href = `tel:${rescueRequest.value.requester.phone}`;
+    }
+};
+
+const callEmergencyContact = () => {
+    if (rescueRequest.value?.requester?.emergency_contact_phone) {
+        window.location.href = `tel:${rescueRequest.value.requester.emergency_contact_phone}`;
     }
 };
 
@@ -748,6 +843,30 @@ const getStatusColor = (status) => {
         'cancelled': 'error',
     };
     return colors[status] || 'grey';
+};
+
+const getStatusChipColor = (status) => {
+    const colors = {
+        'pending': 'orange',
+        'assigned': 'blue',
+        'in_progress': 'primary', 
+        'rescued': 'success',
+        'safe': 'success',
+        'cancelled': 'error',
+    };
+    return colors[status] || 'grey';
+};
+
+const getStatusIcon = (status) => {
+    const icons = {
+        'pending': 'mdi-clock-outline',
+        'assigned': 'mdi-account-check',
+        'in_progress': 'mdi-run-fast', 
+        'rescued': 'mdi-check-circle',
+        'safe': 'mdi-shield-check',
+        'cancelled': 'mdi-close-circle',
+    };
+    return icons[status] || 'mdi-help-circle';
 };
 
 const formatStatus = (status) => {
@@ -829,12 +948,28 @@ const showSnackbar = (message, color = 'success') => {
     snackbar.value = { show: true, message, color };
 };
 
+// Fetch unread message count
+const fetchUnreadMessageCount = async () => {
+    const userData = JSON.parse(localStorage.getItem('userData') || '{}');
+    const userId = userData?.id;
+    if (!userId) return;
+    try {
+        unreadMessageCount.value = await getUnreadMessageCount(userId);
+    } catch (error) {
+        console.error('Failed to fetch unread message count:', error);
+    }
+};
+
 // Lifecycle
-onMounted(() => {
+onMounted(async () => {
     fetchRescueDetails();
+    await fetchUnreadMessageCount();
     
     // Poll for updates every 10 seconds
-    pollingInterval.value = setInterval(fetchRescueDetails, 10000);
+    pollingInterval.value = setInterval(async () => {
+        fetchRescueDetails();
+        await fetchUnreadMessageCount();
+    }, 10000);
 });
 
 onUnmounted(() => {
@@ -845,7 +980,494 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.v-timeline-item {
-    padding-bottom: 16px;
+/* Header */
+.rescue-header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: linear-gradient(135deg, #3674B5 0%, #2d5f96 100%);
+    padding: env(safe-area-inset-top, 0) 0 0 0;
+    box-shadow: 0 2px 12px rgba(54, 116, 181, 0.3);
+}
+
+.header-content {
+    display: flex;
+    align-items: center;
+    padding: 14px 16px;
+    gap: 12px;
+}
+
+.back-btn {
+    color: white;
+    transition: transform 0.2s ease;
+}
+
+.back-btn:hover {
+    transform: translateX(-2px);
+}
+
+.header-title {
+    flex: 1;
+}
+
+.header-title h1 {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: white;
+    margin: 0;
+    letter-spacing: 0.3px;
+}
+
+.header-title p {
+    font-size: 0.7rem;
+    color: rgba(255, 255, 255, 0.85);
+    margin: 0;
+    letter-spacing: 0.5px;
+    font-weight: 500;
+}
+
+.status-chip {
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.65rem;
+    letter-spacing: 0.5px;
+}
+
+/* Main Content */
+.rescue-main {
+    padding-bottom: 100px;
+    background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+    min-height: 100vh;
+}
+
+.loading-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 60vh;
+}
+
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 60vh;
+    text-align: center;
+    padding: 24px;
+}
+
+.empty-state h3 {
+    margin-top: 16px;
+    color: #64748b;
+    font-weight: 600;
+}
+
+.empty-state p {
+    color: #94a3b8;
+}
+
+.rescue-content {
+    padding: 16px;
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+/* Urgency Banner */
+.urgency-banner {
+    display: flex;
+    align-items: center;
+    padding: 18px 20px;
+    border-radius: 20px;
+    margin-bottom: 16px;
+    gap: 16px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+    position: relative;
+    overflow: hidden;
+}
+
+.urgency-banner::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, transparent 50%);
+    pointer-events: none;
+}
+
+.urgency-banner.urgency-critical {
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+}
+
+.urgency-banner.urgency-high {
+    background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+}
+
+.urgency-banner.urgency-medium {
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+}
+
+.urgency-banner.urgency-low {
+    background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+}
+
+.urgency-icon {
+    width: 52px;
+    height: 52px;
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(8px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.urgency-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.urgency-label {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: white;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+}
+
+.urgency-time {
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.9);
+    font-weight: 500;
+}
+
+/* Info Cards */
+.info-card {
+    background: white;
+    border-radius: 18px;
+    padding: 18px;
+    margin-bottom: 14px;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+    border: 1px solid rgba(0, 0, 0, 0.04);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.info-card:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+}
+
+.card-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 14px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+}
+
+/* Person Card */
+.person-card {
+    border-left: 4px solid #3674B5;
+}
+
+.person-info {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.person-avatar {
+    cursor: pointer;
+    flex-shrink: 0;
+    box-shadow: 0 2px 8px rgba(54, 116, 181, 0.2);
+    transition: transform 0.2s ease;
+}
+
+.person-avatar:hover {
+    transform: scale(1.05);
+}
+
+.person-details {
+    flex: 1;
+    min-width: 0;
+}
+
+.person-name {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #1e293b;
+    margin: 0 0 6px 0;
+}
+
+.person-contact, .person-reporter {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.85rem;
+    color: #64748b;
+    margin: 0;
+}
+
+/* Location Card */
+.location-card {
+    border-left: 4px solid #ef4444;
+}
+
+.location-info {
+    margin-bottom: 14px;
+}
+
+.location-primary {
+    margin-bottom: 6px;
+}
+
+.room-name {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: #1e293b;
+}
+
+.location-secondary {
+    font-size: 0.9rem;
+    color: #64748b;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.separator {
+    color: #cbd5e1;
+}
+
+.map-btn {
+    width: 100%;
+    margin-top: 4px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+}
+
+/* Description Card */
+.description-card {
+    border-left: 4px solid #f59e0b;
+}
+
+.description-text {
+    font-size: 0.95rem;
+    color: #475569;
+    line-height: 1.6;
+    margin: 0;
+}
+
+/* Additional Info Card */
+.additional-card {
+    border-left: 4px solid #3b82f6;
+}
+
+.chips-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+/* Medical Information Card */
+.medical-card {
+    border-left: 4px solid #e53935;
+}
+
+.medical-info {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.medical-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+}
+
+.medical-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.medical-icon.blood {
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+}
+
+.medical-icon.allergy {
+    background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+}
+
+.medical-icon.condition {
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+}
+
+.medical-details {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.medical-label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.medical-value {
+    font-size: 0.95rem;
+    color: #1e293b;
+    font-weight: 500;
+}
+
+.medical-value.warning {
+    color: #ea580c;
+}
+
+/* Action Section */
+.action-section {
+    margin-top: 28px;
+    padding-top: 8px;
+}
+
+.action-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.main-action-btn {
+    height: 58px !important;
+    font-size: 1.05rem !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.5px;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+    border-radius: 16px !important;
+    transition: all 0.3s ease;
+}
+
+.main-action-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+}
+
+.safe-btn {
+    background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%) !important;
+}
+
+.secondary-actions {
+    display: flex;
+    gap: 12px;
+}
+
+.secondary-btn {
+    flex: 1;
+    height: 48px !important;
+    border-radius: 14px !important;
+    font-weight: 600 !important;
+    transition: all 0.2s ease;
+}
+
+.secondary-btn:hover {
+    transform: translateY(-1px);
+}
+
+/* Completed State */
+.action-buttons.completed {
+    text-align: center;
+}
+
+.completed-banner {
+    background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+    border-radius: 20px;
+    padding: 36px 24px;
+    margin-bottom: 18px;
+    border: 1px solid rgba(34, 197, 94, 0.2);
+}
+
+.completed-banner h3 {
+    margin: 14px 0 10px 0;
+    font-size: 1.35rem;
+    color: #166534;
+    font-weight: 700;
+}
+
+.completed-banner p {
+    margin: 0;
+    color: #22c55e;
+    font-size: 0.95rem;
+    font-weight: 500;
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+    .rescue-content {
+        padding: 14px;
+    }
+    
+    .urgency-banner {
+        padding: 16px;
+        border-radius: 16px;
+    }
+    
+    .urgency-label {
+        font-size: 0.95rem;
+    }
+    
+    .info-card {
+        padding: 16px;
+        border-radius: 16px;
+    }
+    
+    .main-action-btn {
+        height: 54px !important;
+        font-size: 1rem !important;
+    }
+    
+    .secondary-actions {
+        flex-direction: column;
+    }
+    
+    .secondary-btn {
+        width: 100%;
+    }
+}
+
+/* Desktop visibility */
+@media (max-width: 1024px) {
+    .desktop-only {
+        display: none !important;
+    }
+}
+
+/* Smooth scrolling */
+.rescue-main {
+    scroll-behavior: smooth;
+}
+
+/* Focus states for accessibility */
+.main-action-btn:focus-visible,
+.secondary-btn:focus-visible {
+    outline: 3px solid rgba(54, 116, 181, 0.5);
+    outline-offset: 2px;
 }
 </style>

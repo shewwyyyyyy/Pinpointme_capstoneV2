@@ -209,14 +209,14 @@
         </v-snackbar>
         
         <!-- Bottom Navigation (Mobile/Tablet only) -->
-        <RescuerBottomNav :notification-count="0" />
+        <RescuerBottomNav :notification-count="0" :message-count="unreadMessageCount" />
     </v-app>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue';
 import { router } from '@inertiajs/vue3';
-import { useApi } from '@/Composables/useApi';
+import { useApi, getUnreadMessageCount } from '@/Composables/useApi';
 import RescuerBottomNav from '@/Components/Pages/Rescuer/Menu/RescuerBottomNav.vue';
 
 const props = defineProps({
@@ -238,6 +238,7 @@ const selectedRoom = ref(null);
 const isFullscreen = ref(false);
 const mapContainer = ref(null);
 const imageLoaded = ref(false);
+const unreadMessageCount = ref(0);
 
 // Zoom and pan
 const scale = ref(1);
@@ -479,9 +480,22 @@ watch(selectedFloorIndex, () => {
     resetZoom();
 });
 
+// Fetch unread message count
+const fetchUnreadMessageCount = async () => {
+    const userData = JSON.parse(localStorage.getItem('userData') || '{}');
+    const userId = userData?.id;
+    if (!userId) return;
+    try {
+        unreadMessageCount.value = await getUnreadMessageCount(userId);
+    } catch (error) {
+        console.error('Failed to fetch unread message count:', error);
+    }
+};
+
 // Lifecycle
-onMounted(() => {
+onMounted(async () => {
     fetchData();
+    await fetchUnreadMessageCount();
 });
 </script>
 

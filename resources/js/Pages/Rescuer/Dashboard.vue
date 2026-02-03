@@ -84,26 +84,22 @@
 
         <v-main class="main-container">
             <!-- Header -->
-            <div class="header-section">
-                <div class="d-flex align-center justify-space-between px-4 pt-4">
+            <div class="dashboard-header">
+                <div class="header-content">
                     <v-btn icon variant="text" @click="drawer = !drawer" class="menu-btn desktop-only">
                         <v-icon>mdi-menu</v-icon>
                     </v-btn>
-                    <div class="brand-logo text-center flex-grow-1">
-                        <h1 class="brand-title">PinPointMe</h1>
-                        <p class="brand-tagline">COMING YOUR WAY.</p>
+                    <div class="header-title">
+                        <h1>PinPointMe</h1>
+                        <p>COMING YOUR WAY.</p>
                     </div>
-                    <v-btn icon variant="text" @click="refreshData" class="action-btn">
+                    <v-btn icon variant="text" @click="refreshData" class="refresh-btn">
                         <v-icon size="22">mdi-refresh</v-icon>
                     </v-btn>
                 </div>
-                
-                <!-- Section Title -->
-                <div class="section-title">
-                    <span class="divider-line"></span>
-                    <span class="title-text">Alerts and Notifications</span>
-                    <span class="divider-line"></span>
-                </div>
+            </div>
+            
+            <div class="header-section">
 
                 <!-- Tab Pills -->
                 <div class="tab-pills-container">
@@ -165,18 +161,6 @@
                                     </div>
                                 </div>
                             </div>
-                            <div class="request-actions" @click.stop>
-                                <v-btn
-                                    color="primary"
-                                    variant="flat"
-                                    size="small"
-                                    rounded="pill"
-                                    @click.stop="acceptRescue(request)"
-                                    :loading="updatingId === request.id"
-                                >
-                                    Accept Rescue
-                                </v-btn>
-                            </div>
                         </div>
                     </div>
 
@@ -222,10 +206,10 @@
                                     variant="flat"
                                     size="small"
                                     rounded="pill"
-                                    @click.stop="markAsRescued(request)"
+                                    @click.stop="markAsSafe(request)"
                                     :loading="updatingId === request.id"
                                 >
-                                    Mark Rescued
+                                    Mark Safe
                                 </v-btn>
                             </div>
                         </div>
@@ -266,6 +250,7 @@
             <!-- Bottom Navigation (Mobile/Tablet only) -->
             <RescuerBottomNav 
                 :notification-count="counts.pending"
+                :message-count="unreadMessageCount"
                 @open-notifications="showNotificationPanel = true"
             />
 
@@ -294,7 +279,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { router, usePage } from '@inertiajs/vue3';
-import { apiFetch, getProfilePictureUrl } from '@/Composables/useApi';
+import { apiFetch, getProfilePictureUrl, getUnreadMessageCount } from '@/Composables/useApi';
 import { useNotificationAlert } from '@/Composables/useNotificationAlert';
 import RescuerMenu from '@/Components/Pages/Rescuer/Menu/RescuerMenu.vue';
 import RescuerBottomNav from '@/Components/Pages/Rescuer/Menu/RescuerBottomNav.vue';
@@ -333,6 +318,7 @@ const rescuerName = ref('Rescuer');
 const rescuerId = ref('');
 const userData = ref(null);
 const showNotificationPanel = ref(false);
+const unreadMessageCount = ref(0);
 
 // Computed property for user's profile picture
 const userProfilePicture = computed(() => {
@@ -369,6 +355,14 @@ const rescuedRequests = computed(() =>
     rescueRequests.value.filter((r) => r.status === 'rescued' || r.status === 'safe' || r.status === 'completed')
 );
 
+// Check if rescuer has an active assignment (assigned or in_progress)
+const hasActiveAssignment = computed(() => {
+    return rescueRequests.value.some((r) => 
+        (r.status === 'assigned' || r.status === 'in_progress') &&
+        (String(r.assigned_rescuer) === String(rescuerId.value) || String(r.rescuer_id) === String(rescuerId.value))
+    );
+});
+
 // Toast
 const showToast = ref(false);
 const toastMessage = ref('');
@@ -390,8 +384,16 @@ onMounted(async () => {
     document.body.style.overscrollBehavior = 'none';
     document.documentElement.style.overscrollBehavior = 'none';
     
+    // Check for tab query parameter (used when returning from chat)
+    const urlParams = new URLSearchParams(window.location.search);
+    const tabParam = urlParams.get('tab');
+    if (tabParam && ['pending', 'inProgress', 'rescued'].includes(tabParam)) {
+        selectedTab.value = tabParam;
+    }
+    
     loadUserData();
     await fetchRescueRequests();
+    await fetchUnreadMessageCount();
     
     // Store initial pending state
     previousPendingCount.value = pendingRequests.value.length;
@@ -427,6 +429,9 @@ const pollForNewRequests = async () => {
         const response = await apiFetch(endpoint, { method: 'GET' });
         const data = response?.data || response;
         rescueRequests.value = Array.isArray(data) ? data : [];
+        
+        // Also refresh unread message count during polling
+        await fetchUnreadMessageCount();
         
         // Check for new pending requests
         const currentPending = pendingRequests.value;
@@ -528,12 +533,34 @@ const fetchRescueRequests = async () => {
     }
 };
 
+// Fetch unread message count
+const fetchUnreadMessageCount = async () => {
+    if (!rescuerId.value) {
+        console.warn('fetchUnreadMessageCount: No rescuerId available');
+        return;
+    }
+    try {
+        console.log('Fetching unread message count for rescuer:', rescuerId.value);
+        unreadMessageCount.value = await getUnreadMessageCount(rescuerId.value);
+        console.log('Updated unreadMessageCount:', unreadMessageCount.value);
+    } catch (error) {
+        console.error('Failed to fetch unread message count:', error);
+    }
+};
+
 const refreshData = async () => {
     await fetchRescueRequests();
+    await fetchUnreadMessageCount();
     showNotification('Data refreshed', 'success');
 };
 
 const acceptRescue = async (request) => {
+    // Check if rescuer already has an active assignment
+    if (hasActiveAssignment.value) {
+        showNotification('You are only allowed to accept requests one at a time.', 'warning');
+        return;
+    }
+    
     updatingId.value = request.id;
     try {
         const response = await apiFetch(`/api/rescue-requests/${request.id}`, {
@@ -557,7 +584,7 @@ const acceptRescue = async (request) => {
     }
 };
 
-const markAsRescued = async (request) => {
+const markAsSafe = async (request) => {
     updatingId.value = request.id;
     try {
         const response = await apiFetch(`/api/rescue-requests/${request.id}`, {
@@ -565,12 +592,12 @@ const markAsRescued = async (request) => {
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ status: 'rescued' }),
+            body: JSON.stringify({ status: 'safe' }),
         });
-        showNotification('Marked as rescued!', 'success');
+        showNotification('Marked as safe!', 'success');
         await fetchRescueRequests();
     } catch (error) {
-        console.error('Failed to mark as rescued:', error);
+        console.error('Failed to mark as safe:', error);
         showNotification('Failed to update status', 'error');
     } finally {
         updatingId.value = null;
@@ -593,7 +620,8 @@ const viewRescuedRequest = (request) => {
 };
 
 const openChat = (request) => {
-    router.visit(`/rescuer/chat/${request.conversation_id || 'new'}?user=${request.user_id}`);
+    // Always use rescue-chat route which handles conversation creation properly
+    router.visit(`/rescuer/rescue-chat/${request.id}?from=dashboard-inprogress`);
 };
 
 const getInitials = (name) => {
@@ -728,60 +756,53 @@ const showNotification = (message, color = 'info') => {
     flex-direction: column;
 }
 
-/* Header Section */
-.header-section {
-    padding-bottom: 8px;
+/* Dashboard Header - matches Notifications header */
+.dashboard-header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: #3674B5;
+    padding: env(safe-area-inset-top, 0) 0 0 0;
     flex-shrink: 0;
 }
 
-.menu-btn,
-.action-btn {
-    color: #555;
-    flex-shrink: 0;
+.header-content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    gap: 12px;
 }
 
-.brand-logo {
-    padding: 8px 0;
+.menu-btn, .refresh-btn {
+    color: white;
 }
 
-.brand-title {
-    font-size: 1.5rem;
-    font-weight: 600;
+.header-title {
+    flex: 1;
+    text-align: center;
+}
+
+.header-title h1 {
+    font-size: 1.25rem;
+    font-weight: 700;
     font-style: italic;
-    color: #2c3e50;
+    color: white;
     margin: 0;
-    line-height: 1.2;
 }
 
-.brand-tagline {
+.header-title p {
     font-size: 0.65rem;
     letter-spacing: 2px;
-    color: #7f8c8d;
+    color: rgba(255, 255, 255, 0.8);
     margin: 0;
     text-transform: uppercase;
 }
 
-/* Section Title */
-.section-title {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 12px 24px;
-    gap: 12px;
+/* Header Section (tabs area) */
+.header-section {
+    padding-bottom: 8px;
     flex-shrink: 0;
-}
-
-.divider-line {
-    flex: 1;
-    height: 1px;
-    background: linear-gradient(90deg, transparent, #ccc, transparent);
-    max-width: 60px;
-}
-
-.title-text {
-    font-size: 0.85rem;
-    color: #666;
-    white-space: nowrap;
 }
 
 /* Tab Pills */
@@ -789,7 +810,7 @@ const showNotification = (message, color = 'info') => {
     display: flex;
     justify-content: center;
     gap: 8px;
-    padding: 0 16px 12px;
+    padding: 12px 16px;
     flex-wrap: wrap;
     flex-shrink: 0;
 }

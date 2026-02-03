@@ -1,30 +1,32 @@
 <template>
     <v-app class="bg-user-gradient-light">
-        <!-- App Bar -->
-        <v-app-bar color="primary" density="comfortable">
-            <v-btn icon @click="drawer = true">
-                <v-icon>mdi-menu</v-icon>
-            </v-btn>
-            <v-app-bar-title>Messages</v-app-bar-title>
-            <v-spacer />
-            <v-btn icon @click="fetchConversations">
-                <v-icon>mdi-refresh</v-icon>
-            </v-btn>
-            <v-badge
-                v-if="unreadCount > 0"
-                :content="unreadCount"
-                color="error"
-                overlap
-            >
-                <v-icon>mdi-message-text</v-icon>
-            </v-badge>
-        </v-app-bar>
+        <!-- Header -->
+        <div class="messages-header">
+            <div class="header-content">
+                <v-btn icon variant="text" @click="drawer = true" class="menu-btn desktop-only">
+                    <v-icon>mdi-menu</v-icon>
+                </v-btn>
+                <div class="header-title">
+                    <h1>Messages</h1>
+                    <p v-if="unreadCount > 0">{{ unreadCount }} unread message{{ unreadCount !== 1 ? 's' : '' }}</p>
+                </div>
+                <v-btn 
+                    icon 
+                    variant="text" 
+                    class="refresh-btn"
+                    :loading="refreshing"
+                    @click="refreshConversations"
+                >
+                    <v-icon>mdi-refresh</v-icon>
+                </v-btn>
+            </div>
+        </div>
 
-        <!-- Navigation Drawer -->
+        <!-- Navigation Drawer (Desktop only) -->
         <RescuerMenu v-model="drawer" />
 
         <!-- Main Content -->
-        <v-main>
+        <v-main class="messages-main">
             <div v-if="loading" class="d-flex justify-center align-center" style="min-height: 60vh;">
                 <v-progress-circular indeterminate color="primary" size="64" />
             </div>
@@ -129,7 +131,7 @@
         />
         
         <!-- Bottom Navigation (Mobile/Tablet only) -->
-        <RescuerBottomNav :notification-count="0" />
+        <RescuerBottomNav :notification-count="0" :message-count="unreadCount" />
     </v-app>
 </template>
 
@@ -149,6 +151,8 @@ const refreshing = ref(false);
 const conversations = ref([]);
 const currentUserId = ref(null);
 const pollingInterval = ref(null);
+const consecutiveErrors = ref(0);
+const MAX_CONSECUTIVE_ERRORS = 3; // Only show error after 3 consecutive failures
 
 // Notification Alert
 const { playNotificationSound, vibrate, notify } = useNotificationAlert();
@@ -218,7 +222,7 @@ const triggerNewMessageNotification = (conversation, newMessages) => {
 };
 
 // Methods
-const fetchConversations = async () => {
+const fetchConversations = async (showErrorToast = false) => {
     try {
         const userData = JSON.parse(localStorage.getItem('userData') || '{}');
         currentUserId.value = userData.id;
@@ -237,6 +241,9 @@ const fetchConversations = async () => {
 
         const response = await getConversations(currentUserId.value);
         const data = response.data || response;
+
+        // Reset error count on success
+        consecutiveErrors.value = 0;
 
         if (data) {
             const newConversations = Array.isArray(data) ? data : data.data || [];
@@ -270,7 +277,13 @@ const fetchConversations = async () => {
         }
     } catch (error) {
         console.error('Error fetching conversations:', error);
-        showSnackbar('Failed to load messages', 'error');
+        consecutiveErrors.value++;
+        
+        // Only show error toast if explicitly requested (manual refresh) or after multiple consecutive failures
+        if (showErrorToast || consecutiveErrors.value >= MAX_CONSECUTIVE_ERRORS) {
+            showSnackbar('Failed to load messages', 'error');
+            consecutiveErrors.value = 0; // Reset after showing error
+        }
     } finally {
         loading.value = false;
         refreshing.value = false;
@@ -417,12 +430,18 @@ const showSnackbar = (message, color = 'success') => {
     snackbar.value = { show: true, message, color };
 };
 
+// Manual refresh with error toast
+const refreshConversations = async () => {
+    refreshing.value = true;
+    await fetchConversations(true); // Show error toast on manual refresh
+};
+
 // Lifecycle
 onMounted(() => {
-    fetchConversations();
+    fetchConversations(true); // Show error on initial load
     
     // Poll for new messages every 10 seconds
-    pollingInterval.value = setInterval(fetchConversations, 10000);
+    pollingInterval.value = setInterval(() => fetchConversations(false), 10000);
 });
 
 onUnmounted(() => {
@@ -433,7 +452,88 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+/* Header */
+.messages-header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: #3674B5;
+    padding: env(safe-area-inset-top, 0) 0 0 0;
+}
+
+.header-content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    gap: 12px;
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.menu-btn, .refresh-btn {
+    color: white;
+}
+
+.header-title {
+    flex: 1;
+    text-align: center;
+}
+
+.header-title h1 {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: white;
+    margin: 0;
+}
+
+.header-title p {
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.8);
+    margin: 0;
+}
+
+/* Main Content */
+.messages-main {
+    padding-bottom: 80px;
+}
+
+/* Desktop only visibility */
+.desktop-only {
+    display: flex;
+}
+
+@media (max-width: 1023px) {
+    .desktop-only {
+        display: none !important;
+    }
+}
+
+@media (min-width: 1024px) {
+    /* Show menu button on desktop, no margin needed since drawer is temporary */
+    .desktop-only {
+        display: flex;
+    }
+    
+    /* No bottom padding needed on desktop */
+    .messages-main {
+        padding-bottom: 20px;
+    }
+}
+
+/* Constrain list width for better readability */
+.v-list {
+    max-width: 800px;
+    margin: 0 auto;
+}
+
 .v-list-item {
     min-height: 72px;
+}
+
+/* Empty state and loading centered */
+.pa-4 {
+    max-width: 800px;
+    margin: 0 auto;
 }
 </style>

@@ -1,48 +1,39 @@
 <template>
-    <v-navigation-drawer v-model="drawerModel" temporary>
-        <v-list-item class="pa-4">
+    <v-navigation-drawer 
+        v-model="drawerModel" 
+        temporary
+        class="user-menu-drawer"
+        width="256"
+    >
+        <v-list-item class="pa-4 menu-header">
             <template v-slot:prepend>
-                <v-avatar color="primary" size="48">
+                <v-avatar color="white" size="48">
                     <v-img v-if="profilePictureUrl" :src="profilePictureUrl" cover />
-                    <span v-else class="text-h6 text-white">{{ getInitials(userName) }}</span>
+                    <span v-else class="text-h6" style="color: #3674B5;">{{ getInitials(userName) }}</span>
                 </v-avatar>
             </template>
-            <v-list-item-title class="font-weight-bold">{{ userName }}</v-list-item-title>
-            <v-list-item-subtitle>{{ userEmail }}</v-list-item-subtitle>
+            <v-list-item-title class="font-weight-bold text-white">{{ userName }}</v-list-item-title>
+            <v-list-item-subtitle class="text-white-darken-1">{{ userEmail }}</v-list-item-subtitle>
         </v-list-item>
 
-        <v-divider />
+        <v-divider color="rgba(255,255,255,0.2)" />
 
-        <v-list density="compact" nav>
+        <v-list density="compact" nav class="menu-list">
             <v-list-item
                 v-for="item in menuItems"
                 :key="item.id"
                 :prepend-icon="item.icon"
                 :title="item.name"
                 :active="isActive(item.path)"
-                color="primary"
                 @click="navigateTo(item.path)"
+                class="menu-item"
             />
         </v-list>
-
-        <template v-slot:append>
-            <div class="pa-4">
-                <v-btn
-                    block
-                    color="error"
-                    variant="tonal"
-                    prepend-icon="mdi-logout"
-                    @click="handleLogout"
-                >
-                    Logout
-                </v-btn>
-            </div>
-        </template>
     </v-navigation-drawer>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { router, usePage } from '@inertiajs/vue3';
 import { getProfilePictureUrl } from '@/Composables/useApi';
 
@@ -140,7 +131,7 @@ const isActive = (path) => {
 
 // Navigate to a menu item
 const navigateTo = (path) => {
-    drawerModel.value = false; // Close drawer
+    drawerModel.value = false; // Always close drawer after navigation
     router.visit(path);
 };
 
@@ -173,33 +164,40 @@ onMounted(() => {
         userData.value = data;
     }
 });
-
-const handleLogout = async () => {
-    // Clear all localStorage data
-    localStorage.removeItem('userData');
-    localStorage.removeItem('authToken');
-    localStorage.removeItem('token');
-    localStorage.removeItem('lastRescueCode');
-    localStorage.removeItem('lastRescueRequestId');
-    localStorage.removeItem('lastRescueRequestTime');
-    localStorage.removeItem('conversationId');
-    localStorage.removeItem('chatId');
-
-    try {
-        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
-        await fetch('/logout', {
-            method: 'POST',
-            headers: {
-                'X-CSRF-TOKEN': csrfToken,
-                'Accept': 'application/json',
-            },
-            credentials: 'include'
-        });
-    } catch (e) {
-        console.error('Logout error:', e);
-    }
-    
-    // Force redirect to login
-    window.location.href = '/login';
-};
 </script>
+
+<style scoped>
+.user-menu-drawer {
+    background: linear-gradient(180deg, #3674B5 0%, #2a5d8f 100%) !important;
+}
+
+.menu-header {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.menu-list {
+    background: transparent !important;
+}
+
+.menu-item {
+    color: white !important;
+    margin: 4px 8px;
+    border-radius: 8px;
+}
+
+.menu-item:hover {
+    background: rgba(255, 255, 255, 0.15) !important;
+}
+
+.menu-item :deep(.v-list-item__prepend .v-icon) {
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.menu-item :deep(.v-list-item-title) {
+    color: white;
+}
+
+.text-white-darken-1 {
+    color: rgba(255, 255, 255, 0.7) !important;
+}
+</style>

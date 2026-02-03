@@ -343,14 +343,14 @@
         </v-snackbar>
         
         <!-- Bottom Navigation (Mobile/Tablet only) -->
-        <RescuerBottomNav :notification-count="0" />
+        <RescuerBottomNav :notification-count="0" :message-count="unreadMessageCount" />
     </v-app>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue';
 import { router } from '@inertiajs/vue3';
-import { useApi } from '@/Composables/useApi';
+import { useApi, getUnreadMessageCount } from '@/Composables/useApi';
 import RescuerMenu from '@/Components/Pages/Rescuer/Menu/RescuerMenu.vue';
 import RescuerBottomNav from '@/Components/Pages/Rescuer/Menu/RescuerBottomNav.vue';
 
@@ -366,6 +366,7 @@ const history = ref([]);
 const selectedRescue = ref(null);
 const page = ref(1);
 const hasMore = ref(false);
+const unreadMessageCount = ref(0);
 
 const filters = ref({
     status: null,
@@ -585,9 +586,22 @@ watch(filters, () => {
     // Filters are applied via computed property
 }, { deep: true });
 
+// Fetch unread message count
+const fetchUnreadMessageCount = async () => {
+    const userData = JSON.parse(localStorage.getItem('userData') || '{}');
+    const userId = userData?.id;
+    if (!userId) return;
+    try {
+        unreadMessageCount.value = await getUnreadMessageCount(userId);
+    } catch (error) {
+        console.error('Failed to fetch unread message count:', error);
+    }
+};
+
 // Lifecycle
-onMounted(() => {
+onMounted(async () => {
     fetchHistory();
+    await fetchUnreadMessageCount();
 });
 </script>
 

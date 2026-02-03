@@ -1,35 +1,29 @@
 <template>
-    <v-app>
-        <v-app-bar color="primary" density="compact">
-            <v-app-bar-nav-icon @click="drawer = !drawer" />
-            <v-app-bar-title>PinPointMe</v-app-bar-title>
-            <v-spacer />
-            <v-btn icon @click="showHelp = true">
-                <v-icon>mdi-help-circle-outline</v-icon>
-            </v-btn>
-            <!-- Notification Bell with Badge -->
-            <v-btn icon @click="showNotificationPanel = !showNotificationPanel">
-                <v-badge
-                    :content="totalNotificationCount"
-                    :model-value="totalNotificationCount > 0"
-                    color="error"
-                    overlap
-                >
-                    <v-icon>mdi-bell</v-icon>
-                </v-badge>
-            </v-btn>
-            <v-avatar 
-                size="32" 
-                class="ml-1 mr-2"
-                :style="userProfilePicture ? 'cursor: pointer' : ''"
-                @click="goToProfile"
-            >
-                <v-img v-if="userProfilePicture" :src="userProfilePicture" cover />
-                <v-icon v-else color="white">mdi-account-circle</v-icon>
-            </v-avatar>
-        </v-app-bar>
+    <v-app class="app-container">
+        <!-- Header - matches Rescuer Dashboard style -->
+        <div class="scanner-header">
+            <div class="header-content">
+                <v-btn icon variant="text" @click="drawer = !drawer" class="menu-btn desktop-only">
+                    <v-icon>mdi-menu</v-icon>
+                </v-btn>
+                <div class="header-title">
+                    <h1>PinPointMe</h1>
+                    <p>COMING YOUR WAY.</p>
+                </div>
+                <div class="header-actions">
+                    <v-btn icon variant="text" @click="showHelp = true" class="action-btn">
+                        <v-icon>mdi-help-circle-outline</v-icon>
+                    </v-btn>
+                    <v-btn icon variant="text" @click="showNotificationPanel = !showNotificationPanel" class="desktop-only action-btn">
+                        <v-badge :content="totalNotificationCount" :model-value="totalNotificationCount > 0" color="error" overlap>
+                            <v-icon>mdi-bell</v-icon>
+                        </v-badge>
+                    </v-btn>
+                </div>
+            </div>
+        </div>
 
-        <!-- Navigation Drawer -->
+        <!-- Navigation Drawer - handles its own visibility -->
         <UserMenu v-model="drawer" />
 
         <!-- Notification Panel -->
@@ -37,117 +31,71 @@
             v-model="showNotificationPanel"
             location="right"
             temporary
-            width="350"
+            :width="notificationDrawerWidth"
+            class="notification-drawer"
+            touchless
         >
-            <v-list-item class="pa-4 bg-primary">
-                <template v-slot:prepend>
-                    <v-icon color="white">mdi-bell</v-icon>
-                </template>
-                <v-list-item-title class="text-white font-weight-bold">
-                    Notifications
-                </v-list-item-title>
-                <v-list-item-subtitle class="text-white">
-                    {{ totalNotificationCount }} notification{{ totalNotificationCount !== 1 ? 's' : '' }}
-                </v-list-item-subtitle>
-            </v-list-item>
-
-            <v-divider />
+            <div class="notification-header">
+                <v-icon color="white" class="mr-2">mdi-bell</v-icon>
+                <div>
+                    <h3>Notifications</h3>
+                    <p>{{ totalNotificationCount }} notification{{ totalNotificationCount !== 1 ? 's' : '' }}</p>
+                </div>
+            </div>
 
             <!-- Active Rescue Section -->
-            <div v-if="hasActiveRequest && activeRequest">
-                <v-list-subheader class="bg-warning-lighten-4 font-weight-bold">
-                    <v-icon size="small" class="mr-1">mdi-ambulance</v-icon>
+            <div v-if="hasActiveRequest && activeRequest" class="notification-section">
+                <div class="section-header warning">
+                    <v-icon size="18" class="mr-2">mdi-ambulance</v-icon>
                     Active Rescue
-                </v-list-subheader>
-                <v-list-item @click="goToActiveRescue" class="notification-item">
-                    <template v-slot:prepend>
-                        <v-avatar :color="getStatusColor(activeRequest.status)" size="40">
-                            <v-icon color="white">mdi-ambulance</v-icon>
-                        </v-avatar>
-                    </template>
-                    <v-list-item-title class="font-weight-bold">
-                        Rescue {{ activeRequest.rescue_code }}
-                    </v-list-item-title>
-                    <v-list-item-subtitle>
-                        <v-chip
-                            :color="getStatusColor(activeRequest.status)"
-                            size="x-small"
-                            variant="flat"
-                            class="mr-2"
-                        >
+                </div>
+                <div class="notification-item" @click="goToActiveRescue">
+                    <v-avatar :color="getStatusColor(activeRequest.status)" size="44">
+                        <v-icon color="white">mdi-ambulance</v-icon>
+                    </v-avatar>
+                    <div class="notification-content">
+                        <h4>Rescue {{ activeRequest.rescue_code }}</h4>
+                        <v-chip :color="getStatusColor(activeRequest.status)" size="x-small" variant="flat" class="mt-1">
                             {{ formatStatus(activeRequest.status) }}
                         </v-chip>
-                    </v-list-item-subtitle>
-                    <v-list-item-subtitle>
-                        <v-icon size="12">mdi-clock</v-icon>
-                        {{ formatTimeAgo(activeRequest.created_at) }}
-                    </v-list-item-subtitle>
-                </v-list-item>
-                <v-divider />
+                        <p class="time"><v-icon size="12">mdi-clock</v-icon> {{ formatTimeAgo(activeRequest.created_at) }}</p>
+                    </div>
+                    <v-icon size="20" color="grey">mdi-chevron-right</v-icon>
+                </div>
             </div>
 
             <!-- Chat Messages Section -->
-            <div v-if="unreadChats.length > 0">
-                <v-list-subheader class="bg-info-lighten-4 font-weight-bold">
-                    <v-icon size="small" class="mr-1">mdi-chat</v-icon>
+            <div v-if="unreadChats.length > 0" class="notification-section">
+                <div class="section-header info">
+                    <v-icon size="18" class="mr-2">mdi-chat</v-icon>
                     Unread Messages ({{ unreadMessageCount }})
-                </v-list-subheader>
-                <v-list lines="three">
-                    <v-list-item
-                        v-for="chat in unreadChats"
-                        :key="chat.id"
-                        @click="openChat(chat)"
-                        class="notification-item"
-                    >
-                        <template v-slot:prepend>
-                            <v-avatar color="info" size="40">
-                                <v-img v-if="chat.other_user_picture" :src="chat.other_user_picture" cover />
-                                <v-icon v-else color="white">mdi-account</v-icon>
-                            </v-avatar>
-                        </template>
-                        <v-list-item-title class="font-weight-bold">
-                            {{ chat.other_user_name }}
-                        </v-list-item-title>
-                        <v-list-item-subtitle class="text-truncate">
-                            {{ chat.last_message }}
-                        </v-list-item-subtitle>
-                        <template v-slot:append>
-                            <v-badge
-                                :content="chat.unread_count"
-                                color="error"
-                                inline
-                            />
-                        </template>
-                    </v-list-item>
-                </v-list>
-                <v-divider />
+                </div>
+                <div v-for="chat in unreadChats" :key="chat.id" class="notification-item" @click="openChat(chat)">
+                    <v-avatar color="info" size="44">
+                        <v-img v-if="chat.other_user_picture" :src="chat.other_user_picture" cover />
+                        <v-icon v-else color="white">mdi-account</v-icon>
+                    </v-avatar>
+                    <div class="notification-content">
+                        <h4>{{ chat.other_user_name }}</h4>
+                        <p class="message">{{ chat.last_message }}</p>
+                    </div>
+                    <v-badge :content="chat.unread_count" color="error" inline />
+                </div>
             </div>
 
             <!-- No Notifications -->
-            <div v-if="!hasActiveRequest && unreadChats.length === 0" class="text-center py-8">
-                <v-icon size="48" color="grey">mdi-bell-off-outline</v-icon>
-                <p class="text-grey mt-2">No new notifications</p>
+            <div v-if="!hasActiveRequest && unreadChats.length === 0" class="no-notifications">
+                <v-icon size="56" color="grey-lighten-1">mdi-bell-off-outline</v-icon>
+                <p>No new notifications</p>
             </div>
 
             <template v-slot:append>
-                <div class="pa-4">
-                    <v-btn
-                        v-if="hasActiveRequest"
-                        block
-                        color="warning"
-                        variant="tonal"
-                        class="mb-2"
-                        @click="showNotificationPanel = false; goToActiveRescue()"
-                    >
+                <div class="notification-actions">
+                    <v-btn v-if="hasActiveRequest" block color="warning" variant="flat" class="mb-2 rounded-lg" @click="showNotificationPanel = false; goToActiveRescue()">
                         <v-icon start>mdi-ambulance</v-icon>
                         View Active Rescue
                     </v-btn>
-                    <v-btn
-                        block
-                        color="primary"
-                        variant="tonal"
-                        @click="showNotificationPanel = false; goToInbox()"
-                    >
+                    <v-btn block color="primary" variant="tonal" class="rounded-lg" @click="showNotificationPanel = false; goToInbox()">
                         <v-icon start>mdi-email</v-icon>
                         Open Inbox
                     </v-btn>
@@ -155,542 +103,687 @@
             </template>
         </v-navigation-drawer>
 
-        <v-main class="bg-user-gradient-light">
-            <v-container fluid class="pa-4">
-                <!-- Loading State while checking active request -->
-                <div v-if="isCheckingActiveRequest" class="text-center py-10">
-                    <v-progress-circular
-                        indeterminate
-                        color="primary"
-                        size="50"
-                    />
-                    <p class="text-grey mt-4">Checking for active rescue requests...</p>
+        <v-main class="main-container">
+            <!-- Content Wrapper -->
+            <div class="content-wrapper">
+                <!-- Loading State -->
+                <div v-if="isCheckingActiveRequest" class="loading-state">
+                    <v-progress-circular indeterminate color="primary" size="56" width="5" />
+                    <p>Checking for active rescue requests...</p>
                 </div>
                 
                 <!-- Active Rescue Request Display -->
-                <div v-else-if="hasActiveRequest && activeRequest">
-                    <div class="text-center mb-6">
-                        <v-icon
-                            size="80"
-                            color="warning"
-                        >
-                            mdi-alert-circle
-                        </v-icon>
-                        <h1 class="text-h5 font-weight-bold mt-4">Active Rescue Request</h1>
-                        <p class="text-body-2 text-grey">You have an ongoing rescue request</p>
-                    </div>
-                    
-                    <v-card class="mb-6" elevation="4" rounded="lg">
-                        <v-card-title class="d-flex align-center bg-warning">
-                            <v-icon class="mr-2">mdi-ambulance</v-icon>
-                            Current Rescue Request
-                            <v-spacer />
-                            <v-chip
-                                :color="getStatusColor(activeRequest.status)"
-                                variant="flat"
-                                size="small"
-                            >
-                                {{ formatStatus(activeRequest.status) }}
-                            </v-chip>
-                        </v-card-title>
-                        <v-card-text class="pt-4">
-                            <v-list>
-                                <v-list-item>
-                                    <template v-slot:prepend>
-                                        <v-icon color="primary">mdi-identifier</v-icon>
-                                    </template>
-                                    <v-list-item-title class="font-weight-bold">Rescue Code</v-list-item-title>
-                                    <v-list-item-subtitle>{{ activeRequest.rescue_code }}</v-list-item-subtitle>
-                                </v-list-item>
-                                
-                                <v-list-item v-if="activeRequest.building || activeRequest.floor || activeRequest.room">
-                                    <template v-slot:prepend>
-                                        <v-icon color="primary">mdi-map-marker</v-icon>
-                                    </template>
-                                    <v-list-item-title class="font-weight-bold">Location</v-list-item-title>
-                                    <v-list-item-subtitle>
-                                        {{ activeRequest.building?.name || 'N/A' }}
-                                        <span v-if="activeRequest.floor"> - {{ activeRequest.floor.floor_name }}</span>
-                                        <span v-if="activeRequest.room"> - {{ activeRequest.room.room_name }}</span>
-                                    </v-list-item-subtitle>
-                                </v-list-item>
-                                
-                                <v-list-item v-if="activeRequest.description">
-                                    <template v-slot:prepend>
-                                        <v-icon color="primary">mdi-text</v-icon>
-                                    </template>
-                                    <v-list-item-title class="font-weight-bold">Description</v-list-item-title>
-                                    <v-list-item-subtitle>{{ activeRequest.description }}</v-list-item-subtitle>
-                                </v-list-item>
-                                
-                                <v-list-item v-if="activeRequest.rescuer">
-                                    <template v-slot:prepend>
-                                        <v-icon color="success">mdi-account-hard-hat</v-icon>
-                                    </template>
-                                    <v-list-item-title class="font-weight-bold">Assigned Rescuer</v-list-item-title>
-                                    <v-list-item-subtitle>
-                                        {{ activeRequest.rescuer.first_name }} {{ activeRequest.rescuer.last_name }}
-                                    </v-list-item-subtitle>
-                                </v-list-item>
-                                
-                                <v-list-item v-else>
-                                    <template v-slot:prepend>
-                                        <v-icon color="grey">mdi-account-search</v-icon>
-                                    </template>
-                                    <v-list-item-title class="font-weight-bold">Assigned Rescuer</v-list-item-title>
-                                    <v-list-item-subtitle>Waiting for rescuer assignment...</v-list-item-subtitle>
-                                </v-list-item>
-                                
-                                <v-list-item>
-                                    <template v-slot:prepend>
-                                        <v-icon color="primary">mdi-clock</v-icon>
-                                    </template>
-                                    <v-list-item-title class="font-weight-bold">Requested At</v-list-item-title>
-                                    <v-list-item-subtitle>
-                                        {{ new Date(activeRequest.created_at).toLocaleString() }}
-                                    </v-list-item-subtitle>
-                                </v-list-item>
-                            </v-list>
-                        </v-card-text>
-                        <v-card-actions class="pa-4">
-                            <v-spacer />
-                            <v-btn
-                                color="primary"
-                                size="large"
-                                variant="elevated"
-                                @click="goToActiveRescue"
-                                prepend-icon="mdi-eye"
-                            >
-                                View Status
-                            </v-btn>
-                        </v-card-actions>
-                    </v-card>
-                    
-                    <v-alert
-                        :type="activeRequest?.status === 'rescued' || activeRequest?.status === 'completed' ? 'warning' : 'info'"
-                        variant="tonal"
-                        class="mb-4"
-                    >
-                        <v-alert-title v-if="activeRequest?.status === 'rescued' || activeRequest?.status === 'completed'">
-                            Please confirm you are safe
-                        </v-alert-title>
-                        <v-alert-title v-else>Need help?</v-alert-title>
-                        <p class="mt-2" v-if="activeRequest?.status === 'rescued' || activeRequest?.status === 'completed'">
-                            Your rescue has been completed. Please click "View Status" and confirm that you are safe 
-                            before you can submit a new rescue request.
-                        </p>
-                        <p class="mt-2" v-else>
-                            You can only have one active rescue request at a time. 
-                            Please wait for your current request to be completed or cancelled 
-                            before submitting a new one.
-                        </p>
-                    </v-alert>
-                </div>
-
-                <!-- Normal Scanner Form (only shown when no active request) -->
-                <div v-else>
-                <!-- Header Section -->
-                <div class="text-center mb-6">
-                    <div class="text-center mb-2">
-                        <v-icon
-                            size="80"
-                            color="primary"
-                        >
-                            mdi-map-marker-radius
-                        </v-icon>
-                    </div>
-                    <h1 class="text-h5 font-weight-bold">Emergency Scanner</h1>
-                    <p class="text-body-2 text-grey">Scan your location or describe your emergency</p>
-                </div>
-
-                <!-- Main Action Cards -->
-                <v-row justify="center" class="mb-6">
-                    <!-- QR Scanner Card -->
-                    <v-col cols="12" sm="6" md="4">
-                        <v-card
-                            class="text-center pa-6 h-100"
-                            elevation="4"
-                            rounded="lg"
-                            @click="startQrScan"
-                            :disabled="isScanning"
-                        >
-                            <v-icon size="64" color="primary" class="mb-4">
-                                mdi-qrcode-scan
-                            </v-icon>
-                            <v-card-title class="text-h6">Scan QR Code</v-card-title>
-                            <v-card-text>
-                                Scan the room's QR code to set your location
-                            </v-card-text>
-                            <v-btn
-                                color="primary"
-                                variant="tonal"
-                                :loading="isScanning"
-                                @click.stop="startQrScan"
-                            >
-                                Start Scanning
-                            </v-btn>
-                        </v-card>
-                    </v-col>
-
-                    <!-- Voice Input Card -->
-                    <v-col cols="12" sm="6" md="4">
-                        <v-card
-                            class="text-center pa-6 h-100"
-                            elevation="4"
-                            rounded="lg"
-                            @click="toggleVoiceInput"
-                        >
-                            <v-icon
-                                size="64"
-                                :color="isRecording ? 'error' : 'success'"
-                                class="mb-4"
-                            >
-                                {{ isRecording ? 'mdi-microphone-off' : 'mdi-microphone' }}
-                            </v-icon>
-                            <v-card-title class="text-h6">Voice Description</v-card-title>
-                            <v-card-text>
-                                Describe your emergency situation verbally
-                            </v-card-text>
-                            <v-btn
-                                :color="isRecording ? 'error' : 'success'"
-                                variant="tonal"
-                                :loading="isProcessingAudio"
-                                @click.stop="toggleVoiceInput"
-                            >
-                                {{ isRecording ? 'Stop Recording' : 'Start Recording' }}
-                            </v-btn>
-                            <div v-if="isRecording" class="mt-2 text-error">
-                                Recording: {{ formatRecordingTime }}
+                <div v-else-if="hasActiveRequest && activeRequest" class="active-rescue-display">
+                    <div class="active-hero">
+                        <div class="active-hero-content">
+                            <div class="active-icon-wrapper">
+                                <v-avatar color="warning" size="80">
+                                    <v-icon size="40" color="white">mdi-alert-circle</v-icon>
+                                </v-avatar>
+                                <div class="pulse-ring warning"></div>
                             </div>
+                            <h2>Active Rescue Request</h2>
+                            <p>You have an ongoing rescue request</p>
+                        </div>
+                    </div>
+                    
+                    <div class="active-content">
+                        <v-card class="mb-4 rounded-xl" elevation="0">
+                            <div class="active-card-header">
+                                <v-chip :color="getStatusColor(activeRequest.status)" variant="flat">
+                                    {{ formatStatus(activeRequest.status) }}
+                                </v-chip>
+                                <span class="rescue-code">{{ activeRequest.rescue_code }}</span>
+                            </div>
+                            <v-card-text>
+                                <div class="active-details">
+                                    <div class="detail-row" v-if="activeRequest.building || activeRequest.floor || activeRequest.room">
+                                        <v-icon color="primary" size="20">mdi-map-marker</v-icon>
+                                        <div>
+                                            <span class="label">Location</span>
+                                            <span class="value">
+                                                {{ activeRequest.building?.name || 'N/A' }}
+                                                <span v-if="activeRequest.floor"> - {{ activeRequest.floor.floor_name }}</span>
+                                                <span v-if="activeRequest.room"> - {{ activeRequest.room.room_name }}</span>
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div class="detail-row" v-if="activeRequest.rescuer">
+                                        <v-icon color="success" size="20">mdi-account-hard-hat</v-icon>
+                                        <div>
+                                            <span class="label">Assigned Rescuer</span>
+                                            <span class="value">{{ activeRequest.rescuer.first_name }} {{ activeRequest.rescuer.last_name }}</span>
+                                        </div>
+                                    </div>
+                                    <div class="detail-row" v-else>
+                                        <v-icon color="grey" size="20">mdi-account-search</v-icon>
+                                        <div>
+                                            <span class="label">Rescuer</span>
+                                            <span class="value text-grey">Waiting for assignment...</span>
+                                        </div>
+                                    </div>
+                                    <div class="detail-row">
+                                        <v-icon color="primary" size="20">mdi-clock</v-icon>
+                                        <div>
+                                            <span class="label">Requested</span>
+                                            <span class="value">{{ formatTimeAgo(activeRequest.created_at) }}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </v-card-text>
+                            <v-card-actions class="pa-4 pt-0">
+                                <v-btn color="primary" block size="large" class="rounded-xl" elevation="2" @click="goToActiveRescue">
+                                    <v-icon start>mdi-eye</v-icon>
+                                    View Status
+                                </v-btn>
+                            </v-card-actions>
                         </v-card>
-                    </v-col>
-                </v-row>
+                        
+                        <v-alert
+                            :type="activeRequest?.status === 'rescued' || activeRequest?.status === 'completed' ? 'warning' : 'info'"
+                            variant="tonal"
+                            class="rounded-xl"
+                        >
+                            <v-alert-title v-if="activeRequest?.status === 'rescued' || activeRequest?.status === 'completed'" class="font-weight-bold">
+                                Please confirm you are safe
+                            </v-alert-title>
+                            <v-alert-title v-else class="font-weight-bold">Need help?</v-alert-title>
+                            <p class="mt-2 mb-0" v-if="activeRequest?.status === 'rescued' || activeRequest?.status === 'completed'">
+                                Your rescue has been completed. Please confirm that you are safe before submitting a new rescue request.
+                            </p>
+                            <p class="mt-2 mb-0" v-else>
+                                You can only have one active rescue request at a time. Wait for your current request to be completed.
+                            </p>
+                        </v-alert>
+                    </div>
+                </div>
 
-                <!-- Current Location Display -->
-                <v-card
-                    v-if="selectedBuilding || selectedFloor || selectedRoom"
-                    class="mb-6"
-                    :elevation="locationScanned ? 6 : 2"
-                    rounded="lg"
-                    :class="{ 'border-success': locationScanned }"
-                    :style="locationScanned ? 'border: 2px solid rgb(var(--v-theme-success))' : ''"
-                    ref="locationCard"
-                >
-                    <v-card-title class="d-flex align-center" :class="{ 'bg-success text-white': locationScanned }">
-                        <v-icon :color="locationScanned ? 'white' : 'primary'" class="mr-2">
-                            {{ locationScanned ? 'mdi-check-circle' : 'mdi-map-marker' }}
-                        </v-icon>
-                        {{ locationScanned ? 'Location Scanned Successfully!' : 'Current Location' }}
-                        <v-spacer />
-                        <v-chip v-if="locationScanned" color="white" variant="flat" size="small">
-                            <v-icon start size="small">mdi-qrcode-scan</v-icon>
-                            QR Scanned
-                        </v-chip>
-                    </v-card-title>
-                    <v-card-text>
-                        <v-chip-group>
-                            <v-chip v-if="selectedBuilding" color="primary" variant="tonal">
-                                <v-icon start>mdi-office-building</v-icon>
-                                {{ selectedBuilding.name }}
-                            </v-chip>
-                            <v-chip v-if="selectedFloor" color="secondary" variant="tonal">
-                                <v-icon start>mdi-stairs</v-icon>
-                                {{ selectedFloor.floor_name }}
-                            </v-chip>
-                            <v-chip v-if="selectedRoom" color="success" variant="tonal">
-                                <v-icon start>mdi-door</v-icon>
-                                {{ selectedRoom.room_name }}
-                            </v-chip>
-                        </v-chip-group>
-                        <p v-if="locationScanned" class="text-success mt-3 mb-0">
-                            <v-icon size="small" class="mr-1">mdi-arrow-down</v-icon>
-                            Fill in emergency details below and submit your rescue request
-                        </p>
-                    </v-card-text>
-                </v-card>
+                <!-- Normal Scanner Form -->
+                <div v-else>
+                    <!-- Hero Section -->
+                    <div class="scanner-hero">
+                        <div class="hero-content">
+                            <v-icon size="56" color="white" class="mb-3">mdi-map-marker-radius</v-icon>
+                            <h1>Emergency Scanner</h1>
+                            <p>Scan your location or describe your emergency</p>
+                        </div>
+                    </div>
 
-                <!-- Manual Location Selection -->
-                <v-card class="mb-6" elevation="2" rounded="lg">
-                    <v-card-title>
-                        <v-icon class="mr-2">mdi-map-marker-plus</v-icon>
-                        Select Location Manually
-                    </v-card-title>
-                    <v-card-text>
-                        <v-row>
-                            <v-col cols="12" md="4">
-                                <v-select
-                                    v-model="selectedBuilding"
-                                    :items="buildings"
-                                    item-title="name"
-                                    label="Building"
-                                    variant="outlined"
-                                    density="comfortable"
-                                    return-object
-                                    :loading="isLoadingBuildings"
-                                    @update:model-value="onBuildingChange"
-                                />
-                            </v-col>
-                            <v-col cols="12" md="4">
-                                <v-select
-                                    v-model="selectedFloor"
-                                    :items="availableFloors"
-                                    item-title="floor_name"
-                                    label="Floor"
-                                    variant="outlined"
-                                    density="comfortable"
-                                    return-object
-                                    :disabled="!selectedBuilding"
-                                    @update:model-value="onFloorChange"
-                                />
-                            </v-col>
-                            <v-col cols="12" md="4">
-                                <v-select
-                                    v-model="selectedRoom"
-                                    :items="availableRooms"
-                                    item-title="room_name"
-                                    label="Room"
-                                    variant="outlined"
-                                    density="comfortable"
-                                    return-object
-                                    :disabled="!selectedFloor"
-                                />
-                            </v-col>
-                        </v-row>
-                    </v-card-text>
-                </v-card>
-
-                <!-- Evacuation Path Display -->
-                <v-card v-if="selectedRoom && hasFloorPlan" class="mb-6" elevation="3" rounded="lg">
-                    <v-card-title class="d-flex align-center">
-                        <v-icon class="mr-2" color="error">mdi-exit-run</v-icon>
-                        Evacuation Path for {{ selectedRoom.room_name }}
-                    </v-card-title>
-                    <v-card-subtitle>
-                        {{ selectedBuilding?.name }} - {{ selectedFloor?.floor_name }}
-                    </v-card-subtitle>
-                    <v-card-text>
-                        <div class="evacuation-canvas-container">
-                            <div class="evacuation-canvas-wrapper" :style="evacuationWrapperStyle">
-                                <img
-                                    ref="evacuationImage"
-                                    :src="selectedFloor.floor_plan_url"
-                                    class="evacuation-image"
-                                    @load="onEvacuationImageLoad"
-                                />
-                                <canvas
-                                    ref="evacuationCanvas"
-                                    class="evacuation-overlay"
-                                ></canvas>
+                    <!-- Main Content -->
+                    <div class="scanner-content">
+                        <!-- Quick Action Cards -->
+                        <div class="action-cards mb-4">
+                            <!-- QR Scan Card - Hidden on mobile/tablet (use bottom nav instead) -->
+                            <div class="action-card primary hide-on-mobile" @click="startQrScan" :class="{ disabled: isScanning }">
+                                <div class="action-icon">
+                                    <v-icon size="36" color="white">mdi-qrcode-scan</v-icon>
+                                </div>
+                                <div class="action-text">
+                                    <h3>Scan QR Code</h3>
+                                    <p>Quick location detection</p>
+                                </div>
+                                <v-progress-circular v-if="isScanning" indeterminate size="24" color="white" />
+                                <v-icon v-else color="white" size="20">mdi-chevron-right</v-icon>
+                            </div>
+                            <div class="action-card success" @click="toggleVoiceInput">
+                                <div class="action-icon" :class="{ recording: isRecording }">
+                                    <v-icon size="36" color="white">{{ isRecording ? 'mdi-microphone-off' : 'mdi-microphone' }}</v-icon>
+                                </div>
+                                <div class="action-text">
+                                    <h3>{{ isRecording ? 'Stop Recording' : 'Voice Command' }}</h3>
+                                    <p>{{ isRecording ? formatRecordingTime : 'Say location & emergency' }}</p>
+                                </div>
+                                <v-progress-circular v-if="isProcessingAudio" indeterminate size="24" color="white" />
+                                <v-icon v-else color="white" size="20">mdi-chevron-right</v-icon>
                             </div>
                         </div>
                         
-                        <!-- Zoom Controls -->
-                        <div class="d-flex justify-center align-center mt-3 gap-2">
-                            <v-btn size="small" icon @click="evacuationZoomOut">
-                                <v-icon>mdi-minus</v-icon>
-                            </v-btn>
-                            <v-chip size="small">{{ Math.round(evacuationZoom * 100) }}%</v-chip>
-                            <v-btn size="small" icon @click="evacuationZoomIn">
-                                <v-icon>mdi-plus</v-icon>
-                            </v-btn>
-                            <v-btn size="small" icon @click="resetEvacuationZoom">
-                                <v-icon>mdi-restore</v-icon>
-                            </v-btn>
-                        </div>
-
-                        <!-- Legend -->
-                        <v-row class="mt-4">
-                            <v-col cols="12" sm="6">
-                                <div class="d-flex align-center">
-                                    <div class="legend-line mr-2"></div>
-                                    <span class="text-body-2">Evacuation Path</span>
-                                </div>
-                            </v-col>
-                            <v-col cols="12" sm="6">
-                                <div class="d-flex align-center">
-                                    <div class="legend-room mr-2"></div>
-                                    <span class="text-body-2">Your Room</span>
-                                </div>
-                            </v-col>
-                        </v-row>
-                    </v-card-text>
-                </v-card>
-
-                <!-- Emergency Form -->
-                <v-card id="emergency-form-section" class="mb-6" elevation="4" rounded="lg">
-                    <v-card-title class="d-flex align-center bg-error text-white">
-                        <v-icon class="mr-2">mdi-alert-circle</v-icon>
-                        Emergency Details
-                        <v-spacer />
-                        <v-chip v-if="canSubmit" color="white" variant="flat" size="small">
-                            <v-icon start size="small">mdi-check</v-icon>
-                            Ready to Submit
-                        </v-chip>
-                    </v-card-title>
-                    <v-card-text class="pt-4">
-                        <v-form ref="emergencyFormRef">
-                            <v-row>
-                                <v-col cols="12" md="6">
-                                    <v-text-field
-                                        v-model="emergencyForm.firstName"
-                                        label="First Name"
-                                        variant="outlined"
-                                        density="comfortable"
-                                        prepend-inner-icon="mdi-account"
-                                    />
-                                </v-col>
-                                <v-col cols="12" md="6">
-                                    <v-text-field
-                                        v-model="emergencyForm.lastName"
-                                        label="Last Name"
-                                        variant="outlined"
-                                        density="comfortable"
-                                        prepend-inner-icon="mdi-account"
-                                    />
-                                </v-col>
-                                <v-col cols="12">
-                                    <v-textarea
-                                        v-model="emergencyForm.description"
-                                        label="Describe your emergency"
-                                        variant="outlined"
-                                        rows="3"
-                                        prepend-inner-icon="mdi-text"
-                                    />
-                                </v-col>
-                                <v-col cols="12" md="6">
-                                    <v-select
-                                        v-model="emergencyForm.mobilityStatus"
-                                        :items="mobilityOptions"
-                                        label="Mobility Status"
-                                        variant="outlined"
-                                        density="comfortable"
-                                        prepend-inner-icon="mdi-walk"
-                                    />
-                                </v-col>
-                                <v-col cols="12" md="6">
-                                    <v-select
-                                        v-model="emergencyForm.urgencyLevel"
-                                        :items="urgencyOptions"
-                                        label="Urgency Level"
-                                        variant="outlined"
-                                        density="comfortable"
-                                        prepend-inner-icon="mdi-speedometer"
-                                    />
-                                </v-col>
-                                <v-col cols="12" md="6">
-                                    <v-select
-                                        v-model="emergencyForm.injuries"
-                                        :items="injuryOptions"
-                                        label="Type of Injury"
-                                        variant="outlined"
-                                        density="comfortable"
-                                        prepend-inner-icon="mdi-medical-bag"
-                                        multiple
-                                        chips
-                                        closable-chips
-                                    />
-                                </v-col>
-                                <v-col cols="12" md="6" v-if="emergencyForm.injuries?.includes('other')">
-                                    <v-text-field
-                                        v-model="emergencyForm.otherInjury"
-                                        label="Specify Other Injury"
-                                        variant="outlined"
-                                        density="comfortable"
-                                        prepend-inner-icon="mdi-pencil"
-                                    />
-                                </v-col>
-                                <v-col cols="12">
-                                    <v-textarea
-                                        v-model="emergencyForm.additionalInfo"
-                                        label="Additional Information"
-                                        variant="outlined"
-                                        rows="2"
-                                        prepend-inner-icon="mdi-information"
-                                    />
-                                </v-col>
-                            </v-row>
-                        </v-form>
-                    </v-card-text>
-                    <v-card-actions class="pa-4">
-                        <v-spacer />
-                        <v-btn
-                            color="error"
-                            size="large"
-                            variant="elevated"
-                            :loading="isSubmitting"
-                            :disabled="!canSubmit"
-                            @click="submitRescueRequest"
-                            prepend-icon="mdi-send"
+                        <!-- Voice Command Tips (shown when recording) -->
+                        <v-alert 
+                            v-if="isRecording" 
+                            type="info" 
+                            variant="tonal" 
+                            class="mb-4 rounded-xl voice-tips-alert"
+                            density="compact"
                         >
-                            Request Rescue
-                        </v-btn>
-                    </v-card-actions>
-                </v-card>
+                            <div class="voice-tips">
+                                <div class="voice-tip-header">
+                                    <v-icon size="20" class="mr-2 pulse-icon">mdi-microphone</v-icon>
+                                    <strong>Listening... Speak your location clearly:</strong>
+                                </div>
+                                <div class="voice-examples mt-2">
+                                    <div class="text-caption mb-1">📍 <strong>Location:</strong> "Building A, Floor 2, Room 201"</div>
+                                    <div class="text-caption mb-1">🆘 <strong>Emergency:</strong> "I need help, I'm injured"</div>
+                                    <div class="text-caption text-grey-darken-1" style="font-size: 11px;">
+                                        Tip: Say building name, floor number, and room number
+                                    </div>
+                                </div>
+                            </div>
+                        </v-alert>
+
+                        <!-- Location Status Card -->
+                        <v-card v-if="selectedBuilding || selectedFloor || selectedRoom" class="mb-4 rounded-xl location-status-card" :class="{ scanned: locationScanned }" elevation="0" ref="locationCard">
+                            <div class="location-status-header" :class="{ success: locationScanned }">
+                                <v-icon :color="locationScanned ? 'white' : 'primary'" size="24">
+                                    {{ locationScanned ? 'mdi-check-circle' : 'mdi-map-marker' }}
+                                </v-icon>
+                                <span>{{ locationScanned ? 'Location Scanned!' : 'Current Location' }}</span>
+                                <v-chip v-if="locationScanned" size="x-small" color="white" variant="flat" class="ml-auto">
+                                    <v-icon start size="12">mdi-qrcode-scan</v-icon>
+                                    QR
+                                </v-chip>
+                            </div>
+                            <v-card-text>
+                                <div class="location-chips">
+                                    <v-chip v-if="selectedBuilding" color="primary" variant="tonal" size="small">
+                                        <v-icon start size="14">mdi-office-building</v-icon>
+                                        {{ selectedBuilding.name }}
+                                    </v-chip>
+                                    <v-chip v-if="selectedFloor" color="secondary" variant="tonal" size="small">
+                                        <v-icon start size="14">mdi-stairs</v-icon>
+                                        {{ selectedFloor.floor_name }}
+                                    </v-chip>
+                                    <v-chip v-if="selectedRoom" color="success" variant="tonal" size="small">
+                                        <v-icon start size="14">mdi-door</v-icon>
+                                        {{ selectedRoom.room_name }}
+                                    </v-chip>
+                                </div>
+                            </v-card-text>
+                        </v-card>
+
+                        <!-- Manual Location Selection (Collapsible) -->
+                        <v-expansion-panels class="mb-4" variant="accordion">
+                            <v-expansion-panel elevation="0" class="rounded-xl">
+                                <v-expansion-panel-title class="py-3">
+                                    <div class="d-flex align-center">
+                                        <v-avatar color="grey-lighten-2" size="40" class="mr-3">
+                                            <v-icon color="grey-darken-1" size="20">mdi-map-marker-plus</v-icon>
+                                        </v-avatar>
+                                        <div>
+                                            <h3 class="text-subtitle-1 font-weight-bold mb-0">Manual Location</h3>
+                                            <p class="text-caption text-grey mb-0">Select your location manually</p>
+                                        </div>
+                                    </div>
+                                </v-expansion-panel-title>
+                                <v-expansion-panel-text>
+                                    <div class="manual-select-grid">
+                                        <v-select
+                                            v-model="selectedBuilding"
+                                            :items="buildings"
+                                            item-title="name"
+                                            label="Building"
+                                            variant="outlined"
+                                            density="comfortable"
+                                            return-object
+                                            :loading="isLoadingBuildings"
+                                            @update:model-value="onBuildingChange"
+                                            hide-details
+                                            class="mb-3"
+                                        />
+                                        <v-select
+                                            v-model="selectedFloor"
+                                            :items="availableFloors"
+                                            item-title="floor_name"
+                                            label="Floor"
+                                            variant="outlined"
+                                            density="comfortable"
+                                            return-object
+                                            :disabled="!selectedBuilding"
+                                            @update:model-value="onFloorChange"
+                                            hide-details
+                                            class="mb-3"
+                                        />
+                                        <v-select
+                                            v-model="selectedRoom"
+                                            :items="availableRooms"
+                                            item-title="room_name"
+                                            label="Room"
+                                            variant="outlined"
+                                            density="comfortable"
+                                            return-object
+                                            :disabled="!selectedFloor"
+                                            hide-details
+                                        />
+                                    </div>
+                                </v-expansion-panel-text>
+                            </v-expansion-panel>
+                        </v-expansion-panels>
+
+                        <!-- Evacuation Path (Collapsible) -->
+                        <v-expansion-panels v-if="selectedRoom && hasFloorPlan" class="mb-4" variant="accordion">
+                            <v-expansion-panel elevation="0" class="rounded-xl">
+                                <v-expansion-panel-title class="py-3">
+                                    <div class="d-flex align-center">
+                                        <v-avatar color="error-lighten-4" size="40" class="mr-3">
+                                            <v-icon color="error" size="20">mdi-exit-run</v-icon>
+                                        </v-avatar>
+                                        <div>
+                                            <h3 class="text-subtitle-1 font-weight-bold mb-0">Evacuation Path</h3>
+                                            <p class="text-caption text-grey mb-0">{{ selectedRoom.room_name }} - {{ selectedFloor?.floor_name }}</p>
+                                        </div>
+                                    </div>
+                                </v-expansion-panel-title>
+                                <v-expansion-panel-text>
+                                    <div class="evacuation-canvas-container">
+                                        <div class="evacuation-canvas-wrapper" :style="evacuationWrapperStyle">
+                                            <img ref="evacuationImage" :src="selectedFloor.floor_plan_url" class="evacuation-image" @load="onEvacuationImageLoad" />
+                                            <canvas ref="evacuationCanvas" class="evacuation-overlay"></canvas>
+                                        </div>
+                                    </div>
+                                    <div class="d-flex justify-center align-center mt-3 gap-2">
+                                        <v-btn size="small" icon variant="tonal" @click="evacuationZoomOut"><v-icon>mdi-minus</v-icon></v-btn>
+                                        <v-chip size="small">{{ Math.round(evacuationZoom * 100) }}%</v-chip>
+                                        <v-btn size="small" icon variant="tonal" @click="evacuationZoomIn"><v-icon>mdi-plus</v-icon></v-btn>
+                                        <v-btn size="small" icon variant="tonal" @click="resetEvacuationZoom"><v-icon>mdi-restore</v-icon></v-btn>
+                                    </div>
+                                    <div class="evacuation-legend mt-3">
+                                        <div class="legend-item"><div class="legend-line"></div><span>Evacuation Path</span></div>
+                                        <div class="legend-item"><div class="legend-room"></div><span>Your Room</span></div>
+                                    </div>
+                                </v-expansion-panel-text>
+                            </v-expansion-panel>
+                        </v-expansion-panels>
+
+                        <!-- Emergency Form -->
+                        <v-card id="emergency-form-section" class="mb-4 rounded-xl emergency-form-card" elevation="0">
+                            <div class="emergency-form-header">
+                                <v-icon color="white" size="24" class="mr-2">mdi-alert-circle</v-icon>
+                                <span>Emergency Details</span>
+                                <v-chip v-if="canSubmit" size="x-small" color="white" variant="flat" class="ml-auto">
+                                    <v-icon start size="12">mdi-check</v-icon>
+                                    Ready
+                                </v-chip>
+                            </div>
+                            <v-card-text class="pt-4">
+                                <v-form ref="emergencyFormRef">
+                                    <v-row dense>
+                                        <v-col cols="12" class="pb-0">
+                                            <div class="samaritan-note mb-2">
+                                                <v-icon size="14" color="info" class="mr-1">mdi-information</v-icon>
+                                                <span class="text-caption text-grey-darken-1">Update the name if reporting for someone else (Samaritan Report)</span>
+                                            </div>
+                                        </v-col>
+                                        <v-col cols="6">
+                                            <v-text-field
+                                                v-model="emergencyForm.firstName"
+                                                label="First Name"
+                                                variant="outlined"
+                                                density="comfortable"
+                                                prepend-inner-icon="mdi-account"
+                                                hide-details
+                                                placeholder="Person in need"
+                                            />
+                                        </v-col>
+                                        <v-col cols="6">
+                                            <v-text-field
+                                                v-model="emergencyForm.lastName"
+                                                label="Last Name"
+                                                variant="outlined"
+                                                density="comfortable"
+                                                prepend-inner-icon="mdi-account"
+                                                hide-details
+                                                placeholder="Person in need"
+                                            />
+                                        </v-col>
+                                        <v-col cols="12">
+                                            <v-textarea
+                                                v-model="emergencyForm.description"
+                                                label="Describe your emergency"
+                                                variant="outlined"
+                                                rows="2"
+                                                prepend-inner-icon="mdi-text"
+                                                hide-details
+                                                class="mt-3"
+                                            />
+                                        </v-col>
+                                        <v-col cols="6">
+                                            <v-select
+                                                v-model="emergencyForm.mobilityStatus"
+                                                :items="mobilityOptions"
+                                                label="Mobility"
+                                                variant="outlined"
+                                                density="comfortable"
+                                                prepend-inner-icon="mdi-walk"
+                                                hide-details
+                                                class="mt-3"
+                                            />
+                                        </v-col>
+                                        <v-col cols="6">
+                                            <v-select
+                                                v-model="emergencyForm.urgencyLevel"
+                                                :items="urgencyOptions"
+                                                label="Urgency"
+                                                variant="outlined"
+                                                density="comfortable"
+                                                prepend-inner-icon="mdi-speedometer"
+                                                hide-details
+                                                class="mt-3"
+                                            />
+                                        </v-col>
+                                        <v-col cols="12">
+                                            <v-select
+                                                v-model="emergencyForm.injuries"
+                                                :items="injuryOptions"
+                                                label="Injuries"
+                                                variant="outlined"
+                                                density="comfortable"
+                                                prepend-inner-icon="mdi-medical-bag"
+                                                multiple
+                                                chips
+                                                closable-chips
+                                                hide-details
+                                                class="mt-3"
+                                            />
+                                        </v-col>
+                                        <v-col cols="12" v-if="emergencyForm.injuries?.includes('other')">
+                                            <v-text-field
+                                                v-model="emergencyForm.otherInjury"
+                                                label="Specify Other Injury"
+                                                variant="outlined"
+                                                density="comfortable"
+                                                prepend-inner-icon="mdi-pencil"
+                                                hide-details
+                                                class="mt-3"
+                                            />
+                                        </v-col>
+                                        
+                                        <!-- Media Attachments Section -->
+                                        <v-col cols="12">
+                                            <div class="media-attachments-section mt-3">
+                                                <div class="section-label mb-2">
+                                                    <v-icon size="18" color="grey-darken-1" class="mr-1">mdi-paperclip</v-icon>
+                                                    <span class="text-body-2 font-weight-medium">Attach Photos/Videos (Optional)</span>
+                                                    <v-chip size="x-small" color="grey" variant="tonal" class="ml-2">
+                                                        {{ mediaFiles.length }}/5
+                                                    </v-chip>
+                                                </div>
+                                                
+                                                <!-- Media Preview Grid -->
+                                                <div v-if="mediaFiles.length > 0" class="media-preview-grid mb-3">
+                                                    <div 
+                                                        v-for="(file, index) in mediaFiles" 
+                                                        :key="index" 
+                                                        class="media-preview-item"
+                                                        @click="previewMedia(file)"
+                                                    >
+                                                        <!-- Image Preview -->
+                                                        <img 
+                                                            v-if="file.type.startsWith('image/')" 
+                                                            :src="file.preview" 
+                                                            class="media-thumbnail"
+                                                            alt="Preview"
+                                                        />
+                                                        <!-- Video Preview -->
+                                                        <div v-else-if="file.type.startsWith('video/')" class="video-thumbnail">
+                                                            <video :src="file.preview" class="media-thumbnail" muted></video>
+                                                            <div class="video-overlay">
+                                                                <v-icon color="white" size="24">mdi-play-circle</v-icon>
+                                                            </div>
+                                                        </div>
+                                                        <!-- File Info -->
+                                                        <div class="media-info">
+                                                            <span class="file-size">{{ formatFileSize(file.size) }}</span>
+                                                        </div>
+                                                        <!-- Remove Button -->
+                                                        <v-btn
+                                                            icon
+                                                            size="x-small"
+                                                            color="error"
+                                                            variant="flat"
+                                                            class="remove-media-btn"
+                                                            @click.stop="removeMediaFile(index)"
+                                                        >
+                                                            <v-icon size="14">mdi-close</v-icon>
+                                                        </v-btn>
+                                                    </div>
+                                                    
+                                                    <!-- Add More Button (if less than 5) -->
+                                                    <div 
+                                                        v-if="mediaFiles.length < 5" 
+                                                        class="media-preview-item add-more"
+                                                        @click="triggerMediaInput"
+                                                    >
+                                                        <v-icon size="28" color="grey">mdi-plus</v-icon>
+                                                        <span class="text-caption text-grey">Add</span>
+                                                    </div>
+                                                </div>
+                                                
+                                                <!-- Upload Buttons (when no files) -->
+                                                <div v-else class="media-upload-buttons">
+                                                    <v-btn
+                                                        variant="outlined"
+                                                        color="primary"
+                                                        size="small"
+                                                        class="mr-2"
+                                                        @click="triggerMediaInput"
+                                                    >
+                                                        <v-icon start size="18">mdi-image-plus</v-icon>
+                                                        Photo
+                                                    </v-btn>
+                                                    <v-btn
+                                                        variant="outlined"
+                                                        color="primary"
+                                                        size="small"
+                                                        class="mr-2"
+                                                        @click="triggerVideoInput"
+                                                    >
+                                                        <v-icon start size="18">mdi-video-plus</v-icon>
+                                                        Video
+                                                    </v-btn>
+                                                    <v-btn
+                                                        variant="outlined"
+                                                        color="secondary"
+                                                        size="small"
+                                                        @click="openCamera"
+                                                    >
+                                                        <v-icon start size="18">mdi-camera</v-icon>
+                                                        Camera
+                                                    </v-btn>
+                                                </div>
+                                                
+                                                <!-- Hidden File Inputs -->
+                                                <input
+                                                    ref="mediaInputRef"
+                                                    type="file"
+                                                    accept="image/*,video/*"
+                                                    multiple
+                                                    style="display: none"
+                                                    @change="handleMediaSelect"
+                                                />
+                                                <input
+                                                    ref="videoInputRef"
+                                                    type="file"
+                                                    accept="video/*"
+                                                    style="display: none"
+                                                    @change="handleMediaSelect"
+                                                />
+                                                <input
+                                                    ref="cameraInputRef"
+                                                    type="file"
+                                                    accept="image/*"
+                                                    capture="environment"
+                                                    style="display: none"
+                                                    @change="handleMediaSelect"
+                                                />
+                                                
+                                                <p class="text-caption text-grey mt-2">
+                                                    <v-icon size="12">mdi-information</v-icon>
+                                                    Max 5 files, 10MB each. Photos & videos help rescuers assess the situation.
+                                                </p>
+                                            </div>
+                                        </v-col>
+                                    </v-row>
+                                </v-form>
+                            </v-card-text>
+                            <v-card-actions class="pa-4 pt-2">
+                                <v-btn
+                                    color="error"
+                                    size="large"
+                                    variant="flat"
+                                    block
+                                    :loading="isSubmitting"
+                                    :disabled="!canSubmit"
+                                    @click="submitRescueRequest"
+                                    class="rounded-xl submit-btn"
+                                    elevation="2"
+                                >
+                                    <v-icon start>mdi-send</v-icon>
+                                    Request Rescue
+                                </v-btn>
+                            </v-card-actions>
+                        </v-card>
+                    </div>
                 </div>
-                <!-- End of Normal Scanner Form -->
-            </v-container>
+            </div>
 
             <!-- QR Scanner Dialog -->
             <v-dialog v-model="showQrScanner" fullscreen>
-                <v-card class="fill-height" color="black">
-                    <v-toolbar color="primary">
-                        <v-btn icon @click="showQrScanner = false">
-                            <v-icon>mdi-close</v-icon>
+                <v-card class="fill-height qr-scanner-dialog" color="black">
+                    <div class="qr-scanner-header">
+                        <v-btn icon variant="text" @click="closeQrScanner">
+                            <v-icon color="white">mdi-close</v-icon>
                         </v-btn>
-                        <v-toolbar-title>Scan QR Code</v-toolbar-title>
-                        <v-spacer></v-spacer>
-                        <v-chip v-if="isScanning" color="success" size="small" class="mr-2">
-                            <v-icon start size="small">mdi-circle</v-icon>
+                        <span class="qr-title">Scan QR Code</span>
+                        <v-chip v-if="isScanning" color="success" size="small">
+                            <v-icon start size="12">mdi-circle</v-icon>
                             Scanning
                         </v-chip>
-                    </v-toolbar>
-                    <v-card-text class="d-flex flex-column align-center justify-center fill-height pa-0">
+                    </div>
+                    <v-card-text class="d-flex flex-column align-center justify-center fill-height pa-0 qr-scanner-content">
                         <div id="qr-reader" style="width: 100%; max-width: 500px;"></div>
-                        <p class="text-white text-center mt-4">
-                            Point your camera at a room QR code
-                        </p>
+                        <p class="text-white text-center mt-4 mb-2">Point your camera at a room QR code</p>
+                        
+                        <!-- Zoom Controls -->
+                        <div class="zoom-controls" v-if="isScanning && zoomSupported">
+                            <div class="zoom-label">
+                                <v-icon size="16" color="white">mdi-magnify</v-icon>
+                                <span>Zoom: {{ Math.round(currentZoom * 10) / 10 }}x</span>
+                            </div>
+                            <div class="zoom-slider-container">
+                                <v-btn 
+                                    icon 
+                                    size="small" 
+                                    variant="text" 
+                                    color="white"
+                                    @click="decreaseZoom"
+                                    :disabled="currentZoom <= minZoom"
+                                >
+                                    <v-icon size="20">mdi-minus</v-icon>
+                                </v-btn>
+                                <v-slider
+                                    v-model="currentZoom"
+                                    :min="minZoom"
+                                    :max="maxZoom"
+                                    :step="0.1"
+                                    color="white"
+                                    track-color="rgba(255,255,255,0.3)"
+                                    thumb-color="white"
+                                    hide-details
+                                    class="zoom-slider"
+                                    @update:model-value="applyZoom"
+                                />
+                                <v-btn 
+                                    icon 
+                                    size="small" 
+                                    variant="text" 
+                                    color="white"
+                                    @click="increaseZoom"
+                                    :disabled="currentZoom >= maxZoom"
+                                >
+                                    <v-icon size="20">mdi-plus</v-icon>
+                                </v-btn>
+                            </div>
+                            <p class="zoom-hint">Use slider or pinch to zoom</p>
+                        </div>
                     </v-card-text>
                 </v-card>
             </v-dialog>
 
             <!-- Help Dialog -->
-            <v-dialog v-model="showHelp" max-width="500">
-                <v-card>
-                    <v-card-title class="d-flex align-center">
-                        <v-icon class="mr-2" color="primary">mdi-help-circle</v-icon>
-                        How to Use
-                    </v-card-title>
-                    <v-card-text>
-                        <v-list>
-                            <v-list-item prepend-icon="mdi-numeric-1-circle">
-                                <v-list-item-title>Scan QR Code</v-list-item-title>
-                                <v-list-item-subtitle>
-                                    Scan the room's QR code to automatically set your location
-                                </v-list-item-subtitle>
-                            </v-list-item>
-                            <v-list-item prepend-icon="mdi-numeric-2-circle">
-                                <v-list-item-title>Or Select Manually</v-list-item-title>
-                                <v-list-item-subtitle>
-                                    Choose your building, floor, and room from the dropdowns
-                                </v-list-item-subtitle>
-                            </v-list-item>
-                            <v-list-item prepend-icon="mdi-numeric-3-circle">
-                                <v-list-item-title>Describe Emergency</v-list-item-title>
-                                <v-list-item-subtitle>
-                                    Fill in the emergency details or use voice input
-                                </v-list-item-subtitle>
-                            </v-list-item>
-                            <v-list-item prepend-icon="mdi-numeric-4-circle">
-                                <v-list-item-title>Request Rescue</v-list-item-title>
-                                <v-list-item-subtitle>
-                                    Submit your request and wait for help
-                                </v-list-item-subtitle>
-                            </v-list-item>
-                        </v-list>
+            <v-dialog v-model="showHelp" max-width="450">
+                <v-card class="rounded-xl">
+                    <v-card-text class="pa-0">
+                        <div class="help-header">
+                            <v-icon size="40" color="white">mdi-help-circle</v-icon>
+                            <h2>How to Use</h2>
+                        </div>
+                        <div class="help-steps pa-4">
+                            <div class="help-step">
+                                <div class="step-number">1</div>
+                                <div class="step-content">
+                                    <h4>Scan QR Code</h4>
+                                    <p>Scan the room's QR code to automatically set your location</p>
+                                </div>
+                            </div>
+                            <div class="help-step">
+                                <div class="step-number">2</div>
+                                <div class="step-content">
+                                    <h4>Or Select Manually</h4>
+                                    <p>Choose your building, floor, and room from the dropdowns</p>
+                                </div>
+                            </div>
+                            <div class="help-step">
+                                <div class="step-number">3</div>
+                                <div class="step-content">
+                                    <h4>Describe Emergency</h4>
+                                    <p>Fill in the emergency details or use voice input</p>
+                                </div>
+                            </div>
+                            <div class="help-step">
+                                <div class="step-number">4</div>
+                                <div class="step-content">
+                                    <h4>Request Rescue</h4>
+                                    <p>Submit your request and wait for help</p>
+                                </div>
+                            </div>
+                        </div>
                     </v-card-text>
-                    <v-card-actions>
-                        <v-spacer />
-                        <v-btn color="primary" @click="showHelp = false">Got it</v-btn>
+                    <v-card-actions class="pa-4 pt-0">
+                        <v-btn color="primary" block class="rounded-lg" @click="showHelp = false">Got it</v-btn>
+                    </v-card-actions>
+                </v-card>
+            </v-dialog>
+
+            <!-- Media Preview Dialog -->
+            <v-dialog v-model="showMediaPreview" max-width="600" content-class="media-preview-dialog">
+                <v-card class="rounded-xl" color="black">
+                    <v-card-title class="d-flex justify-space-between align-center pa-3">
+                        <span class="text-white text-body-1">{{ previewMediaFile?.name }}</span>
+                        <v-btn icon variant="text" @click="showMediaPreview = false">
+                            <v-icon color="white">mdi-close</v-icon>
+                        </v-btn>
+                    </v-card-title>
+                    <v-card-text class="pa-0 d-flex justify-center align-center" style="min-height: 300px;">
+                        <!-- Image Preview -->
+                        <img 
+                            v-if="previewMediaFile?.type?.startsWith('image/')" 
+                            :src="previewMediaFile?.preview" 
+                            style="max-width: 100%; max-height: 70vh; object-fit: contain;"
+                            alt="Preview"
+                        />
+                        <!-- Video Preview -->
+                        <video 
+                            v-else-if="previewMediaFile?.type?.startsWith('video/')" 
+                            :src="previewMediaFile?.preview" 
+                            controls
+                            style="max-width: 100%; max-height: 70vh;"
+                        ></video>
+                    </v-card-text>
+                    <v-card-actions class="pa-3">
+                        <v-chip size="small" color="grey-darken-3" variant="flat">
+                            <v-icon start size="14">{{ previewMediaFile?.type?.startsWith('video/') ? 'mdi-video' : 'mdi-image' }}</v-icon>
+                            {{ formatFileSize(previewMediaFile?.size || 0) }}
+                        </v-chip>
+                        <v-spacer></v-spacer>
+                        <v-btn 
+                            color="error" 
+                            variant="tonal" 
+                            size="small"
+                            @click="removePreviewedMedia"
+                        >
+                            <v-icon start size="16">mdi-delete</v-icon>
+                            Remove
+                        </v-btn>
                     </v-card-actions>
                 </v-card>
             </v-dialog>
@@ -714,6 +807,14 @@
                 @click="handlePopupClick"
             />
         </v-main>
+        
+        <!-- Bottom Navigation for Mobile -->
+        <UserBottomNav 
+            :notification-count="totalNotificationCount" 
+            :message-count="unreadMessageCount"
+            :show-notification-panel="showNotificationPanel"
+            @toggle-notifications="showNotificationPanel = !showNotificationPanel"
+        />
     </v-app>
 </template>
 
@@ -733,6 +834,7 @@ import {
 import { useAudioRecording } from '@/Composables/useAudioRecording';
 import { useNotificationAlert } from '@/Composables/useNotificationAlert';
 import UserMenu from '@/Components/Pages/User/Menu/UserMenu.vue';
+import UserBottomNav from '@/Components/Pages/User/Menu/UserBottomNav.vue';
 import NotificationPopup from '@/Components/NotificationPopup.vue';
 
 // Get Inertia page for auth
@@ -774,6 +876,14 @@ const drawer = ref(false);
 // Notification Panel
 const showNotificationPanel = ref(false);
 const conversations = ref([]);
+
+// Responsive notification drawer width
+const notificationDrawerWidth = computed(() => {
+    if (typeof window !== 'undefined') {
+        return window.innerWidth < 400 ? window.innerWidth * 0.9 : 320;
+    }
+    return 320;
+});
 
 // Computed unread chats
 const unreadChats = computed(() => {
@@ -824,11 +934,24 @@ const fetchConversations = async () => {
     try {
         if (!userData.value?.id) return;
         
+        // Store previous unread counts for detecting new messages
+        const previousUnreadCounts = {};
+        conversations.value.forEach(c => {
+            previousUnreadCounts[c.id] = c.unread_count || 0;
+        });
+        const wasEmpty = conversations.value.length === 0;
+        
         const response = await getConversations(userData.value.id);
         const data = response.data || response;
         const convList = Array.isArray(data) ? data : (data?.data || []);
         
-        conversations.value = convList.map((conv) => {
+        const newConversations = convList.map((conv) => {
+            // Find the CURRENT user's participant record (for unread_count)
+            const myParticipant = conv.participants?.find(
+                (p) => String(p.user_id) === String(userData.value.id)
+            );
+            
+            // Find the OTHER participant (for display name/picture)
             const otherParticipant = conv.participants?.find(
                 (p) => String(p.user_id) !== String(userData.value.id)
             );
@@ -844,9 +967,16 @@ const fetchConversations = async () => {
                     ? getProfilePictureUrl(otherUser.profile_picture)
                     : null,
                 last_message: conv.last_message?.content || 'No messages yet',
-                unread_count: otherParticipant?.unread_count || 0,
+                last_message_time: conv.last_message?.timestamp || conv.updated_at,
+                // Use CURRENT user's unread_count (what I haven't read)
+                unread_count: myParticipant?.unread_count || 0,
             };
         });
+        
+        // Note: Chat notifications are handled by the Chat module itself
+        // We only track unread counts here for the badge display
+        
+        conversations.value = newConversations;
     } catch (err) {
         console.error('Error fetching conversations:', err);
     }
@@ -886,6 +1016,13 @@ const evacuationWrapperStyle = computed(() => ({
     transform: `scale(${evacuationZoom.value})`,
     transformOrigin: 'top left'
 }));
+
+// Camera zoom controls
+const zoomSupported = ref(false);
+const currentZoom = ref(1);
+const minZoom = ref(1);
+const maxZoom = ref(4);
+let videoTrack = null;
 
 // Active rescue request check
 const hasActiveRequest = ref(false);
@@ -950,6 +1087,16 @@ const emergencyForm = ref({
     otherInjury: '',
     additionalInfo: '',
 });
+
+// Media Attachments
+const mediaFiles = ref([]);
+const mediaInputRef = ref(null);
+const videoInputRef = ref(null);
+const cameraInputRef = ref(null);
+const showMediaPreview = ref(false);
+const previewMediaFile = ref(null);
+const MAX_FILES = 5;
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
 const mobilityOptions = [
     { title: 'Can walk normally', value: 'normal' },
@@ -1037,7 +1184,48 @@ onMounted(async () => {
     
     // Start polling for updates
     startPolling();
+    
+    // Check if we should auto-open the QR scanner (from bottom nav or query param)
+    await nextTick();
+    checkAutoOpenScanner();
 });
+
+// Check if scanner should auto-open based on URL params
+const checkAutoOpenScanner = () => {
+    if (typeof window !== 'undefined') {
+        const urlParams = new URLSearchParams(window.location.search);
+        const shouldScan = urlParams.get('scan') === 'true';
+        const mode = urlParams.get('mode');
+        
+        // Only auto-open if no active request
+        if (!hasActiveRequest.value && !isCheckingActiveRequest.value) {
+            if (shouldScan) {
+                // Auto-open scanner
+                setTimeout(() => {
+                    startQrScan();
+                }, 300);
+                
+                // Clean up URL (remove query params)
+                const cleanUrl = window.location.pathname;
+                window.history.replaceState({}, '', cleanUrl);
+            } else if (mode === 'voice') {
+                // Auto-start voice input
+                setTimeout(() => {
+                    toggleVoiceInput();
+                }, 300);
+                
+                // Clean up URL
+                const cleanUrl = window.location.pathname;
+                window.history.replaceState({}, '', cleanUrl);
+            } else if (mode === 'manual') {
+                // Scroll to manual location section
+                // Clean up URL
+                const cleanUrl = window.location.pathname;
+                window.history.replaceState({}, '', cleanUrl);
+            }
+        }
+    }
+};
 
 // Start polling for status updates and new messages
 const startPolling = () => {
@@ -1111,7 +1299,10 @@ const triggerStatusChangeNotification = (oldStatus, newStatus, request) => {
     }
 };
 
-// Trigger notification for new messages
+// Note: Chat notifications are handled within the Chat module itself
+// Removed triggerChatNotification to avoid duplicate notifications
+
+// Trigger notification for new messages (generic count-based)
 const triggerNewMessageNotification = (newCount) => {
     showPopupNotification(
         '💬 New Message',
@@ -1232,6 +1423,8 @@ onUnmounted(() => {
         clearInterval(pollingInterval);
         pollingInterval = null;
     }
+    // Clear media file previews to free memory
+    clearMediaFiles();
 });
 
 const loadBuildings = async () => {
@@ -1286,6 +1479,11 @@ watch([selectedRoom, selectedFloor], () => {
 const startQrScan = async () => {
     isScanning.value = true;
     showQrScanner.value = true;
+    
+    // Reset zoom values
+    currentZoom.value = 1;
+    zoomSupported.value = false;
+    videoTrack = null;
 
     await nextTick();
 
@@ -1304,12 +1502,94 @@ const startQrScan = async () => {
                 // QR code not found - this is normal, ignore
             }
         );
+        
+        // Try to get zoom capabilities after scanner starts
+        await nextTick();
+        setTimeout(() => {
+            setupZoomCapabilities();
+        }, 500);
     } catch (error) {
         console.error('QR scan error:', error);
         showNotification('Failed to start camera. Please allow camera permissions.', 'error');
         isScanning.value = false;
         showQrScanner.value = false;
     }
+};
+
+// Setup zoom capabilities
+const setupZoomCapabilities = async () => {
+    try {
+        // Get the video element from html5-qrcode
+        const videoElement = document.querySelector('#qr-reader video');
+        if (!videoElement || !videoElement.srcObject) {
+            console.log('Video element not ready');
+            return;
+        }
+        
+        const stream = videoElement.srcObject;
+        const tracks = stream.getVideoTracks();
+        
+        if (tracks.length === 0) {
+            console.log('No video tracks found');
+            return;
+        }
+        
+        videoTrack = tracks[0];
+        const capabilities = videoTrack.getCapabilities();
+        
+        console.log('Camera capabilities:', capabilities);
+        
+        if (capabilities.zoom) {
+            zoomSupported.value = true;
+            minZoom.value = capabilities.zoom.min || 1;
+            maxZoom.value = capabilities.zoom.max || 4;
+            currentZoom.value = capabilities.zoom.min || 1;
+            console.log(`Zoom supported: ${minZoom.value}x - ${maxZoom.value}x`);
+        } else {
+            console.log('Zoom not supported by this camera');
+            zoomSupported.value = false;
+        }
+    } catch (error) {
+        console.log('Error setting up zoom:', error);
+        zoomSupported.value = false;
+    }
+};
+
+// Apply zoom level
+const applyZoom = async (zoomLevel) => {
+    if (!videoTrack || !zoomSupported.value) return;
+    
+    try {
+        await videoTrack.applyConstraints({
+            advanced: [{ zoom: zoomLevel }]
+        });
+        console.log('Zoom applied:', zoomLevel);
+    } catch (error) {
+        console.error('Error applying zoom:', error);
+    }
+};
+
+// Zoom control functions
+const increaseZoom = () => {
+    const step = 0.5;
+    const newZoom = Math.min(currentZoom.value + step, maxZoom.value);
+    currentZoom.value = newZoom;
+    applyZoom(newZoom);
+};
+
+const decreaseZoom = () => {
+    const step = 0.5;
+    const newZoom = Math.max(currentZoom.value - step, minZoom.value);
+    currentZoom.value = newZoom;
+    applyZoom(newZoom);
+};
+
+// Close QR scanner properly
+const closeQrScanner = async () => {
+    await stopQrScanner();
+    showQrScanner.value = false;
+    videoTrack = null;
+    zoomSupported.value = false;
 };
 
 const stopQrScanner = async () => {
@@ -1323,6 +1603,7 @@ const stopQrScanner = async () => {
         html5QrCode = null;
     }
     isScanning.value = false;
+    videoTrack = null;
 };
 
 const onQrCodeScanned = async (decodedText, decodedResult) => {
@@ -1631,11 +1912,363 @@ const toggleVoiceInput = async () => {
     } else {
         try {
             await startAudioRecording();
+            showNotification('🎤 Listening... Say your location (e.g., "Building A, Floor 2, Room 201")', 'info');
         } catch (error) {
             console.error('Failed to start recording:', error);
             showNotification('Failed to access microphone', 'error');
         }
     }
+};
+
+// Smart location extraction from voice transcript
+const extractLocationFromVoice = (transcript) => {
+    const text = transcript.toLowerCase().trim();
+    console.log('🎯 Extracting location from:', text);
+    
+    let matchedBuilding = null;
+    let matchedFloor = null;
+    let matchedRoom = null;
+    let confidence = { building: 0, floor: 0, room: 0 };
+    
+    // Number words to digits mapping
+    const numberWords = {
+        'ground': '0', 'g': '0', 'basement': '-1', 'b': '-1',
+        'first': '1', 'second': '2', 'third': '3', 'fourth': '4', 'fifth': '5',
+        'sixth': '6', 'seventh': '7', 'eighth': '8', 'ninth': '9', 'tenth': '10',
+        'one': '1', 'two': '2', 'three': '3', 'four': '4', 'five': '5',
+        'six': '6', 'seven': '7', 'eight': '8', 'nine': '9', 'ten': '10',
+        'eleven': '11', 'twelve': '12'
+    };
+    
+    // Convert number words in text to digits for easier matching
+    let normalizedText = text;
+    for (const [word, digit] of Object.entries(numberWords)) {
+        normalizedText = normalizedText.replace(new RegExp(`\\b${word}\\b`, 'gi'), digit);
+    }
+    console.log('📝 Normalized text:', normalizedText);
+    
+    // Extract potential building name from voice patterns
+    const buildingPatterns = [
+        /(?:i'm in|i am in|i'm at|at|inside|in)\s*(?:the\s*)?(.+?)\s*(?:building|bldg)/i,
+        /(?:building|bldg)\s*([a-z0-9\s]+?)(?:\s*,|\s+floor|\s+flr|\s+level|\s+room|\s+rm|$)/i,
+        /(.+?)\s*(?:building|bldg)/i,
+    ];
+    
+    let extractedBuildingText = null;
+    for (const pattern of buildingPatterns) {
+        const match = text.match(pattern);
+        if (match && match[1]) {
+            extractedBuildingText = match[1].trim().toLowerCase();
+            console.log('🔍 Extracted building text:', extractedBuildingText);
+            break;
+        }
+    }
+    
+    // Try to match building from database
+    for (const building of buildings.value) {
+        const buildingName = building.name.toLowerCase();
+        const buildingWords = buildingName.split(/[\s-]+/).filter(w => w.length > 1);
+        
+        // Method 1: Direct name match
+        if (text.includes(buildingName)) {
+            matchedBuilding = building;
+            confidence.building = 100;
+            console.log(`✅ Building matched (exact): ${building.name}`);
+            break;
+        }
+        
+        // Method 2: Match extracted building text
+        if (extractedBuildingText) {
+            // Check if building name contains extracted text or vice versa
+            if (buildingName.includes(extractedBuildingText) || extractedBuildingText.includes(buildingName)) {
+                matchedBuilding = building;
+                confidence.building = 95;
+                console.log(`✅ Building matched (extracted): ${building.name}`);
+                break;
+            }
+            
+            // Check individual words match
+            const extractedWords = extractedBuildingText.split(/[\s-]+/).filter(w => w.length > 1);
+            const wordMatches = extractedWords.filter(ew => 
+                buildingWords.some(bw => bw.includes(ew) || ew.includes(bw))
+            );
+            if (wordMatches.length > 0 && wordMatches.length >= extractedWords.length * 0.5) {
+                if (!matchedBuilding || confidence.building < 80) {
+                    matchedBuilding = building;
+                    confidence.building = 80;
+                    console.log(`✅ Building matched (word overlap): ${building.name}`);
+                }
+            }
+        }
+        
+        // Method 3: Check if any significant building word appears in text
+        for (const word of buildingWords) {
+            if (word.length > 2 && (text.includes(word) || normalizedText.includes(word))) {
+                if (!matchedBuilding) {
+                    matchedBuilding = building;
+                    confidence.building = 60;
+                    console.log(`✅ Building matched (partial word): ${building.name} via "${word}"`);
+                }
+            }
+        }
+    }
+    
+    // If building matched, try to find floor
+    if (matchedBuilding) {
+        const floors = matchedBuilding.floors || [];
+        console.log(`🔍 Searching ${floors.length} floors in ${matchedBuilding.name}`);
+        
+        // Extract potential floor from voice patterns
+        const floorPatterns = [
+            /(?:floor|flr|level)\s*([a-z0-9\s-]+?)(?:\s*,|\s+room|\s+rm|$)/i,
+            /(\d+)(?:st|nd|rd|th)\s*(?:floor|flr|level)/i,
+            /(?:floor|flr)\s*(\d+)/i,
+            /level\s*(\d+)/i,
+        ];
+        
+        let extractedFloorNum = null;
+        for (const pattern of floorPatterns) {
+            const match = normalizedText.match(pattern);
+            if (match && match[1]) {
+                extractedFloorNum = match[1].trim().replace(/\D/g, '');
+                console.log('🔍 Extracted floor number:', extractedFloorNum);
+                break;
+            }
+        }
+        
+        for (const floor of floors) {
+            const floorName = floor.floor_name.toLowerCase();
+            const floorNameNormalized = floorName;
+            
+            // Method 1: Direct name match
+            if (text.includes(floorName) || normalizedText.includes(floorName)) {
+                matchedFloor = floor;
+                confidence.floor = 100;
+                console.log(`✅ Floor matched (exact): ${floor.floor_name}`);
+                break;
+            }
+            
+            // Method 2: Match floor number
+            const floorNumMatch = floorName.match(/(\d+)/);
+            if (floorNumMatch && extractedFloorNum) {
+                const dbFloorNum = floorNumMatch[1];
+                if (dbFloorNum === extractedFloorNum) {
+                    matchedFloor = floor;
+                    confidence.floor = 95;
+                    console.log(`✅ Floor matched (number): ${floor.floor_name}`);
+                    break;
+                }
+            }
+            
+            // Method 3: Check if floor number appears anywhere in normalized text
+            if (floorNumMatch) {
+                const dbFloorNum = floorNumMatch[1];
+                const floorRegex = new RegExp(`(?:floor|flr|level)\\s*${dbFloorNum}\\b|\\b${dbFloorNum}(?:st|nd|rd|th)?\\s*(?:floor|flr|level)`, 'i');
+                if (floorRegex.test(normalizedText)) {
+                    matchedFloor = floor;
+                    confidence.floor = 90;
+                    console.log(`✅ Floor matched (regex): ${floor.floor_name}`);
+                    break;
+                }
+            }
+        }
+        
+        // If floor matched, try to find room
+        if (matchedFloor) {
+            const rooms = matchedFloor.rooms || [];
+            console.log(`🔍 Searching ${rooms.length} rooms in ${matchedFloor.floor_name}`);
+            
+            // Extract potential room from voice patterns
+            const roomPatterns = [
+                /(?:room|rm|office|classroom|lab|laboratory|class)\s*([a-z0-9\s-]+?)(?:\s*,|\s*\.|$)/i,
+                /(?:room|rm)\s*(\d+[a-z]*)/i,
+                /(\d{2,}[a-z]*)\s*(?:room)?/i, // Room numbers like 201, 302a
+            ];
+            
+            let extractedRoomId = null;
+            for (const pattern of roomPatterns) {
+                const match = normalizedText.match(pattern);
+                if (match && match[1]) {
+                    extractedRoomId = match[1].trim().toLowerCase().replace(/\s+/g, '');
+                    console.log('🔍 Extracted room identifier:', extractedRoomId);
+                    break;
+                }
+            }
+            
+            for (const room of rooms) {
+                const roomName = room.room_name.toLowerCase();
+                const roomNameClean = roomName.replace(/\s+/g, '');
+                
+                // Method 1: Direct name match
+                if (text.includes(roomName) || normalizedText.includes(roomName)) {
+                    matchedRoom = room;
+                    confidence.room = 100;
+                    console.log(`✅ Room matched (exact): ${room.room_name}`);
+                    break;
+                }
+                
+                // Method 2: Match extracted room identifier
+                if (extractedRoomId) {
+                    if (roomNameClean.includes(extractedRoomId) || extractedRoomId.includes(roomNameClean)) {
+                        matchedRoom = room;
+                        confidence.room = 95;
+                        console.log(`✅ Room matched (extracted): ${room.room_name}`);
+                        break;
+                    }
+                    
+                    // Check room number only
+                    const roomNumMatch = roomName.match(/(\d+[a-z]*)/i);
+                    if (roomNumMatch) {
+                        const dbRoomNum = roomNumMatch[1].toLowerCase();
+                        if (dbRoomNum === extractedRoomId || extractedRoomId.includes(dbRoomNum)) {
+                            matchedRoom = room;
+                            confidence.room = 90;
+                            console.log(`✅ Room matched (number): ${room.room_name}`);
+                            break;
+                        }
+                    }
+                }
+                
+                // Method 3: Check if room number appears in text
+                const roomNumMatch = roomName.match(/(\d+[a-z]*)/i);
+                if (roomNumMatch) {
+                    const dbRoomNum = roomNumMatch[1].toLowerCase();
+                    if (normalizedText.includes(dbRoomNum)) {
+                        matchedRoom = room;
+                        confidence.room = 85;
+                        console.log(`✅ Room matched (contains): ${room.room_name}`);
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    
+    const result = {
+        building: matchedBuilding,
+        floor: matchedFloor,
+        room: matchedRoom,
+        confidence,
+        hasLocation: !!(matchedBuilding || matchedFloor || matchedRoom)
+    };
+    
+    console.log('📍 Final location extraction result:', {
+        building: matchedBuilding?.name,
+        floor: matchedFloor?.floor_name,
+        room: matchedRoom?.room_name,
+        confidence
+    });
+    
+    return result;
+};
+
+// Extract emergency details from voice (separates location from emergency description)
+const extractEmergencyFromVoice = (transcript) => {
+    const text = transcript.toLowerCase();
+    let cleanDescription = transcript;
+    
+    const result = {
+        description: '',
+        mobility: null,
+        urgency: null,
+        injuries: []
+    };
+    
+    // Location-related phrases to REMOVE from description (these go to location fields)
+    const locationPhrases = [
+        // Building patterns
+        /(?:i'm in|i am in|i'm at|i am at|at|inside|in)\s*(?:the\s*)?([a-z0-9\s]+?)\s*(?:building|bldg)/gi,
+        /(?:building|bldg)\s*([a-z0-9\s]+?)(?:\s*,|\s+floor|\s+room|$)/gi,
+        /([a-z]+)\s*building/gi,
+        // Floor patterns
+        /(?:floor|flr|level)\s*([a-z0-9\s-]+?)(?:\s*,|\s+room|\s+and|$)/gi,
+        /(\d+)(?:st|nd|rd|th)\s*(?:floor|flr|level)/gi,
+        /(?:ground|basement|first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth)\s*(?:floor|flr|level)/gi,
+        // Room patterns
+        /(?:room|rm|office|classroom|lab|laboratory)\s*([a-z0-9\s-]+?)(?:\s*,|\s*\.|$)/gi,
+        // Combined location references
+        /(?:i'm in|i am in|located at|my location is)\s*[^,\.]+/gi,
+    ];
+    
+    // Remove location phrases from description
+    for (const pattern of locationPhrases) {
+        cleanDescription = cleanDescription.replace(pattern, ' ');
+    }
+    
+    // Clean up the description
+    cleanDescription = cleanDescription
+        .replace(/\s+/g, ' ')  // Multiple spaces to single
+        .replace(/^\s*,\s*/g, '')  // Leading commas
+        .replace(/\s*,\s*$/g, '')  // Trailing commas
+        .replace(/^[\s,]+|[\s,]+$/g, '')  // Trim
+        .trim();
+    
+    // If description is too short or empty after removing location, keep original emergency parts
+    if (cleanDescription.length < 5) {
+        // Try to extract just the emergency/help part
+        const emergencyMatch = transcript.match(/(?:help|need|emergency|injured|hurt|stuck|trapped|bleeding|pain|broken|fire|smoke)[^]*$/i);
+        if (emergencyMatch) {
+            cleanDescription = emergencyMatch[0].trim();
+        } else {
+            cleanDescription = transcript; // Fallback to full transcript
+        }
+    }
+    
+    result.description = cleanDescription;
+    
+    // Mobility detection
+    const mobilityPatterns = {
+        'immobile': ['cannot move', "can't move", 'unable to move', 'stuck', 'trapped', 'immobile', 'paralyzed', 'pinned'],
+        'limited': ['limited mobility', 'hard to walk', 'difficulty walking', 'injured leg', 'hurt leg', 'limping', 'barely walk'],
+        'normal': ['can walk', 'able to walk', 'walking fine', 'mobile', 'i can move'],
+    };
+    
+    for (const [status, patterns] of Object.entries(mobilityPatterns)) {
+        if (patterns.some(p => text.includes(p))) {
+            result.mobility = status;
+            break;
+        }
+    }
+    
+    // Urgency detection
+    const urgencyPatterns = {
+        'critical': ['critical', 'dying', 'heart attack', 'stroke', 'not breathing', 'severe bleeding', 'life threatening', 'emergency', 'please hurry', 'help me'],
+        'high': ['urgent', 'serious', 'bad injury', 'lots of blood', 'unconscious', 'passed out', 'seizure', 'very hurt'],
+        'medium': ['injured', 'hurt', 'pain', 'bleeding', 'broken', 'sprain', 'need help', 'fell down'],
+        'low': ['minor', 'small cut', 'slight', 'feeling unwell', 'dizzy', 'not serious'],
+    };
+    
+    for (const [level, patterns] of Object.entries(urgencyPatterns)) {
+        if (patterns.some(p => text.includes(p))) {
+            result.urgency = level;
+            break;
+        }
+    }
+    
+    // Injury detection
+    const injuryPatterns = {
+        'bleeding': ['bleeding', 'blood', 'cut', 'laceration', 'wound', 'gash'],
+        'fracture': ['broken', 'fracture', 'bone', 'snap', 'crack'],
+        'burn': ['burn', 'burned', 'fire', 'hot', 'scalded'],
+        'head': ['head injury', 'hit head', 'hit my head', 'concussion', 'head hurt', 'headache'],
+        'breathing': ['breathing', 'breath', 'asthma', 'choking', 'suffocating', 'can\'t breathe'],
+        'unconscious': ['unconscious', 'fainted', 'passed out', 'not responding', 'blacked out'],
+        'chest_pain': ['chest pain', 'heart', 'chest hurts', 'chest'],
+        'seizure': ['seizure', 'convulsion', 'shaking', 'fits'],
+        'allergic': ['allergic', 'allergy', 'swelling', 'hives', 'anaphylaxis'],
+    };
+    
+    for (const [injury, patterns] of Object.entries(injuryPatterns)) {
+        if (patterns.some(p => text.includes(p))) {
+            result.injuries.push(injury);
+        }
+    }
+    
+    console.log('🔍 Emergency extraction - Original:', transcript);
+    console.log('🔍 Emergency extraction - Clean description:', cleanDescription);
+    console.log('🔍 Emergency extraction - Result:', result);
+    
+    return result;
 };
 
 const processAudioTranscription = async (audioBlob) => {
@@ -1648,24 +2281,87 @@ const processAudioTranscription = async (audioBlob) => {
         console.log('✅ Transcription result:', transcript);
         
         if (transcript) {
-            emergencyForm.value.description = transcript;
-
-            // Try to extract emergency fields
-            const fields = await extractFieldsAndInferLocation(transcript);
-            if (fields) {
-                if (fields.mobility_status) emergencyForm.value.mobilityStatus = fields.mobility_status;
-                if (fields.urgency_level) emergencyForm.value.urgencyLevel = fields.urgency_level;
-                if (fields.injuries) emergencyForm.value.injuries = fields.injuries;
-                if (fields.additional_info) emergencyForm.value.additionalInfo = fields.additional_info;
-
-                // Handle location inference
-                if (fields.location_inference) {
-                    await applyLocationInference(fields.location_inference);
+            // Step 1: Try to extract location from voice directly
+            const locationResult = extractLocationFromVoice(transcript);
+            console.log('📍 Location extraction result:', locationResult);
+            
+            // Step 2: Extract emergency details from voice
+            const emergencyResult = extractEmergencyFromVoice(transcript);
+            console.log('🚨 Emergency extraction result:', emergencyResult);
+            
+            // Step 3: Apply extracted location
+            let locationApplied = false;
+            if (locationResult.hasLocation) {
+                if (locationResult.building) {
+                    selectedBuilding.value = locationResult.building;
+                    await nextTick();
+                    
+                    if (locationResult.floor) {
+                        selectedFloor.value = locationResult.floor;
+                        await nextTick();
+                        
+                        if (locationResult.room) {
+                            selectedRoom.value = locationResult.room;
+                            locationApplied = true;
+                            locationScanned.value = false; // Mark as voice input, not QR
+                            
+                            showNotification(
+                                `✅ Location detected: ${locationResult.building.name} → ${locationResult.floor.floor_name} → ${locationResult.room.room_name}`,
+                                'success'
+                            );
+                        } else {
+                            showNotification(
+                                `📍 Building & Floor detected: ${locationResult.building.name} → ${locationResult.floor.floor_name}. Please select a room.`,
+                                'info'
+                            );
+                        }
+                    } else {
+                        showNotification(
+                            `📍 Building detected: ${locationResult.building.name}. Please select floor and room.`,
+                            'info'
+                        );
+                    }
                 }
             }
-            showNotification('Audio transcribed successfully', 'success');
+            
+            // Step 4: Apply emergency details
+            emergencyForm.value.description = emergencyResult.description;
+            if (emergencyResult.mobility) {
+                emergencyForm.value.mobilityStatus = emergencyResult.mobility;
+            }
+            if (emergencyResult.urgency) {
+                emergencyForm.value.urgencyLevel = emergencyResult.urgency;
+            }
+            if (emergencyResult.injuries.length > 0) {
+                emergencyForm.value.injuries = emergencyResult.injuries;
+            }
+            
+            // Step 5: If no location found locally, try API extraction as fallback
+            if (!locationResult.hasLocation) {
+                try {
+                    const fields = await extractFieldsAndInferLocation(transcript);
+                    if (fields && fields.location_inference) {
+                        await applyLocationInference(fields.location_inference);
+                    } else {
+                        showNotification(
+                            '🎤 Voice recorded! Please select your location manually or say it more clearly.',
+                            'warning'
+                        );
+                    }
+                } catch (apiError) {
+                    console.log('API extraction failed, using local extraction only');
+                    showNotification(
+                        '🎤 Voice recorded! Please select your location from the dropdown.',
+                        'info'
+                    );
+                }
+            }
+            
+            // Scroll to form after processing
+            scrollToEmergencyForm();
+            
         } else {
-            showNotification('No speech detected in audio', 'warning');
+            showNotification('No speech detected. Please try again.', 'warning');
         }
     } catch (error) {
         console.error('❌ Transcription error:', error);
@@ -1768,21 +2464,49 @@ const submitRescueRequest = async () => {
             injuriesString = injuries.join(', ');
         }
 
-        const payload = {
-            user_id: userData.value?.id,
-            building_id: selectedBuilding.value.id,
-            floor_id: selectedFloor.value.id,
-            room_id: selectedRoom.value.id,
-            description: emergencyForm.value.description,
-            mobility_status: emergencyForm.value.mobilityStatus,
-            urgency_level: emergencyForm.value.urgencyLevel,
-            injuries: injuriesString,
-            additional_info: emergencyForm.value.additionalInfo,
-            firstName: emergencyForm.value.firstName,
-            lastName: emergencyForm.value.lastName,
-        };
-
-        const result = await createRescueRequest(payload);
+        // Use FormData if there are media files attached
+        let result;
+        
+        if (mediaFiles.value.length > 0) {
+            // Create FormData for file upload
+            const formData = new FormData();
+            formData.append('user_id', userData.value?.id);
+            formData.append('building_id', selectedBuilding.value.id);
+            formData.append('floor_id', selectedFloor.value.id);
+            formData.append('room_id', selectedRoom.value.id);
+            formData.append('description', emergencyForm.value.description || '');
+            formData.append('mobility_status', emergencyForm.value.mobilityStatus || '');
+            formData.append('urgency_level', emergencyForm.value.urgencyLevel || '');
+            formData.append('injuries', injuriesString);
+            formData.append('additional_info', emergencyForm.value.additionalInfo || '');
+            formData.append('firstName', emergencyForm.value.firstName || '');
+            formData.append('lastName', emergencyForm.value.lastName || '');
+            
+            // Append media files
+            mediaFiles.value.forEach((mediaFile, index) => {
+                formData.append(`media_files[${index}]`, mediaFile.file, mediaFile.name);
+            });
+            
+            // Submit with FormData
+            result = await createRescueRequest(formData, true);
+        } else {
+            // Regular JSON payload without files
+            const payload = {
+                user_id: userData.value?.id,
+                building_id: selectedBuilding.value.id,
+                floor_id: selectedFloor.value.id,
+                room_id: selectedRoom.value.id,
+                description: emergencyForm.value.description,
+                mobility_status: emergencyForm.value.mobilityStatus,
+                urgency_level: emergencyForm.value.urgencyLevel,
+                injuries: injuriesString,
+                additional_info: emergencyForm.value.additionalInfo,
+                firstName: emergencyForm.value.firstName,
+                lastName: emergencyForm.value.lastName,
+            };
+            
+            result = await createRescueRequest(payload);
+        }
 
         if (result.rescueCode && result.requestId) {
             localStorage.setItem('lastRescueCode', result.rescueCode);
@@ -1790,6 +2514,9 @@ const submitRescueRequest = async () => {
             localStorage.setItem('lastRescueRequestTime', new Date().toISOString());
 
             showNotification('Rescue request submitted successfully!', 'success');
+            
+            // Clear media files after successful submission
+            clearMediaFiles();
 
             // Navigate to help coming page
             setTimeout(() => {
@@ -1930,6 +2657,123 @@ const resetEvacuationZoom = () => {
     evacuationZoom.value = 1;
 };
 
+// ==================== Media Attachment Functions ====================
+
+// Trigger file input for photos/videos
+const triggerMediaInput = () => {
+    if (mediaInputRef.value) {
+        mediaInputRef.value.click();
+    }
+};
+
+// Trigger file input for videos only
+const triggerVideoInput = () => {
+    if (videoInputRef.value) {
+        videoInputRef.value.click();
+    }
+};
+
+// Open camera for photo capture
+const openCamera = () => {
+    if (cameraInputRef.value) {
+        cameraInputRef.value.click();
+    }
+};
+
+// Handle media file selection
+const handleMediaSelect = async (event) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+    
+    const remainingSlots = MAX_FILES - mediaFiles.value.length;
+    if (remainingSlots <= 0) {
+        showNotification('Maximum 5 files allowed', 'warning');
+        return;
+    }
+    
+    const filesToAdd = Array.from(files).slice(0, remainingSlots);
+    
+    for (const file of filesToAdd) {
+        // Validate file type
+        if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) {
+            showNotification(`${file.name} is not a valid image or video`, 'error');
+            continue;
+        }
+        
+        // Validate file size
+        if (file.size > MAX_FILE_SIZE) {
+            showNotification(`${file.name} exceeds 10MB limit`, 'error');
+            continue;
+        }
+        
+        // Create preview URL
+        const preview = URL.createObjectURL(file);
+        
+        mediaFiles.value.push({
+            file: file,
+            name: file.name,
+            type: file.type,
+            size: file.size,
+            preview: preview,
+        });
+    }
+    
+    // Reset the input
+    event.target.value = '';
+    
+    if (filesToAdd.length > 0) {
+        showNotification(`${filesToAdd.length} file(s) added`, 'success');
+    }
+};
+
+// Remove a media file
+const removeMediaFile = (index) => {
+    const file = mediaFiles.value[index];
+    if (file.preview) {
+        URL.revokeObjectURL(file.preview);
+    }
+    mediaFiles.value.splice(index, 1);
+};
+
+// Preview a media file
+const previewMedia = (file) => {
+    previewMediaFile.value = file;
+    showMediaPreview.value = true;
+};
+
+// Remove the currently previewed media
+const removePreviewedMedia = () => {
+    if (previewMediaFile.value) {
+        const index = mediaFiles.value.findIndex(f => f.preview === previewMediaFile.value.preview);
+        if (index !== -1) {
+            removeMediaFile(index);
+        }
+    }
+    showMediaPreview.value = false;
+    previewMediaFile.value = null;
+};
+
+// Format file size for display
+const formatFileSize = (bytes) => {
+    if (!bytes || bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+};
+
+// Clear all media files (call when form is reset or submitted)
+const clearMediaFiles = () => {
+    mediaFiles.value.forEach(file => {
+        if (file.preview) {
+            URL.revokeObjectURL(file.preview);
+        }
+    });
+    mediaFiles.value = [];
+};
+
+// ==================== End Media Attachment Functions ====================
+
 const showNotification = (message, color = 'info') => {
     toastMessage.value = message;
     toastColor.value = color;
@@ -1938,7 +2782,900 @@ const showNotification = (message, color = 'info') => {
 </script>
 
 <style scoped>
-/* Component-specific styles only - background is now global */
+/* App Container - Prevent all unwanted scrolling/dragging */
+.app-container {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    overflow: hidden !important;
+    touch-action: none;
+}
+
+.app-container :deep(.v-application__wrap) {
+    min-height: 100vh !important;
+    max-height: 100vh !important;
+    overflow: hidden !important;
+}
+
+/* Main Container */
+.main-container {
+    background: linear-gradient(180deg, #e8f5f3 0%, #f5f9f8 50%, #ffffff 100%);
+    height: 100vh !important;
+    max-height: 100vh !important;
+    overflow: hidden !important;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Content Wrapper - Scrollable Area */
+.content-wrapper {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
+    overscroll-behavior: contain;
+}
+
+/* Header Styling - Matches Rescuer Dashboard */
+.scanner-header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: #3674B5;
+    padding: env(safe-area-inset-top, 0) 0 0 0;
+    flex-shrink: 0;
+}
+
+.header-content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    gap: 12px;
+}
+
+.menu-btn, .action-btn {
+    color: white;
+}
+
+.header-title {
+    flex: 1;
+    text-align: center;
+}
+
+.header-title h1 {
+    font-size: 1.25rem;
+    font-weight: 700;
+    font-style: italic;
+    color: white;
+    margin: 0;
+}
+
+.header-title p {
+    font-size: 0.65rem;
+    letter-spacing: 2px;
+    color: rgba(255, 255, 255, 0.8);
+    margin: 0;
+    text-transform: uppercase;
+}
+
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+/* Desktop-only elements (hidden on mobile/tablet) */
+.desktop-only {
+    display: flex;
+}
+
+/* Mobile-only elements (hidden on desktop) */
+.mobile-only {
+    display: none;
+}
+
+/* Responsive visibility */
+@media (max-width: 1023px) {
+    /* On mobile/tablet: hide desktop menu button */
+    .desktop-only {
+        display: none !important;
+    }
+    
+    .mobile-only {
+        display: flex;
+    }
+    
+    /* Add padding for bottom nav on mobile/tablet */
+    .content-wrapper {
+        padding-bottom: 80px;
+    }
+}
+
+@media (min-width: 1024px) {
+    /* On desktop: show menu button, hide bottom nav */
+    .desktop-only {
+        display: flex;
+    }
+    
+    /* No bottom padding needed on desktop */
+    .content-wrapper {
+        padding-bottom: 20px;
+    }
+}
+
+/* Notification Drawer */
+.notification-drawer {
+    z-index: 2000 !important;
+}
+
+.notification-header {
+    display: flex;
+    align-items: center;
+    padding: 20px;
+    background: linear-gradient(135deg, #3674B5 0%, #2196F3 100%);
+    color: white;
+}
+
+.notification-header h3 {
+    font-size: 1.125rem;
+    font-weight: 600;
+    margin: 0;
+}
+
+.notification-header p {
+    font-size: 0.75rem;
+    opacity: 0.8;
+    margin: 0;
+}
+
+.notification-section {
+    border-bottom: 1px solid #eee;
+}
+
+.section-header {
+    display: flex;
+    align-items: center;
+    padding: 12px 16px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.section-header.warning {
+    background: #FFF8E1;
+    color: #FF8F00;
+}
+
+.section-header.info {
+    background: #E3F2FD;
+    color: #1976D2;
+}
+
+.notification-item {
+    display: flex;
+    align-items: center;
+    padding: 12px 16px;
+    gap: 12px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.notification-item:hover {
+    background: #f5f5f5;
+}
+
+.notification-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.notification-content h4 {
+    font-size: 0.875rem;
+    font-weight: 600;
+    margin: 0;
+    color: #333;
+}
+
+.notification-content .message {
+    font-size: 0.8rem;
+    color: #666;
+    margin: 4px 0 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.notification-content .time {
+    font-size: 0.7rem;
+    color: #999;
+    margin: 4px 0 0;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.no-notifications {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 48px 24px;
+    color: #999;
+}
+
+.no-notifications p {
+    margin: 8px 0 0;
+}
+
+.notification-actions {
+    padding: 16px;
+}
+
+/* Loading State */
+.loading-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 60vh;
+    padding: 24px;
+}
+
+.loading-state p {
+    margin-top: 16px;
+    color: #666;
+}
+
+/* Active Rescue Display */
+.active-rescue-display {
+    min-height: 100vh;
+}
+
+.active-hero {
+    background: linear-gradient(135deg, #FF9800 0%, #FFC107 100%);
+    padding: 40px 20px;
+    position: relative;
+    overflow: hidden;
+}
+
+.active-hero::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.05'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+    opacity: 0.3;
+}
+
+.active-hero-content {
+    position: relative;
+    z-index: 1;
+    text-align: center;
+}
+
+.active-icon-wrapper {
+    position: relative;
+    display: inline-block;
+    margin-bottom: 16px;
+}
+
+.pulse-ring {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    animation: pulse 2s ease-out infinite;
+}
+
+.pulse-ring.warning {
+    border: 3px solid rgba(255, 255, 255, 0.5);
+}
+
+@keyframes pulse {
+    0% {
+        transform: translate(-50%, -50%) scale(1);
+        opacity: 0.5;
+    }
+    100% {
+        transform: translate(-50%, -50%) scale(1.5);
+        opacity: 0;
+    }
+}
+
+.active-hero h2 {
+    color: white;
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin: 0 0 8px;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.active-hero p {
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 0.9rem;
+    margin: 0;
+}
+
+.active-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px;
+    border-bottom: 1px solid #eee;
+}
+
+.rescue-code {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #666;
+}
+
+.active-details {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.active-details .detail-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+}
+
+.active-details .detail-row > div {
+    display: flex;
+    flex-direction: column;
+}
+
+.active-details .label {
+    font-size: 0.7rem;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.active-details .value {
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: #333;
+}
+
+/* Scanner Hero */
+.scanner-hero {
+    background: linear-gradient(135deg, #3674B5 0%, #2196F3 100%);
+    padding: 32px 20px 48px;
+    position: relative;
+    overflow: hidden;
+}
+
+.scanner-hero::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.05'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+    opacity: 0.3;
+}
+
+.hero-content {
+    position: relative;
+    z-index: 1;
+    text-align: center;
+}
+
+.hero-content h1 {
+    color: white;
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin: 0 0 8px;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.hero-content p {
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 0.9rem;
+    margin: 0;
+}
+
+/* Scanner Content */
+.scanner-content {
+    margin-top: -24px;
+    border-radius: 24px 24px 0 0;
+    background: #f5f5f5;
+    position: relative;
+    z-index: 2;
+    min-height: calc(100vh - 200px);
+    padding: 24px 16px;
+}
+
+/* Active Content */
+.active-content {
+    margin-top: -20px;
+    border-radius: 24px 24px 0 0;
+    background: #f5f5f5;
+    position: relative;
+    z-index: 2;
+    min-height: calc(100vh - 240px);
+    padding: 24px 16px;
+}
+
+/* Constrain content width on larger screens */
+@media (min-width: 600px) {
+    .scanner-content,
+    .active-content {
+        max-width: 600px;
+        margin-left: auto;
+        margin-right: auto;
+        margin-top: -24px;
+    }
+    
+    .hero-content,
+    .active-hero-content {
+        max-width: 600px;
+        margin: 0 auto;
+    }
+    
+    .action-cards {
+        flex-direction: row;
+    }
+    
+    .action-card {
+        flex: 1;
+    }
+}
+
+/* Action Cards */
+.action-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.action-card {
+    display: flex;
+    align-items: center;
+    padding: 16px;
+    border-radius: 16px;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+    gap: 16px;
+}
+
+.action-card:active {
+    transform: scale(0.98);
+}
+
+.action-card.disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+.action-card.primary {
+    background: linear-gradient(135deg, #3674B5 0%, #2196F3 100%);
+    box-shadow: 0 4px 16px rgba(54, 116, 181, 0.3);
+}
+
+.action-card.success {
+    background: linear-gradient(135deg, #388E3C 0%, #4CAF50 100%);
+    box-shadow: 0 4px 16px rgba(76, 175, 80, 0.3);
+}
+
+/* Hide scan QR card on mobile/tablet - use bottom nav instead */
+@media (max-width: 1024px) {
+    .action-card.hide-on-mobile {
+        display: none !important;
+    }
+    
+    /* Make voice input card full width when scan card is hidden */
+    .action-cards {
+        grid-template-columns: 1fr;
+    }
+}
+
+.action-icon {
+    width: 56px;
+    height: 56px;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.action-icon.recording {
+    animation: recordingPulse 1s ease-in-out infinite;
+    background: rgba(255, 100, 100, 0.3);
+}
+
+@keyframes recordingPulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+}
+
+/* Voice Tips Alert */
+.voice-tips-alert {
+    border: 1px solid rgba(33, 150, 243, 0.3);
+}
+
+.voice-tips {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.voice-tip-header {
+    display: flex;
+    align-items: center;
+    font-size: 0.875rem;
+}
+
+.voice-examples {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.pulse-icon {
+    animation: recordingPulse 1s ease-in-out infinite;
+    color: #f44336;
+}
+
+/* Samaritan Report Note */
+.samaritan-note {
+    display: flex;
+    align-items: center;
+    padding: 8px 12px;
+    background: linear-gradient(135deg, rgba(33, 150, 243, 0.08) 0%, rgba(33, 150, 243, 0.04) 100%);
+    border-radius: 8px;
+    border-left: 3px solid #2196F3;
+}
+
+.samaritan-note .v-icon {
+    flex-shrink: 0;
+}
+
+/* Media Attachments Section */
+.media-attachments-section {
+    padding: 12px;
+    background: #f8f9fa;
+    border-radius: 12px;
+    border: 1px dashed #ddd;
+}
+
+.section-label {
+    display: flex;
+    align-items: center;
+}
+
+.media-preview-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+    gap: 8px;
+}
+
+.media-preview-item {
+    position: relative;
+    aspect-ratio: 1;
+    border-radius: 8px;
+    overflow: hidden;
+    cursor: pointer;
+    background: #e0e0e0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid transparent;
+    transition: all 0.2s ease;
+}
+
+.media-preview-item:hover {
+    border-color: #3674B5;
+    transform: scale(1.02);
+}
+
+.media-preview-item.add-more {
+    background: #fff;
+    border: 2px dashed #ccc;
+    gap: 4px;
+}
+
+.media-preview-item.add-more:hover {
+    border-color: #3674B5;
+    background: #f0f7ff;
+}
+
+.media-thumbnail {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.video-thumbnail {
+    position: relative;
+    width: 100%;
+    height: 100%;
+}
+
+.video-thumbnail video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.video-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.media-info {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 4px;
+    background: linear-gradient(to top, rgba(0,0,0,0.7), transparent);
+}
+
+.media-info .file-size {
+    font-size: 10px;
+    color: white;
+    font-weight: 500;
+}
+
+.remove-media-btn {
+    position: absolute !important;
+    top: 4px;
+    right: 4px;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.media-preview-item:hover .remove-media-btn {
+    opacity: 1;
+}
+
+.media-upload-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+/* Media Preview Dialog */
+.media-preview-dialog .v-card {
+    overflow: hidden;
+}
+
+@media (max-width: 600px) {
+    .media-preview-grid {
+        grid-template-columns: repeat(4, 1fr);
+    }
+    
+    .media-upload-buttons {
+        flex-direction: column;
+    }
+    
+    .media-upload-buttons .v-btn {
+        width: 100%;
+        margin-right: 0 !important;
+    }
+}
+
+.action-text {
+    flex: 1;
+}
+
+.action-text h3 {
+    color: white;
+    font-size: 1rem;
+    font-weight: 600;
+    margin: 0 0 4px;
+}
+
+.action-text p {
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 0.8rem;
+    margin: 0;
+}
+
+/* Location Status Card */
+.location-status-card {
+    border: 2px solid #e0e0e0;
+}
+
+.location-status-card.scanned {
+    border-color: #4CAF50;
+}
+
+.location-status-header {
+    display: flex;
+    align-items: center;
+    padding: 12px 16px;
+    gap: 8px;
+    font-weight: 600;
+    color: #333;
+}
+
+.location-status-header.success {
+    background: linear-gradient(135deg, #388E3C 0%, #4CAF50 100%);
+    color: white;
+}
+
+.location-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+/* Manual Selection */
+.manual-select-grid {
+    display: flex;
+    flex-direction: column;
+}
+
+/* Emergency Form Card */
+.emergency-form-card {
+    border: 2px solid #e0e0e0;
+}
+
+.emergency-form-header {
+    display: flex;
+    align-items: center;
+    padding: 16px;
+    background: linear-gradient(135deg, #D32F2F 0%, #F44336 100%);
+    color: white;
+    font-weight: 600;
+}
+
+.submit-btn {
+    font-weight: 600;
+    font-size: 1rem;
+    letter-spacing: 0.5px;
+    min-height: 52px;
+}
+
+/* QR Scanner Dialog */
+.qr-scanner-dialog {
+    background: black !important;
+}
+
+.qr-scanner-header {
+    display: flex;
+    align-items: center;
+    padding: 12px 8px;
+    background: linear-gradient(135deg, #3674B5 0%, #2196F3 100%);
+    gap: 8px;
+}
+
+.qr-title {
+    flex: 1;
+    color: white;
+    font-size: 1.125rem;
+    font-weight: 600;
+}
+
+.qr-scanner-content {
+    position: relative;
+}
+
+/* Zoom Controls */
+.zoom-controls {
+    width: 100%;
+    max-width: 320px;
+    padding: 16px 20px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 16px;
+    margin-top: 16px;
+    backdrop-filter: blur(10px);
+}
+
+.zoom-label {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    color: white;
+    font-size: 0.875rem;
+    font-weight: 600;
+    margin-bottom: 12px;
+}
+
+.zoom-slider-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.zoom-slider {
+    flex: 1;
+}
+
+.zoom-hint {
+    text-align: center;
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 0.75rem;
+    margin-top: 8px;
+    margin-bottom: 0;
+}
+
+/* Help Dialog */
+.help-header {
+    background: linear-gradient(135deg, #3674B5 0%, #2196F3 100%);
+    padding: 24px;
+    text-align: center;
+    color: white;
+}
+
+.help-header h2 {
+    margin: 12px 0 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+}
+
+.help-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.help-step {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+}
+
+.step-number {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #3674B5 0%, #2196F3 100%);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    flex-shrink: 0;
+}
+
+.step-content {
+    flex: 1;
+}
+
+.step-content h4 {
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin: 0 0 4px;
+    color: #333;
+}
+
+.step-content p {
+    font-size: 0.8rem;
+    color: #666;
+    margin: 0;
+}
+
+/* Evacuation Canvas */
 .evacuation-canvas-container {
     overflow: auto;
     background-color: #e0e0e0;
@@ -1949,8 +3686,9 @@ const showNotification = (message, color = 'info') => {
         linear-gradient(-45deg, transparent 75%, #ccc 75%);
     background-size: 20px 20px;
     background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
-    max-height: 60vh;
-    min-height: 300px;
+    max-height: 50vh;
+    min-height: 200px;
+    border-radius: 12px;
 }
 
 .evacuation-canvas-wrapper {
@@ -1970,22 +3708,77 @@ const showNotification = (message, color = 'info') => {
     pointer-events: none;
 }
 
+.evacuation-legend {
+    display: flex;
+    gap: 24px;
+    justify-content: center;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.8rem;
+    color: #666;
+}
+
 .legend-line {
-    width: 30px;
+    width: 24px;
     height: 4px;
     background: #FF5722;
     border-radius: 2px;
 }
 
 .legend-room {
-    width: 24px;
-    height: 16px;
+    width: 20px;
+    height: 14px;
     background: rgba(76, 175, 80, 0.3);
     border: 2px solid #4CAF50;
     border-radius: 2px;
 }
 
+/* Utility */
 .gap-2 {
     gap: 8px;
+}
+
+/* Mobile-responsive layout */
+.v-main {
+    padding-bottom: 0 !important;
+}
+
+/* Expansion Panel Customization */
+:deep(.v-expansion-panel-title) {
+    padding: 12px 16px !important;
+    min-height: auto !important;
+}
+
+:deep(.v-expansion-panel-text__wrapper) {
+    padding: 0 16px 16px !important;
+}
+
+/* Scrollbar Styling */
+.content-wrapper::-webkit-scrollbar {
+    width: 4px;
+}
+
+.content-wrapper::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.content-wrapper::-webkit-scrollbar-thumb {
+    background: rgba(0,0,0,0.2);
+    border-radius: 4px;
+}
+
+/* Prevent text selection everywhere except inputs */
+* {
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+input, textarea {
+    -webkit-user-select: auto;
+    user-select: auto;
 }
 </style>

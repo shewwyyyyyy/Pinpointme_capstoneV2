@@ -58,6 +58,7 @@ Route::prefix('users')->group(function () {
 // User active rescue and history - needs to be accessible for web app
 Route::get('/users/{userId}/active-rescue', [RescueRequestController::class, 'userActiveRescue']);
 Route::get('/users/{userId}/rescue-history', [RescueRequestController::class, 'userHistory']);
+Route::get('/rescue-requests/user/{userId}', [RescueRequestController::class, 'userHistory']);
 
 // Buildings API (Public - for QR scanning)
 Route::get('/buildings', [BuildingController::class, 'index']);

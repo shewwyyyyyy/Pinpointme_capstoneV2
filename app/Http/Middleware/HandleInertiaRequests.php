@@ -59,6 +59,13 @@ class HandleInertiaRequests extends Middleware
                         'isAdmin' => (bool) (Auth::user()->isAdmin ?? Auth::user()->is_admin ?? false),
                         'profile_picture' => Auth::user()->profile_picture ?? null,
                         'contact_number' => Auth::user()->contact_number ?? '',
+                        'phone_number' => Auth::user()->phone_number ?? Auth::user()->phone ?? '',
+                        'emergency_contact_name' => Auth::user()->emergency_contact_name ?? '',
+                        'emergency_contact_phone' => Auth::user()->emergency_contact_phone ?? '',
+                        'emergency_contact_relation' => Auth::user()->emergency_contact_relation ?? '',
+                        'blood_type' => Auth::user()->blood_type ?? '',
+                        'allergies' => Auth::user()->allergies ?? '',
+                        'medical_conditions' => Auth::user()->medical_conditions ?? '',
                     ]
                 ] : null,
             ]);

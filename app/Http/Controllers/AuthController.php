@@ -714,6 +714,7 @@ class AuthController extends Controller
         $validator = Validator::make($request->all(), [
             'first_name' => 'sometimes|string|max:255',
             'last_name' => 'sometimes|string|max:255',
+            'phone' => 'sometimes|string|max:20',
             'phone_number' => 'sometimes|string|max:20',
             'emergency_contact_name' => 'sometimes|string|max:255',
             'emergency_contact_phone' => 'sometimes|string|max:20',
@@ -733,6 +734,12 @@ class AuthController extends Controller
         }
 
         $data = $validator->validated();
+
+        // Map phone_number to phone if provided
+        if (isset($data['phone_number'])) {
+            $data['phone'] = $data['phone_number'];
+            unset($data['phone_number']);
+        }
 
         // If password is being changed, verify current password
         if (isset($data['password']) && isset($data['current_password'])) {
@@ -1001,6 +1008,96 @@ class AuthController extends Controller
             'email' => $user->email,
             'role' => $user->role,
         ]);
+    }
+
+    /**
+     * Handle forgot password request - sends password reset link
+     */
+    public function forgotPassword(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'email' => 'required|email',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Please enter a valid email address',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        $user = User::where('email', $request->email)->first();
+        
+        // For security, we return success even if user doesn't exist
+        // to prevent email enumeration
+        if (!$user) {
+            return response()->json([
+                'status' => 'success',
+                'message' => 'If an account exists with this email, a password reset link has been sent.'
+            ]);
+        }
+
+        // Generate a password reset token (6-digit OTP)
+        $resetToken = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+        
+        // Store token with expiration (30 minutes for forgot password)
+        $user->update([
+            'otp_code' => $resetToken,
+            'otp_expires_at' => Carbon::now()->addMinutes(30),
+            'otp_verified' => false,
+        ]);
+
+        // Generate reset URL
+        $resetUrl = url('/reset-password?email=' . urlencode($user->email) . '&token=' . $resetToken);
+
+        // Send password reset email
+        try {
+            Mail::send([], [], function ($message) use ($user, $resetToken, $resetUrl) {
+                $message->to($user->email)
+                    ->subject('PinPointMe - Reset Your Password')
+                    ->html("
+                        <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;'>
+                            <div style='background: linear-gradient(135deg, #3674B5, #1E4A7A); color: white; padding: 30px; text-align: center;'>
+                                <h1 style='margin: 0;'>PinPointMe</h1>
+                                <p style='margin: 5px 0 0 0; opacity: 0.9;'>COMING YOUR WAY.</p>
+                            </div>
+                            <div style='padding: 30px; background: #f9f9f9;'>
+                                <h2 style='color: #333; margin-top: 0;'>Password Reset Request</h2>
+                                <p style='color: #666;'>Hello {$user->first_name},</p>
+                                <p style='color: #666;'>We received a request to reset your password. Use this verification code:</p>
+                                <div style='background: white; border: 2px solid #3674B5; border-radius: 10px; padding: 25px; text-align: center; margin: 25px 0;'>
+                                    <h1 style='color: #3674B5; letter-spacing: 10px; font-size: 40px; margin: 0; font-family: monospace;'>{$resetToken}</h1>
+                                </div>
+                                <p style='color: #999; font-size: 13px; text-align: center;'>This code will expire in <strong>30 minutes</strong></p>
+                                <p style='color: #666; text-align: center; margin-top: 20px;'>Or click the button below to reset your password:</p>
+                                <div style='text-align: center; margin: 25px 0;'>
+                                    <a href='{$resetUrl}' style='display: inline-block; background: #3674B5; color: white; padding: 15px 40px; text-decoration: none; border-radius: 8px; font-weight: bold;'>Reset Password</a>
+                                </div>
+                                <div style='background: #FFF3E0; border-left: 4px solid #FF9800; padding: 15px; margin-top: 20px;'>
+                                    <p style='color: #E65100; margin: 0; font-size: 13px;'>
+                                        <strong>Security Notice:</strong> If you didn't request this password reset, please ignore this email or contact support if you have concerns.
+                                    </p>
+                                </div>
+                            </div>
+                            <div style='padding: 15px; background: #1E4A7A; text-align: center; font-size: 12px; color: rgba(255,255,255,0.8);'>
+                                &copy; " . date('Y') . " PinPointMe - Emergency Rescue System
+                            </div>
+                        </div>
+                    ");
+            });
+
+            return response()->json([
+                'status' => 'success', 
+                'message' => 'If an account exists with this email, a password reset link has been sent.'
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('Failed to send password reset email: ' . $e->getMessage());
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to send reset email. Please try again later.'
+            ], 500);
+        }
     }
 
 

@@ -1,49 +1,44 @@
 <template>
-    <v-navigation-drawer v-model="drawerModel" temporary>
-        <v-list-item class="pa-4">
+    <v-navigation-drawer v-model="drawerModel" temporary class="rescuer-menu-drawer">
+        <v-list-item class="pa-4 menu-header">
             <template v-slot:prepend>
-                <v-avatar color="primary" size="48">
+                <v-avatar color="white" size="48">
                     <v-img v-if="profilePictureUrl" :src="profilePictureUrl" cover />
-                    <span v-else class="text-h6 text-white">{{ getInitials(userName) }}</span>
+                    <span v-else class="text-h6" style="color: #3674B5;">{{ getInitials(userName) }}</span>
                 </v-avatar>
             </template>
-            <v-list-item-title class="font-weight-bold">{{ userName }}</v-list-item-title>
-            <v-list-item-subtitle>Rescuer</v-list-item-subtitle>
+            <v-list-item-title class="font-weight-bold text-white">{{ userName }}</v-list-item-title>
+            <v-list-item-subtitle class="text-white-darken-1">Rescuer</v-list-item-subtitle>
         </v-list-item>
 
-        <v-divider />
+        <v-divider color="rgba(255,255,255,0.2)" />
 
-        <v-list density="compact" nav>
+        <v-list density="compact" nav class="menu-list">
             <v-list-item
                 prepend-icon="mdi-view-dashboard"
                 title="Dashboard"
                 @click="navigateTo('/rescuer/dashboard')"
+                class="menu-item"
             />
             <v-list-item
                 prepend-icon="mdi-message-text"
                 title="Messages"
                 @click="navigateTo('/rescuer/chats')"
+                class="menu-item"
+            />
+            <v-list-item
+                prepend-icon="mdi-bell"
+                title="Notifications"
+                @click="navigateTo('/rescuer/notifications')"
+                class="menu-item"
             />
             <v-list-item
                 prepend-icon="mdi-account"
                 title="Profile"
                 @click="navigateTo('/rescuer/profile')"
+                class="menu-item"
             />
         </v-list>
-
-        <template v-slot:append>
-            <div class="pa-4">
-                <v-btn
-                    block
-                    color="error"
-                    variant="tonal"
-                    prepend-icon="mdi-logout"
-                    @click="handleLogout"
-                >
-                    Logout
-                </v-btn>
-            </div>
-        </template>
     </v-navigation-drawer>
 </template>
 
@@ -167,6 +162,37 @@ const handleLogout = async () => {
 </script>
 
 <style scoped>
-/* RescuerMenu is always available but the toggle button will be hidden on mobile */
-/* The drawer itself works on all screen sizes when triggered */
+.rescuer-menu-drawer {
+    background: linear-gradient(180deg, #3674B5 0%, #2a5d8f 100%) !important;
+}
+
+.menu-header {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.menu-list {
+    background: transparent !important;
+}
+
+.menu-item {
+    color: white !important;
+    margin: 4px 8px;
+    border-radius: 8px;
+}
+
+.menu-item:hover {
+    background: rgba(255, 255, 255, 0.15) !important;
+}
+
+.menu-item :deep(.v-list-item__prepend .v-icon) {
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.menu-item :deep(.v-list-item-title) {
+    color: white;
+}
+
+.text-white-darken-1 {
+    color: rgba(255, 255, 255, 0.7) !important;
+}
 </style>
