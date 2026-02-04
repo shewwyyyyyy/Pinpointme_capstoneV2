@@ -1,11 +1,12 @@
 <template>
     <v-app class="bg-grey-lighten-4">
-        <!-- App Bar -->
+
+        <!-- App Bar (Unified) -->
         <v-app-bar color="primary" elevation="2">
             <v-app-bar-nav-icon @click="drawer = !drawer"></v-app-bar-nav-icon>
             <v-app-bar-title>
-                <v-icon class="mr-2">mdi-shield-check</v-icon>
-                PinPointMe Admin
+                <v-icon class="mr-2" color="white">mdi-shield-check</v-icon>
+                <span class="text-white font-weight-bold">PinPointMe Admin</span>
             </v-app-bar-title>
             <v-spacer />
             <v-btn icon @click="logout">
@@ -13,7 +14,7 @@
             </v-btn>
         </v-app-bar>
 
-        <!-- Navigation Drawer -->
+        <!-- Navigation Drawer (Unified) -->
         <v-navigation-drawer v-model="drawer" permanent>
             <v-list>
                 <v-list-item prepend-icon="mdi-view-dashboard" title="Dashboard" href="/admin/dashboard"></v-list-item>

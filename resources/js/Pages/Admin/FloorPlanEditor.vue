@@ -1,22 +1,15 @@
 <template>
     <v-app class="bg-grey-lighten-4">
-        <!-- App Bar -->
+
+        <!-- App Bar (Unified) -->
         <v-app-bar color="primary" elevation="2">
-            <v-btn icon @click="goBack">
-                <v-icon>mdi-arrow-left</v-icon>
-            </v-btn>
+            <v-app-bar-nav-icon @click="goBack"></v-app-bar-nav-icon>
             <v-app-bar-title>
-                <v-icon class="mr-2">mdi-floor-plan</v-icon>
-                Floor Plan Editor
+                <v-icon class="mr-2" color="white">mdi-shield-check</v-icon>
+                <span class="text-white font-weight-bold">PinPointMe Admin</span>
             </v-app-bar-title>
             <v-spacer />
-            <v-btn 
-                color="success" 
-                variant="elevated" 
-                class="mr-2"
-                :loading="saving"
-                @click="saveAnnotations"
-            >
+            <v-btn color="success" variant="elevated" class="mr-2" :loading="saving" @click="saveAnnotations">
                 <v-icon left>mdi-content-save</v-icon>
                 Save
             </v-btn>

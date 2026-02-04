@@ -1,55 +1,30 @@
 <template>
     <v-app class="bg-grey-lighten-4">
-        <!-- App Bar with Gradient -->
-        <v-app-bar elevation="0" class="gradient-app-bar">
-            <v-app-bar-nav-icon @click="drawer = !drawer" color="white"></v-app-bar-nav-icon>
-            <v-app-bar-title class="d-flex align-center">
-                <img src="/images/pinpointme-logo.png" alt="PinPointMe" height="36" class="mr-2" style="filter: brightness(0) invert(1);" onerror="this.style.display='none'" />
+        <!-- App Bar (Unified) -->
+        <v-app-bar color="primary" elevation="2">
+            <v-app-bar-nav-icon @click="drawer = !drawer"></v-app-bar-nav-icon>
+            <v-app-bar-title>
+                <v-icon class="mr-2" color="white">mdi-shield-check</v-icon>
                 <span class="text-white font-weight-bold">PinPointMe Admin</span>
             </v-app-bar-title>
             <v-spacer />
-            <v-chip color="rgba(255,255,255,0.2)" variant="flat" class="mr-2 text-white">
-                <v-icon start color="success">mdi-circle</v-icon>
-                System Online
-            </v-chip>
-            <v-btn icon @click="refreshData" color="white">
-                <v-icon>mdi-refresh</v-icon>
-            </v-btn>
-            <v-btn icon @click="logout" color="white">
+            <v-btn icon @click="logout">
                 <v-icon>mdi-logout</v-icon>
             </v-btn>
         </v-app-bar>
 
-        <!-- Navigation Drawer -->
+        <!-- Navigation Drawer (Unified) -->
         <v-navigation-drawer v-model="drawer" permanent>
-            <!-- Brand Header -->
-            <div class="pa-4 gradient-drawer-header">
-                <div class="d-flex align-center">
-                    <v-avatar color="white" size="48" class="mr-3">
-                        <v-icon color="primary" size="28">mdi-map-marker-radius</v-icon>
-                    </v-avatar>
-                    <div>
-                        <h3 class="text-white font-weight-bold text-h6">PinPointMe</h3>
-                        <p class="text-white-50 text-caption mb-0">Emergency Response</p>
-                    </div>
-                </div>
-            </div>
-            <v-divider></v-divider>
-            <v-list class="py-2">
-                <v-list-item prepend-icon="mdi-view-dashboard" title="Dashboard" :href="'/admin/dashboard'" :active="currentPage === 'dashboard'" rounded="xl" class="mx-2 mb-1"></v-list-item>
-                <v-list-item prepend-icon="mdi-account-group" title="Users" :href="'/admin/users'" :active="currentPage === 'users'" rounded="xl" class="mx-2 mb-1"></v-list-item>
-                <v-list-item prepend-icon="mdi-lifebuoy" title="Rescuers" :href="'/admin/rescuers'" :active="currentPage === 'rescuers'" rounded="xl" class="mx-2 mb-1"></v-list-item>
-                <v-list-item prepend-icon="mdi-office-building" title="Buildings" :href="'/admin/buildings'" :active="currentPage === 'buildings'" rounded="xl" class="mx-2 mb-1"></v-list-item>
-                <v-list-item prepend-icon="mdi-file-chart" title="Reports" :href="'/admin/reports'" :active="currentPage === 'reports'" rounded="xl" class="mx-2 mb-1"></v-list-item>
-                <v-list-item prepend-icon="mdi-shield-alert" title="Preventive Measures" :href="'/admin/preventive-measures'" :active="currentPage === 'preventive'" rounded="xl" class="mx-2 mb-1"></v-list-item>
+            <v-list>
+                <v-list-item prepend-icon="mdi-view-dashboard" title="Dashboard" href="/admin/dashboard" active></v-list-item>
+                <v-list-item prepend-icon="mdi-account-group" title="Users" href="/admin/users"></v-list-item>
+                <v-list-item prepend-icon="mdi-lifebuoy" title="Rescuers" href="/admin/rescuers"></v-list-item>
+                <v-list-item prepend-icon="mdi-office-building" title="Buildings" href="/admin/buildings"></v-list-item>
+                <v-list-item prepend-icon="mdi-file-chart" title="Reports" href="/admin/reports"></v-list-item>
+                <v-list-item prepend-icon="mdi-shield-alert" title="Preventive Measures" href="/admin/preventive-measures"></v-list-item>
             </v-list>
             <template v-slot:append>
-                <div class="pa-4">
-                    <v-btn block color="error" variant="tonal" @click="logout" rounded="xl">
-                        <v-icon start>mdi-logout</v-icon>
-                        Logout
-                    </v-btn>
-                </div>
+                <!-- Remove logout button from drawer - now only in avatar menu -->
             </template>
         </v-navigation-drawer>
 
@@ -363,8 +338,10 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
-import { router } from '@inertiajs/vue3';
+import { ref, computed, onMounted } from 'vue';
+import { router, usePage } from '@inertiajs/vue3';
+
+const page = usePage();
 
 // Props from Inertia
 const props = defineProps({
@@ -393,6 +370,47 @@ const props = defineProps({
 const drawer = ref(true);
 const currentPage = ref('dashboard');
 const timeFilter = ref('week');
+
+// Admin Profile
+const adminProfile = ref({
+    full_name: 'Administrator',
+    email: '',
+    profile_picture: null
+});
+
+const adminInitials = computed(() => {
+    if (adminProfile.value.full_name) {
+        const names = adminProfile.value.full_name.split(' ');
+        if (names.length >= 2) {
+            return `${names[0][0]}${names[names.length - 1][0]}`.toUpperCase();
+        }
+        return names[0][0]?.toUpperCase() || 'AD';
+    }
+    return 'AD';
+});
+
+// Load admin profile from localStorage or page props
+const loadAdminProfile = () => {
+    try {
+        const userData = JSON.parse(localStorage.getItem('userData') || '{}');
+        if (userData.first_name || userData.last_name) {
+            adminProfile.value = {
+                full_name: `${userData.first_name || ''} ${userData.last_name || ''}`.trim(),
+                email: userData.email || '',
+                profile_picture: userData.profile_picture || null
+            };
+        } else if (page.props.auth?.user) {
+            const user = page.props.auth.user;
+            adminProfile.value = {
+                full_name: `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.name || 'Administrator',
+                email: user.email || '',
+                profile_picture: user.profile_picture || null
+            };
+        }
+    } catch (e) {
+        console.error('Error loading admin profile:', e);
+    }
+};
 
 const timeFilters = [
     { label: 'Today', value: 'day' },
@@ -503,7 +521,8 @@ const formatDate = (dateString) => {
 };
 
 onMounted(() => {
-    // Data comes from Inertia props
+    // Load admin profile data
+    loadAdminProfile();
 });
 </script>
 

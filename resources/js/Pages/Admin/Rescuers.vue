@@ -1,64 +1,52 @@
 <template>
     <v-app class="bg-grey-lighten-4">
-        <!-- App Bar with Gradient -->
-        <v-app-bar elevation="0" class="gradient-app-bar">
-            <v-app-bar-nav-icon @click="drawer = !drawer" color="white"></v-app-bar-nav-icon>
-            <v-app-bar-title class="d-flex align-center">
-                <v-icon color="white" class="mr-2">mdi-map-marker-radius</v-icon>
+
+        <!-- App Bar (Unified) -->
+        <v-app-bar color="primary" elevation="2">
+            <v-app-bar-nav-icon @click="drawer = !drawer"></v-app-bar-nav-icon>
+            <v-app-bar-title>
+                <v-icon class="mr-2" color="white">mdi-shield-check</v-icon>
                 <span class="text-white font-weight-bold">PinPointMe Admin</span>
             </v-app-bar-title>
             <v-spacer />
-            <v-chip color="rgba(255,255,255,0.2)" variant="flat" class="mr-2 text-white">
-                <v-icon start color="success">mdi-circle</v-icon>
-                System Online
-            </v-chip>
-            <v-menu>
+            <!-- Profile Avatar Menu -->
+            <v-menu offset-y>
                 <template v-slot:activator="{ props }">
-                    <v-btn icon v-bind="props" color="white">
+                    <v-btn icon v-bind="props">
                         <v-avatar color="white" size="36">
                             <span class="text-primary font-weight-bold">{{ adminInitials }}</span>
                         </v-avatar>
                     </v-btn>
                 </template>
-                <v-list density="compact">
-                    <v-list-item prepend-icon="mdi-account" title="Profile"></v-list-item>
-                    <v-divider></v-divider>
-                    <v-list-item prepend-icon="mdi-logout" title="Logout" @click="logout"></v-list-item>
+                <v-list>
+                    <v-list-item @click="goToProfile" prepend-icon="mdi-account">
+                        <v-list-item-title>Profile</v-list-item-title>
+                    </v-list-item>
+                    <v-list-item @click="toggleDarkMode" prepend-icon="mdi-theme-light-dark">
+                        <v-list-item-title>{{ isDark ? 'Light Mode' : 'Dark Mode' }}</v-list-item-title>
+                    </v-list-item>
+                    <v-list-item @click="logout" prepend-icon="mdi-logout">
+                        <v-list-item-title>Logout</v-list-item-title>
+                    </v-list-item>
                 </v-list>
             </v-menu>
         </v-app-bar>
 
-        <!-- Navigation Drawer -->
-        <v-navigation-drawer v-model="drawer" permanent>
-            <!-- Brand Header -->
-            <div class="pa-4 gradient-drawer-header">
-                <div class="d-flex align-center">
-                    <v-avatar color="white" size="48" class="mr-3">
-                        <v-icon color="primary" size="28">mdi-map-marker-radius</v-icon>
-                    </v-avatar>
-                    <div>
-                        <h3 class="text-white font-weight-bold text-h6">PinPointMe</h3>
-                        <p class="text-white-50 text-caption mb-0">Emergency Response</p>
-                    </div>
-                </div>
-            </div>
-            <v-divider></v-divider>
-            <v-list class="py-2">
-                <v-list-item prepend-icon="mdi-view-dashboard" title="Dashboard" :href="'/admin/dashboard'" :active="currentPage === 'dashboard'" rounded="xl" class="mx-2 mb-1"></v-list-item>
-                <v-list-item prepend-icon="mdi-account-group" title="Users" :href="'/admin/users'" :active="currentPage === 'users'" rounded="xl" class="mx-2 mb-1"></v-list-item>
-                <v-list-item prepend-icon="mdi-lifebuoy" title="Rescuers" :href="'/admin/rescuers'" :active="currentPage === 'rescuers'" rounded="xl" class="mx-2 mb-1"></v-list-item>
-                <v-list-item prepend-icon="mdi-office-building" title="Buildings" :href="'/admin/buildings'" :active="currentPage === 'buildings'" rounded="xl" class="mx-2 mb-1"></v-list-item>
-                <v-list-item prepend-icon="mdi-file-chart" title="Reports" :href="'/admin/reports'" :active="currentPage === 'reports'" rounded="xl" class="mx-2 mb-1"></v-list-item>
-                <v-list-item prepend-icon="mdi-shield-alert" title="Preventive Measures" :href="'/admin/preventive-measures'" :active="currentPage === 'preventive'" rounded="xl" class="mx-2 mb-1"></v-list-item>
+        <!-- Navigation Drawer (Unified) -->
+        <v-navigation-drawer
+            v-model="drawer"
+            :permanent="!isMobile"
+            :temporary="isMobile"
+            app
+        >
+            <v-list>
+                <v-list-item prepend-icon="mdi-view-dashboard" title="Dashboard" href="/admin/dashboard"></v-list-item>
+                <v-list-item prepend-icon="mdi-account-group" title="Users" href="/admin/users"></v-list-item>
+                <v-list-item prepend-icon="mdi-lifebuoy" title="Rescuers" href="/admin/rescuers" active></v-list-item>
+                <v-list-item prepend-icon="mdi-office-building" title="Buildings" href="/admin/buildings"></v-list-item>
+                <v-list-item prepend-icon="mdi-file-chart" title="Reports" href="/admin/reports"></v-list-item>
+                <v-list-item prepend-icon="mdi-shield-alert" title="Preventive Measures" href="/admin/preventive-measures"></v-list-item>
             </v-list>
-            <template v-slot:append>
-                <div class="pa-4">
-                    <v-btn block color="error" variant="tonal" @click="logout" rounded="xl">
-                        <v-icon start>mdi-logout</v-icon>
-                        Logout
-                    </v-btn>
-                </div>
-            </template>
         </v-navigation-drawer>
 
         <!-- Main Content -->
@@ -71,6 +59,23 @@
                         <p class="text-grey mt-1">To maintain security and compliance.</p>
                     </div>
                     <v-spacer />
+                    <v-menu offset-y>
+                        <template v-slot:activator="{ props }">
+                            <v-btn color="info" class="mr-4" v-bind="props">
+                                <v-icon start>mdi-file-export</v-icon>
+                                Export
+                                <v-icon end>mdi-chevron-down</v-icon>
+                            </v-btn>
+                        </template>
+                        <v-list>
+                            <v-list-item @click="exportRescuers('csv')" prepend-icon="mdi-file-delimited">
+                                <v-list-item-title>Export as CSV</v-list-item-title>
+                            </v-list-item>
+                            <v-list-item @click="exportRescuers('xlsx')" prepend-icon="mdi-file-excel">
+                                <v-list-item-title>Export as XLSX</v-list-item-title>
+                            </v-list-item>
+                        </v-list>
+                    </v-menu>
                     <!-- Add Rescuer Button with Dropdown -->
                     <v-menu>
                         <template v-slot:activator="{ props }">
@@ -760,6 +765,18 @@
 </template>
 
 <script setup>
+import { useDisplay } from 'vuetify';
+const { mobile } = useDisplay();
+const isMobile = computed(() => mobile.value);
+
+const isDark = ref(false);
+const toggleDarkMode = () => {
+    isDark.value = !isDark.value;
+    document.documentElement.classList.toggle('v-theme--dark', isDark.value);
+};
+const goToProfile = () => {
+    window.location.href = '/admin/profile';
+};
 import { ref, computed, onMounted } from 'vue';
 import * as XLSX from 'xlsx';
 import { getProfilePictureUrl } from '@/Composables/useApi';
@@ -807,6 +824,53 @@ const bulkUpdateStatus = ref('available');
 const manualBulkData = ref([{ first_name: '', last_name: '', email: '', phone: '' }]);
 
 // Data
+// Export rescuers as CSV, XLSX, or PDF
+const exportRescuers = (format = 'csv') => {
+    const data = rescuersList.value.map(r => ({
+        'First Name': r.first_name,
+        'Last Name': r.last_name,
+        'Email': r.email,
+        'Phone': r.phone || '',
+        'Status': r.status,
+        'Created': r.created_at
+    }));
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Rescuers');
+    if (format === 'csv') {
+        XLSX.writeFile(workbook, 'rescuers_export.csv');
+    } else {
+        XLSX.writeFile(workbook, 'rescuers_export.xlsx');
+    }
+};
+
+const exportPDF = () => {
+    const doc = new jsPDF();
+    const columns = [
+        { header: 'First Name', dataKey: 'first_name' },
+        { header: 'Last Name', dataKey: 'last_name' },
+        { header: 'Email', dataKey: 'email' },
+        { header: 'Phone', dataKey: 'phone' },
+        { header: 'Status', dataKey: 'status' },
+        { header: 'Created', dataKey: 'created_at' }
+    ];
+    const rows = rescuersList.value.map(r => ({
+        first_name: r.first_name,
+        last_name: r.last_name,
+        email: r.email,
+        phone: r.phone || '',
+        status: r.status,
+        created_at: r.created_at
+    }));
+    autoTable(doc, {
+        columns,
+        body: rows,
+        styles: { fontSize: 8 },
+        headStyles: { fillColor: [25, 118, 210] },
+        margin: { top: 20 }
+    });
+    doc.save('rescuers_export.pdf');
+};
 const rescuersList = ref(props.rescuers?.data || []);
 const counts = ref(props.counts);
 const auditTrail = ref(props.auditTrail || []);
@@ -1233,7 +1297,10 @@ const getStatusColor = (status) => {
         available: 'success',
         on_rescue: 'warning',
         off_duty: 'grey',
-        unavailable: 'error'
+        unavailable: 'error',
+        pending: 'info',
+        inactive: 'grey-darken-1',
+        active: 'success' // Map active to success color
     };
     return colors[status] || 'grey';
 };
@@ -1241,9 +1308,12 @@ const getStatusColor = (status) => {
 const formatStatus = (status) => {
     const labels = {
         available: 'Available',
-        on_rescue: 'On rescue',
-        off_duty: 'Off duty',
-        unavailable: 'Unavailable'
+        on_rescue: 'On Rescue',
+        off_duty: 'Off Duty',
+        unavailable: 'Unavailable',
+        pending: 'Pending Activation',
+        inactive: 'Inactive',
+        active: 'Available' // Display 'Available' instead of 'Active'
     };
     return labels[status] || status?.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) || 'Unknown';
 };

@@ -1,22 +1,20 @@
 <template>
     <v-app class="bg-grey-lighten-4">
-        <!-- App Bar -->
+
+        <!-- App Bar (Unified) -->
         <v-app-bar color="primary" elevation="2">
             <v-app-bar-nav-icon @click="drawer = !drawer"></v-app-bar-nav-icon>
             <v-app-bar-title>
-                <v-icon class="mr-2">mdi-shield-check</v-icon>
-                PinPointMe Admin
+                <v-icon class="mr-2" color="white">mdi-shield-check</v-icon>
+                <span class="text-white font-weight-bold">PinPointMe Admin</span>
             </v-app-bar-title>
             <v-spacer />
-            <v-btn icon @click="exportReport" :loading="exporting">
-                <v-icon>mdi-download</v-icon>
-            </v-btn>
             <v-btn icon @click="logout">
                 <v-icon>mdi-logout</v-icon>
             </v-btn>
         </v-app-bar>
 
-        <!-- Navigation Drawer -->
+        <!-- Navigation Drawer (Unified) -->
         <v-navigation-drawer v-model="drawer" permanent>
             <v-list>
                 <v-list-item prepend-icon="mdi-view-dashboard" title="Dashboard" href="/admin/dashboard"></v-list-item>
@@ -86,67 +84,95 @@
                                     <v-icon start>mdi-filter-off</v-icon>
                                     Reset
                                 </v-btn>
-                                <v-btn color="primary" @click="exportReport" :loading="exporting">
-                                    <v-icon start>mdi-download</v-icon>
-                                    Export
+                                <v-btn color="error" @click="exportToPDF" :loading="exporting">
+                                    <v-icon start>mdi-file-pdf-box</v-icon>
+                                    Export PDF
                                 </v-btn>
                             </v-col>
                         </v-row>
                     </v-card-text>
                 </v-card>
 
-                <!-- Stats Cards -->
+                <!-- Enhanced Stats Cards -->
                 <v-row class="mb-6">
-                    <v-col cols="6" md="3">
-                        <v-card class="pa-4" rounded="lg">
-                            <div class="d-flex align-center">
-                                <v-avatar color="primary" size="48">
-                                    <v-icon color="white">mdi-alert-circle</v-icon>
-                                </v-avatar>
-                                <div class="ml-3">
-                                    <p class="text-grey text-caption mb-0">Total Requests</p>
-                                    <h4 class="text-h5 font-weight-bold">{{ counts.total }}</h4>
+                    <v-col cols="12" sm="6" md="3">
+                        <v-card class="stat-card stat-card-primary" rounded="xl" elevation="4">
+                            <div class="stat-card-overlay"></div>
+                            <v-card-text class="position-relative pa-4">
+                                <div class="d-flex align-center justify-space-between">
+                                    <div>
+                                        <p class="text-white text-caption mb-1 opacity-80">Total Requests</p>
+                                        <h2 class="text-h3 font-weight-bold text-white">{{ counts.total }}</h2>
+                                        <v-chip color="rgba(255,255,255,0.2)" size="x-small" class="mt-2 text-white">
+                                            <v-icon start size="12">mdi-trending-up</v-icon>
+                                            {{ timeFilter === 'day' ? 'Today' : timeFilter === 'week' ? 'This Week' : timeFilter === 'month' ? 'This Month' : 'This Year' }}
+                                        </v-chip>
+                                    </div>
+                                    <v-avatar size="56" color="rgba(255,255,255,0.2)">
+                                        <v-icon size="32" color="white">mdi-alert-circle-outline</v-icon>
+                                    </v-avatar>
                                 </div>
-                            </div>
+                            </v-card-text>
                         </v-card>
                     </v-col>
-                    <v-col cols="6" md="3">
-                        <v-card class="pa-4" rounded="lg">
-                            <div class="d-flex align-center">
-                                <v-avatar color="warning" size="48">
-                                    <v-icon color="white">mdi-clock</v-icon>
-                                </v-avatar>
-                                <div class="ml-3">
-                                    <p class="text-grey text-caption mb-0">Pending</p>
-                                    <h4 class="text-h5 font-weight-bold text-warning">{{ counts.pending }}</h4>
+                    <v-col cols="12" sm="6" md="3">
+                        <v-card class="stat-card stat-card-warning" rounded="xl" elevation="4">
+                            <div class="stat-card-overlay"></div>
+                            <v-card-text class="position-relative pa-4">
+                                <div class="d-flex align-center justify-space-between">
+                                    <div>
+                                        <p class="text-white text-caption mb-1 opacity-80">Pending</p>
+                                        <h2 class="text-h3 font-weight-bold text-white">{{ counts.pending }}</h2>
+                                        <v-chip color="rgba(255,255,255,0.2)" size="x-small" class="mt-2 text-white">
+                                            <v-icon start size="12">mdi-clock-outline</v-icon>
+                                            {{ getPercentage(counts.pending) }}% of total
+                                        </v-chip>
+                                    </div>
+                                    <v-avatar size="56" color="rgba(255,255,255,0.2)">
+                                        <v-icon size="32" color="white">mdi-clock-alert-outline</v-icon>
+                                    </v-avatar>
                                 </div>
-                            </div>
+                            </v-card-text>
                         </v-card>
                     </v-col>
-                    <v-col cols="6" md="3">
-                        <v-card class="pa-4" rounded="lg">
-                            <div class="d-flex align-center">
-                                <v-avatar color="info" size="48">
-                                    <v-icon color="white">mdi-progress-clock</v-icon>
-                                </v-avatar>
-                                <div class="ml-3">
-                                    <p class="text-grey text-caption mb-0">In Progress</p>
-                                    <h4 class="text-h5 font-weight-bold text-info">{{ counts.in_progress }}</h4>
+                    <v-col cols="12" sm="6" md="3">
+                        <v-card class="stat-card stat-card-info" rounded="xl" elevation="4">
+                            <div class="stat-card-overlay"></div>
+                            <v-card-text class="position-relative pa-4">
+                                <div class="d-flex align-center justify-space-between">
+                                    <div>
+                                        <p class="text-white text-caption mb-1 opacity-80">In Progress</p>
+                                        <h2 class="text-h3 font-weight-bold text-white">{{ counts.in_progress }}</h2>
+                                        <v-chip color="rgba(255,255,255,0.2)" size="x-small" class="mt-2 text-white">
+                                            <v-icon start size="12">mdi-run-fast</v-icon>
+                                            {{ getPercentage(counts.in_progress) }}% of total
+                                        </v-chip>
+                                    </div>
+                                    <v-avatar size="56" color="rgba(255,255,255,0.2)">
+                                        <v-icon size="32" color="white">mdi-progress-clock</v-icon>
+                                    </v-avatar>
                                 </div>
-                            </div>
+                            </v-card-text>
                         </v-card>
                     </v-col>
-                    <v-col cols="6" md="3">
-                        <v-card class="pa-4" rounded="lg">
-                            <div class="d-flex align-center">
-                                <v-avatar color="success" size="48">
-                                    <v-icon color="white">mdi-check-circle</v-icon>
-                                </v-avatar>
-                                <div class="ml-3">
-                                    <p class="text-grey text-caption mb-0">Completed</p>
-                                    <h4 class="text-h5 font-weight-bold text-success">{{ counts.completed }}</h4>
+                    <v-col cols="12" sm="6" md="3">
+                        <v-card class="stat-card stat-card-success" rounded="xl" elevation="4">
+                            <div class="stat-card-overlay"></div>
+                            <v-card-text class="position-relative pa-4">
+                                <div class="d-flex align-center justify-space-between">
+                                    <div>
+                                        <p class="text-white text-caption mb-1 opacity-80">Completed</p>
+                                        <h2 class="text-h3 font-weight-bold text-white">{{ counts.completed }}</h2>
+                                        <v-chip color="rgba(255,255,255,0.2)" size="x-small" class="mt-2 text-white">
+                                            <v-icon start size="12">mdi-check-all</v-icon>
+                                            {{ getPercentage(counts.completed) }}% success rate
+                                        </v-chip>
+                                    </div>
+                                    <v-avatar size="56" color="rgba(255,255,255,0.2)">
+                                        <v-icon size="32" color="white">mdi-check-circle-outline</v-icon>
+                                    </v-avatar>
                                 </div>
-                            </div>
+                            </v-card-text>
                         </v-card>
                     </v-col>
                 </v-row>
@@ -329,6 +355,8 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue';
 import { router } from '@inertiajs/vue3';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 const props = defineProps({
     reportData: { type: Array, default: () => [] },
@@ -350,6 +378,21 @@ const snackbarColor = ref('success');
 const reportsList = ref(props.reportData || []);
 const counts = ref(props.counts);
 
+// Admin initials for profile
+const adminInitials = computed(() => {
+    const userData = JSON.parse(localStorage.getItem('userData') || '{}');
+    if (userData.first_name && userData.last_name) {
+        return `${userData.first_name[0]}${userData.last_name[0]}`.toUpperCase();
+    }
+    return 'AD';
+});
+
+// Calculate percentage helper
+const getPercentage = (value) => {
+    if (!counts.value.total || counts.value.total === 0) return 0;
+    return Math.round((value / counts.value.total) * 100);
+};
+
 const timeFilters = [
     { label: 'Today', value: 'day' },
     { label: 'This Week', value: 'week' },
@@ -367,7 +410,7 @@ const statusFilters = [
 
 const headers = [
     { title: 'Code', key: 'rescue_code', width: '100px' },
-    { title: 'Name', key: 'name' },
+    { title: 'Reported By', key: 'name' },
     { title: 'Location', key: 'location' },
     { title: 'Time', key: 'time', width: '100px' },
     { title: 'Date', key: 'date', width: '120px' },
@@ -443,24 +486,97 @@ const viewDetails = (item) => {
     detailsDialog.value = true;
 };
 
-const exportReport = async () => {
+const exportToPDF = async () => {
     exporting.value = true;
     try {
-        // Generate CSV
-        const csvContent = generateCSV(filteredData.value);
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement('a');
-        const url = URL.createObjectURL(blob);
-        link.setAttribute('href', url);
-        link.setAttribute('download', `rescue_report_${new Date().toISOString().split('T')[0]}.csv`);
-        link.style.visibility = 'hidden';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        showSnackbar('Report exported successfully', 'success');
+        const doc = new jsPDF('p', 'mm', 'a4');
+        const pageWidth = doc.internal.pageSize.getWidth();
+        
+        // Header with gradient effect simulation
+        doc.setFillColor(25, 118, 210);
+        doc.rect(0, 0, pageWidth, 35, 'F');
+        
+        // Logo placeholder and title
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(22);
+        doc.setFont('helvetica', 'bold');
+        doc.text('PinPointMe - Rescue Reports', 14, 18);
+        
+        // Date and time
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        const reportDate = new Date().toLocaleDateString('en-US', { 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+        doc.text(`Generated: ${reportDate}`, 14, 28);
+        
+        // Time period filter
+        const periodText = timeFilter.value === 'day' ? 'Today' : 
+                          timeFilter.value === 'week' ? 'This Week' : 
+                          timeFilter.value === 'month' ? 'This Month' : 'This Year';
+        doc.text(`Period: ${periodText}`, pageWidth - 60, 28);
+        
+        // Table headers and data
+        const tableColumn = ['Code', 'Reported By', 'Location', 'Time', 'Date', 'Status', 'Urgency', 'Rescuer'];
+        const tableRows = filteredData.value.map(r => [
+            r.rescue_code || '',
+            r.name || '',
+            r.location || '',
+            r.time || '',
+            r.date || '',
+            formatStatus(r.status),
+            r.urgency_level || 'Medium',
+            r.rescuer_name || 'Unassigned'
+        ]);
+        
+        autoTable(doc, {
+            head: [tableColumn],
+            body: tableRows,
+            startY: 40,
+            theme: 'striped',
+            headStyles: {
+                fillColor: [25, 118, 210],
+                textColor: [255, 255, 255],
+                fontStyle: 'bold',
+                fontSize: 9
+            },
+            bodyStyles: {
+                fontSize: 8
+            },
+            alternateRowStyles: {
+                fillColor: [245, 245, 245]
+            },
+            // Remove columnStyles for portrait, let autoTable auto-fit columns
+            didDrawPage: function(data) {
+                // Footer
+                doc.setFontSize(8);
+                doc.setTextColor(128, 128, 128);
+                doc.text(
+                    `Page ${doc.internal.getNumberOfPages()}`,
+                    pageWidth / 2,
+                    doc.internal.pageSize.getHeight() - 10,
+                    { align: 'center' }
+                );
+                doc.text(
+                    'PinPointMe Emergency Response System',
+                    14,
+                    doc.internal.pageSize.getHeight() - 10
+                );
+            }
+        });
+        
+        // Save the PDF
+        const fileName = `rescue_report_${new Date().toISOString().split('T')[0]}.pdf`;
+        doc.save(fileName);
+        
+        showSnackbar('PDF report exported successfully!', 'success');
     } catch (error) {
-        console.error('Error exporting report:', error);
-        showSnackbar('Error exporting report', 'error');
+        console.error('Error exporting PDF:', error);
+        showSnackbar('Error exporting PDF. Please try again.', 'error');
     } finally {
         exporting.value = false;
     }
@@ -540,3 +656,50 @@ onMounted(() => {
     // Data comes from Inertia props
 });
 </script>
+
+<style scoped>
+/* Gradient App Bar */
+.gradient-app-bar {
+    background: linear-gradient(135deg, #1976D2 0%, #1565C0 50%, #0D47A1 100%) !important;
+}
+
+/* Stat Cards with Gradient Backgrounds */
+.stat-card {
+    position: relative;
+    overflow: hidden;
+}
+
+.stat-card-overlay {
+    position: absolute;
+    top: -50%;
+    right: -50%;
+    width: 100%;
+    height: 200%;
+    background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+    pointer-events: none;
+}
+
+.stat-card-primary {
+    background: linear-gradient(135deg, #1976D2 0%, #1565C0 50%, #0D47A1 100%) !important;
+}
+
+.stat-card-warning {
+    background: linear-gradient(135deg, #FB8C00 0%, #F57C00 50%, #EF6C00 100%) !important;
+}
+
+.stat-card-info {
+    background: linear-gradient(135deg, #00ACC1 0%, #0097A7 50%, #00838F 100%) !important;
+}
+
+.stat-card-success {
+    background: linear-gradient(135deg, #43A047 0%, #388E3C 50%, #2E7D32 100%) !important;
+}
+
+.opacity-80 {
+    opacity: 0.8;
+}
+
+.gap-2 {
+    gap: 8px;
+}
+</style>

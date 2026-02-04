@@ -438,9 +438,12 @@ class AuthController extends Controller
         }
 
         // Activate account and set new password
+        // For rescuers, set status to 'available'; for others, set to 'active'
+        $newStatus = $user->role === 'rescuer' ? 'available' : 'active';
+        
         $user->update([
             'password' => Hash::make($request->password),
-            'status' => 'active',
+            'status' => $newStatus,
             'otp_code' => null,
             'otp_expires_at' => null,
             'otp_verified' => true,
@@ -448,6 +451,48 @@ class AuthController extends Controller
             'force_password_change' => false, // Prevent double password change
             'password_changed_at' => Carbon::now(),
         ]);
+        
+        // Send congratulatory email
+        try {
+            Mail::send([], [], function ($message) use ($user) {
+                $message->to($user->email)
+                    ->subject('Welcome to PinPointMe - Account Activated!')
+                    ->html("
+                        <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;'>
+                            <div style='background: linear-gradient(135deg, #1976D2, #0D47A1); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;'>
+                                <h1 style='color: white; margin: 0;'>🎉 Welcome to PinPointMe!</h1>
+                            </div>
+                            <div style='background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;'>
+                                <h2 style='color: #2E7D32;'>Congratulations, {$user->first_name}!</h2>
+                                <p style='color: #333; line-height: 1.6;'>
+                                    Your account has been successfully activated. You're now ready to use the PinPointMe Emergency Response System.
+                                </p>
+                                <div style='background: #e8f5e9; border-left: 4px solid #4caf50; padding: 15px; margin: 20px 0; border-radius: 4px;'>
+                                    <p style='margin: 0; color: #2E7D32;'>
+                                        <strong>✓ Account Status:</strong> " . ucfirst($newStatus) . "<br>
+                                        <strong>✓ Email:</strong> {$user->email}<br>
+                                        <strong>✓ Role:</strong> " . ucfirst($user->role) . "
+                                    </p>
+                                </div>
+                                <p style='color: #333; line-height: 1.6;'>
+                                    You can now log in to the system and access all the features available to your role.
+                                </p>
+                                <div style='text-align: center; margin-top: 30px;'>
+                                    <a href='https://pinpointme.app/login' style='background: linear-gradient(135deg, #1976D2, #0D47A1); color: white; padding: 12px 30px; text-decoration: none; border-radius: 25px; font-weight: bold;'>
+                                        Login to PinPointMe
+                                    </a>
+                                </div>
+                                <p style='color: #666; font-size: 12px; margin-top: 30px; text-align: center;'>
+                                    If you have any questions, please contact support at support@sdca.edu.ph
+                                </p>
+                            </div>
+                        </div>
+                    ");
+            });
+        } catch (\Exception $e) {
+            // Log email error but don't fail the activation
+            \Log::error('Failed to send activation email: ' . $e->getMessage());
+        }
 
         return response()->json([
             'success' => true, 
@@ -982,14 +1027,65 @@ class AuthController extends Controller
         }
 
         // Update password and mark as changed
-        $user->update([
+        $updateData = [
             'password' => Hash::make($request->password),
             'force_password_change' => false,
             'password_changed_at' => Carbon::now(),
             'otp_code' => null,
             'otp_expires_at' => null,
             'otp_verified' => false,
-        ]);
+        ];
+        
+        // For rescuers, set status to 'available' after first password change
+        if ($user->role === 'rescuer' && ($user->status === 'pending' || $user->status === 'inactive' || !$user->password_changed_at)) {
+            $updateData['status'] = 'available';
+        }
+        
+        $user->update($updateData);
+        
+        // Send password change confirmation email
+        try {
+            $newStatus = $updateData['status'] ?? $user->status;
+            Mail::send([], [], function ($message) use ($user, $newStatus) {
+                $message->to($user->email)
+                    ->subject('Password Changed Successfully - PinPointMe')
+                    ->html("
+                        <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;'>
+                            <div style='background: linear-gradient(135deg, #1976D2, #0D47A1); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;'>
+                                <h1 style='color: white; margin: 0;'>🔐 Password Changed</h1>
+                            </div>
+                            <div style='background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;'>
+                                <h2 style='color: #1976D2;'>Hello, {$user->first_name}!</h2>
+                                <p style='color: #333; line-height: 1.6;'>
+                                    Your password has been successfully changed. You can now use your new password to log in to PinPointMe.
+                                </p>
+                                <div style='background: #e3f2fd; border-left: 4px solid #1976D2; padding: 15px; margin: 20px 0; border-radius: 4px;'>
+                                    <p style='margin: 0; color: #1565C0;'>
+                                        <strong>Account Details:</strong><br>
+                                        Email: {$user->email}<br>
+                                        Role: " . ucfirst($user->role) . "<br>
+                                        Status: " . ucfirst($newStatus) . "
+                                    </p>
+                                </div>
+                                <p style='color: #333; line-height: 1.6;'>
+                                    If you did not make this change, please contact support immediately.
+                                </p>
+                                <div style='text-align: center; margin-top: 30px;'>
+                                    <a href='https://pinpointme.app/login' style='background: linear-gradient(135deg, #1976D2, #0D47A1); color: white; padding: 12px 30px; text-decoration: none; border-radius: 25px; font-weight: bold;'>
+                                        Login Now
+                                    </a>
+                                </div>
+                                <p style='color: #666; font-size: 12px; margin-top: 30px; text-align: center;'>
+                                    This is an automated message from PinPointMe Emergency Response System
+                                </p>
+                            </div>
+                        </div>
+                    ");
+            });
+        } catch (\Exception $e) {
+            // Log email error but don't fail the password change
+            \Log::error('Failed to send password change email: ' . $e->getMessage());
+        }
 
         return response()->json([
             'success' => true, 
