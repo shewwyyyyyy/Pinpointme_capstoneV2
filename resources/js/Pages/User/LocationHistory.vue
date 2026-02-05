@@ -1,5 +1,5 @@
 <template>
-    <v-app class="app-container">
+    <v-app class="bg-user-gradient-light">
         <!-- Header - matches Dashboard style -->
         <div class="page-header">
             <div class="header-content">
@@ -21,6 +21,44 @@
 
         <v-main class="main-content">
             <v-container fluid class="pa-4">
+                <!-- Filter Tabs -->
+                <v-card class="mb-4" elevation="0" rounded="lg">
+                    <v-card-text class="pa-2">
+                        <v-tabs v-model="filter" bg-color="transparent" color="primary" density="compact">
+                            <v-tab value="all">
+                                <v-icon start size="16">mdi-history</v-icon>
+                                All
+                                <v-chip v-if="allCount > 0" size="x-small" class="ml-1">{{ allCount }}</v-chip>
+                            </v-tab>
+                            <v-tab value="pending">
+                                <v-icon start size="16">mdi-clock-outline</v-icon>
+                                Pending
+                                <v-chip v-if="pendingCount > 0" size="x-small" color="warning" class="ml-1">{{ pendingCount }}</v-chip>
+                            </v-tab>
+                            <v-tab value="rescued">
+                                <v-icon start size="16">mdi-check-circle</v-icon>
+                                Rescued
+                                <v-chip v-if="rescuedCount > 0" size="x-small" color="success" class="ml-1">{{ rescuedCount }}</v-chip>
+                            </v-tab>
+                        </v-tabs>
+                    </v-card-text>
+                </v-card>
+
+                <!-- Search Bar -->
+                <v-card class="mb-4" elevation="0" rounded="lg">
+                    <v-card-text class="pa-3">
+                        <v-text-field
+                            v-model="searchQuery"
+                            placeholder="Search by rescue code or location..."
+                            prepend-inner-icon="mdi-magnify"
+                            variant="outlined"
+                            density="compact"
+                            hide-details
+                            rounded
+                            clearable
+                        />
+                    </v-card-text>
+                </v-card>
                
 
                 <!-- Loading State -->
@@ -45,67 +83,101 @@
 
                 <!-- Location History List -->
                 <template v-else>
+                    <!-- Results Info -->
+                    <div class="d-flex justify-space-between align-center mb-3">
+                        <p class="text-body-2 text-grey ma-0">
+                            Showing {{ Math.min((currentPage - 1) * itemsPerPage + 1, filteredLocations.length) }}-{{ Math.min(currentPage * itemsPerPage, filteredLocations.length) }} of {{ filteredLocations.length }} results
+                        </p>
+                        <v-select
+                            v-model="itemsPerPage"
+                            :items="[5, 10, 15, 20]"
+                            density="compact"
+                            variant="outlined"
+                            hide-details
+                            style="max-width: 80px;"
+                        />
+                    </div>
+
                     <!-- History Cards -->
-                    <v-card
-                        v-for="location in filteredLocations"
-                        :key="location.id"
-                        class="mb-3"
-                        elevation="2"
-                        rounded="lg"
-                        @click="viewLocation(location)"
-                    >
-                        <v-card-text class="d-flex align-start">
-                            <!-- Status Icon -->
-                            <v-avatar
-                                :color="getStatusColor(location.status)"
-                                size="48"
-                                class="mr-3"
-                            >
-                                <v-icon color="white">
-                                    {{ location.isRescued ? 'mdi-check' : 'mdi-clock-outline' }}
-                                </v-icon>
-                            </v-avatar>
+                    <div class="history-cards-container">
+                        <v-card
+                            v-for="location in paginatedLocations"
+                            :key="location.id"
+                            class="location-card mb-3"
+                            elevation="2"
+                            rounded="lg"
+                            @click="viewLocation(location)"
+                        >
+                            <v-card-text class="card-content">
+                                <!-- Status Icon -->
+                                <v-avatar
+                                    :color="getStatusColor(location.status)"
+                                    size="48"
+                                    class="status-avatar"
+                                >
+                                    <v-icon color="white" size="20">
+                                        {{ location.isRescued ? 'mdi-check-circle' : 'mdi-clock-outline' }}
+                                    </v-icon>
+                                </v-avatar>
 
-                            <!-- Content -->
-                            <div class="flex-grow-1">
-                                <div class="d-flex justify-space-between align-start">
-                                    <div>
-                                        <h4 class="font-weight-bold">
-                                            {{ location.name || 'Rescue Request' }}
-                                        </h4>
-                                        <p class="text-caption text-grey mb-1">
-                                            {{ location.location || formatLocation(location) }}
-                                        </p>
+                                <!-- Content -->
+                                <div class="card-details">
+                                    <div class="card-header">
+                                        <div class="card-title-section">
+                                            <h4 class="location-title">
+                                                {{ location.name || 'Rescue Request' }}
+                                            </h4>
+                                            <p class="location-subtitle">
+                                                {{ location.location || formatLocation(location) }}
+                                            </p>
+                                        </div>
+                                        <v-chip
+                                            :color="getStatusColor(location.status)"
+                                            variant="flat"
+                                            size="small"
+                                            class="status-chip"
+                                        >
+                                            {{ location.status || (location.isRescued ? 'safe' : 'pending') }}
+                                        </v-chip>
                                     </div>
-                                    <v-chip
-                                        :color="getStatusColor(location.status)"
-                                        variant="tonal"
-                                        size="x-small"
-                                    >
-                                        {{ location.status || (location.isRescued ? 'Rescued' : 'Pending') }}
-                                    </v-chip>
+
+                                    <div class="card-footer">
+                                        <div class="time-info">
+                                            <v-icon size="14" class="mr-1" color="grey">mdi-clock-outline</v-icon>
+                                            <span class="time-text">
+                                                {{ formatDate(location.timestamp || location.created_at) }}
+                                            </span>
+                                        </div>
+                                        <v-chip
+                                            v-if="location.rescue_code"
+                                            size="small"
+                                            variant="outlined"
+                                            color="primary"
+                                            class="rescue-code-chip"
+                                        >
+                                            {{ location.rescue_code }}
+                                        </v-chip>
+                                    </div>
                                 </div>
 
-                                <div class="d-flex align-center mt-2">
-                                    <v-icon size="14" class="mr-1" color="grey">mdi-clock-outline</v-icon>
-                                    <span class="text-caption text-grey">
-                                        {{ formatDate(location.timestamp || location.created_at) }}
-                                    </span>
-                                    <v-chip
-                                        v-if="location.rescue_code"
-                                        size="x-small"
-                                        variant="outlined"
-                                        class="ml-2"
-                                    >
-                                        {{ location.rescue_code }}
-                                    </v-chip>
-                                </div>
-                            </div>
+                                <!-- Arrow Icon -->
+                                <v-icon color="grey-darken-1" class="chevron-icon">
+                                    mdi-chevron-right
+                                </v-icon>
+                            </v-card-text>
+                        </v-card>
+                    </div>
 
-                            <!-- Arrow Icon -->
-                            <v-icon color="grey" class="ml-2">
-                                mdi-chevron-right
-                            </v-icon>
+                    <!-- Pagination -->
+                    <v-card v-if="totalPages > 1" class="mt-4" elevation="0" rounded="lg">
+                        <v-card-text class="pa-2">
+                            <v-pagination
+                                v-model="currentPage"
+                                :length="totalPages"
+                                :total-visible="5"
+                                color="primary"
+                                class="pagination-component"
+                            />
                         </v-card-text>
                     </v-card>
                 </template>
@@ -126,7 +198,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { router } from '@inertiajs/vue3';
 import { getUserRescueHistory } from '@/Composables/useApi';
 import { useUnreadMessages } from '@/Composables/useUnreadMessages';
@@ -136,9 +208,14 @@ import UserBottomNav from '@/Components/Pages/User/Menu/UserBottomNav.vue';
 // State
 const drawer = ref(false);
 const filter = ref('all');
+const searchQuery = ref('');
 const locations = ref([]);
 const isLoading = ref(true);
 const error = ref('');
+
+// Pagination state
+const currentPage = ref(1);
+const itemsPerPage = ref(10);
 
 // Unread messages count for bottom nav
 const { unreadCount } = useUnreadMessages();
@@ -157,20 +234,59 @@ const currentUserId = computed(() => {
     return null;
 });
 
-// Filtered locations based on tab
+// Filtered locations based on tab and search
 const filteredLocations = computed(() => {
-    if (filter.value === 'all') {
-        return locations.value;
-    } else if (filter.value === 'pending') {
-        return locations.value.filter(
+    let filtered = locations.value;
+    
+    // Filter by tab
+    if (filter.value === 'pending') {
+        filtered = filtered.filter(
             (loc) => !loc.isRescued && !['rescued', 'safe', 'cancelled'].includes(loc.status)
         );
     } else if (filter.value === 'rescued') {
-        return locations.value.filter(
+        filtered = filtered.filter(
             (loc) => loc.isRescued || ['rescued', 'safe'].includes(loc.status)
         );
     }
-    return locations.value;
+    
+    // Filter by search query
+    if (searchQuery.value?.trim()) {
+        const query = searchQuery.value.toLowerCase().trim();
+        filtered = filtered.filter(loc => 
+            (loc.name?.toLowerCase().includes(query)) ||
+            (loc.location?.toLowerCase().includes(query)) ||
+            (loc.rescue_code?.toLowerCase().includes(query))
+        );
+    }
+    
+    return filtered;
+});
+
+// Count badges for tabs
+const allCount = computed(() => locations.value.length);
+const pendingCount = computed(() => 
+    locations.value.filter(loc => 
+        !loc.isRescued && !['rescued', 'safe', 'cancelled'].includes(loc.status)
+    ).length
+);
+const rescuedCount = computed(() => 
+    locations.value.filter(loc => 
+        loc.isRescued || ['rescued', 'safe'].includes(loc.status)
+    ).length
+);
+
+// Pagination
+const totalPages = computed(() => Math.ceil(filteredLocations.value.length / itemsPerPage.value));
+
+const paginatedLocations = computed(() => {
+    const start = (currentPage.value - 1) * itemsPerPage.value;
+    const end = start + itemsPerPage.value;
+    return filteredLocations.value.slice(start, end);
+});
+
+// Reset pagination when filter or search changes
+watch([filter, searchQuery], () => {
+    currentPage.value = 1;
 });
 
 onMounted(async () => {
@@ -275,18 +391,6 @@ const viewLocation = (location) => {
 </script>
 
 <style scoped>
-/* App Container */
-.app-container {
-    position: fixed !important;
-    top: 0 !important;
-    left: 0 !important;
-    right: 0 !important;
-    bottom: 0 !important;
-    width: 100vw !important;
-    height: 100vh !important;
-    overflow: hidden !important;
-}
-
 /* Header - matches Dashboard style */
 .page-header {
     position: sticky;
@@ -332,10 +436,130 @@ const viewLocation = (location) => {
 
 /* Main Content */
 .main-content {
-    background: linear-gradient(180deg, #e8f5f3 0%, #f5f9f8 50%, #ffffff 100%);
     height: 100%;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
+}
+
+/* History Cards Container */
+.history-cards-container {
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+/* Location Card */
+.location-card {
+    cursor: pointer;
+    transition: all 0.3s ease;
+    background: white;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.location-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15) !important;
+    border-color: rgba(54, 116, 181, 0.2);
+}
+
+.card-content {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    padding: 16px !important;
+}
+
+.status-avatar {
+    flex-shrink: 0;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.card-details {
+    flex: 1;
+    min-width: 0;
+}
+
+.card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 12px;
+    gap: 12px;
+}
+
+.card-title-section {
+    flex: 1;
+    min-width: 0;
+}
+
+.location-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #1a365d;
+    margin: 0 0 4px 0;
+    line-height: 1.3;
+}
+
+.location-subtitle {
+    font-size: 0.85rem;
+    color: #64748b;
+    margin: 0;
+    line-height: 1.4;
+}
+
+.status-chip {
+    font-weight: 600;
+    flex-shrink: 0;
+    text-transform: capitalize;
+}
+
+.card-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+}
+
+.time-info {
+    display: flex;
+    align-items: center;
+    color: #64748b;
+}
+
+.time-text {
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+
+.rescue-code-chip {
+    font-family: 'Courier New', monospace;
+    font-weight: 600;
+    font-size: 0.75rem;
+}
+
+.chevron-icon {
+    flex-shrink: 0;
+    opacity: 0.7;
+    transition: opacity 0.3s ease;
+}
+
+.location-card:hover .chevron-icon {
+    opacity: 1;
+}
+
+/* Pagination */
+.pagination-component {
+    margin: 0;
+}
+
+.pagination-component :deep(.v-pagination__item) {
+    min-width: 40px;
+    height: 40px;
+}
+
+.pagination-component :deep(.v-pagination__prev),
+.pagination-component :deep(.v-pagination__next) {
+    min-width: 40px;
+    height: 40px;
 }
 
 /* Desktop-only elements */
@@ -343,20 +567,94 @@ const viewLocation = (location) => {
     display: flex;
 }
 
-/* Responsive visibility */
+/* Responsive visibility and layout */
 @media (max-width: 1023px) {
     .desktop-only {
         display: none !important;
     }
     
     .main-content :deep(.v-container) {
-        padding-bottom: 80px !important;
+        padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 120px) !important;
+    }
+    
+    .card-content {
+        padding: 12px !important;
+        gap: 12px;
+    }
+    
+    .location-title {
+        font-size: 0.95rem;
+    }
+    
+    .location-subtitle {
+        font-size: 0.8rem;
+    }
+}
+
+@media (max-width: 600px) {
+    .main-content :deep(.v-container) {
+        padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 140px) !important;
+        padding-left: 12px !important;
+        padding-right: 12px !important;
+    }
+    
+    .card-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+    
+    .card-title-section {
+        width: 100%;
+    }
+    
+    .status-chip {
+        align-self: flex-start;
+    }
+    
+    .card-footer {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+    
+    .rescue-code-chip {
+        align-self: flex-end;
+    }
+    
+    .pagination-component :deep(.v-pagination__item) {
+        min-width: 36px;
+        height: 36px;
+    }
+    
+    .pagination-component :deep(.v-pagination__prev),
+    .pagination-component :deep(.v-pagination__next) {
+        min-width: 36px;
+        height: 36px;
     }
 }
 
 @media (min-width: 1024px) {
     .desktop-only {
         display: flex;
+    }
+    
+    .main-content :deep(.v-container) {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding-bottom: 40px !important;
+    }
+    
+    .location-card {
+        margin-bottom: 12px;
+    }
+    
+    .card-content {
+        padding: 20px !important;
+    }
+    
+    .location-title {
+        font-size: 1.1rem;
     }
 }
 </style>

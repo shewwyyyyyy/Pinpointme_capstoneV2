@@ -90,6 +90,23 @@ class AdminController extends Controller
     }
 
     /**
+     * Admin Profile page
+     */
+    public function profile(Request $request)
+    {
+        $user = $request->user();
+        
+        if ($request->expectsJson() || $request->is('api/*')) {
+            return response()->json([
+                'success' => true,
+                'data' => $user
+            ]);
+        }
+
+        return Inertia::render('Admin/Profile');
+    }
+
+    /**
      * Users management page
      */
     public function users(Request $request)
@@ -385,6 +402,9 @@ class AdminController extends Controller
             'phone' => 'nullable|string',
             'phone_number' => 'nullable|string',
             'contact_number' => 'nullable|string',
+            'student_id' => 'nullable|string|size:9',
+            'faculty_id' => 'nullable|string|size:9',
+            'staff_id' => 'nullable|string|size:9',
         ]);
 
         if ($validator->fails()) {
@@ -394,7 +414,22 @@ class AdminController extends Controller
         // Handle phone field from different sources (phone, phone_number, contact_number)
         $phoneValue = $request->phone ?? $request->phone_number ?? $request->contact_number ?? $user->phone;
         
-        $updateData = $request->only(['first_name', 'last_name', 'email', 'role', 'status', 'student_id']);
+        $updateData = $request->only(['first_name', 'last_name', 'email', 'role', 'status']);
+        
+        // Handle ID fields based on role - clean to only 9 digits
+        if ($request->has('student_id') && $request->student_id) {
+            $cleanedId = preg_replace('/\D/', '', $request->student_id);
+            $updateData['student_id'] = substr($cleanedId, 0, 9);
+        }
+        if ($request->has('faculty_id') && $request->faculty_id) {
+            $cleanedId = preg_replace('/\D/', '', $request->faculty_id);
+            $updateData['faculty_id'] = substr($cleanedId, 0, 9);
+        }
+        if ($request->has('staff_id') && $request->staff_id) {
+            $cleanedId = preg_replace('/\D/', '', $request->staff_id);
+            $updateData['staff_id'] = substr($cleanedId, 0, 9);
+        }
+        
         if ($phoneValue !== null) {
             $updateData['phone'] = $phoneValue;
         }

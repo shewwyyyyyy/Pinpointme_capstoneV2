@@ -40,60 +40,75 @@
             app
         >
             <v-list>
-                <v-list-item prepend-icon="mdi-view-dashboard" title="Dashboard" href="/admin/dashboard"></v-list-item>
-                <v-list-item prepend-icon="mdi-account-group" title="Users" href="/admin/users"></v-list-item>
-                <v-list-item prepend-icon="mdi-lifebuoy" title="Rescuers" href="/admin/rescuers" active></v-list-item>
-                <v-list-item prepend-icon="mdi-office-building" title="Buildings" href="/admin/buildings"></v-list-item>
-                <v-list-item prepend-icon="mdi-file-chart" title="Reports" href="/admin/reports"></v-list-item>
-                <v-list-item prepend-icon="mdi-shield-alert" title="Preventive Measures" href="/admin/preventive-measures"></v-list-item>
+                <v-list-item prepend-icon="mdi-view-dashboard" title="Dashboard" href="/admin/dashboard" @click="closeDrawerOnMobile"></v-list-item>
+                <v-list-item prepend-icon="mdi-account-group" title="Users" href="/admin/users" @click="closeDrawerOnMobile"></v-list-item>
+                <v-list-item prepend-icon="mdi-lifebuoy" title="Rescuers" href="/admin/rescuers" active @click="closeDrawerOnMobile"></v-list-item>
+                <v-list-item prepend-icon="mdi-office-building" title="Buildings" href="/admin/buildings" @click="closeDrawerOnMobile"></v-list-item>
+                <v-list-item prepend-icon="mdi-file-chart" title="Reports" href="/admin/reports" @click="closeDrawerOnMobile"></v-list-item>
+                <v-list-item prepend-icon="mdi-shield-alert" title="Preventive Measures" href="/admin/preventive-measures" @click="closeDrawerOnMobile"></v-list-item>
             </v-list>
         </v-navigation-drawer>
 
         <!-- Main Content -->
         <v-main>
-            <v-container fluid class="pa-6">
+            <v-container fluid :class="isMobile ? 'pa-3' : 'pa-6'">
                 <!-- Page Header -->
-                <div class="d-flex align-center mb-6">
-                    <div>
-                        <h1 class="text-h4 font-weight-bold gradient-text">Rescuer Management</h1>
-                        <p class="text-grey mt-1">To maintain security and compliance.</p>
+                <div class="page-header mb-4 mb-md-6">
+                    <div class="page-header-content">
+                        <h1 :class="isMobile ? 'text-h5' : 'text-h4'" class="font-weight-bold gradient-text">Rescuer Management</h1>
+                        <p class="text-grey mt-1 text-body-2">To maintain security and compliance.</p>
                     </div>
-                    <v-spacer />
-                    <v-menu offset-y>
-                        <template v-slot:activator="{ props }">
-                            <v-btn color="info" class="mr-4" v-bind="props">
-                                <v-icon start>mdi-file-export</v-icon>
-                                Export
-                                <v-icon end>mdi-chevron-down</v-icon>
-                            </v-btn>
-                        </template>
-                        <v-list>
-                            <v-list-item @click="exportRescuers('csv')" prepend-icon="mdi-file-delimited">
-                                <v-list-item-title>Export as CSV</v-list-item-title>
-                            </v-list-item>
-                            <v-list-item @click="exportRescuers('xlsx')" prepend-icon="mdi-file-excel">
-                                <v-list-item-title>Export as XLSX</v-list-item-title>
-                            </v-list-item>
-                        </v-list>
-                    </v-menu>
-                    <!-- Add Rescuer Button with Dropdown -->
-                    <v-menu>
-                        <template v-slot:activator="{ props }">
-                            <v-btn color="primary" v-bind="props" rounded="lg">
-                                <v-icon start>mdi-plus</v-icon>
-                                Add Rescuer
-                                <v-icon end>mdi-chevron-down</v-icon>
-                            </v-btn>
-                        </template>
-                        <v-list density="compact">
-                            <v-list-item @click="openAddDialog" prepend-icon="mdi-account-plus">
-                                <v-list-item-title>Add Single Rescuer</v-list-item-title>
-                            </v-list-item>
-                            <v-list-item @click="openBulkDialog" prepend-icon="mdi-account-multiple-plus">
-                                <v-list-item-title>Bulk Add Rescuers</v-list-item-title>
-                            </v-list-item>
-                        </v-list>
-                    </v-menu>
+                    <div class="page-header-actions">
+                        <v-menu offset-y>
+                            <template v-slot:activator="{ props }">
+                                <v-btn 
+                                    color="info" 
+                                    v-bind="props"
+                                    :size="isMobile ? 'small' : 'default'"
+                                    class="mr-2"
+                                >
+                                    <v-icon :start="!isMobile">mdi-file-export</v-icon>
+                                    <span v-if="!isMobile">Export</span>
+                                    <v-icon end size="small">mdi-chevron-down</v-icon>
+                                </v-btn>
+                            </template>
+                            <v-list>
+                                <v-list-item @click="exportRescuers('csv')" prepend-icon="mdi-file-delimited">
+                                    <v-list-item-title>Export as CSV</v-list-item-title>
+                                </v-list-item>
+                                <v-list-item @click="exportRescuers('xlsx')" prepend-icon="mdi-file-excel">
+                                    <v-list-item-title>Export as XLSX</v-list-item-title>
+                                </v-list-item>
+                                <v-list-item @click="exportRescuers('pdf')" prepend-icon="mdi-file-pdf-box">
+                                    <v-list-item-title>Export as PDF</v-list-item-title>
+                                </v-list-item>
+                            </v-list>
+                        </v-menu>
+                        <!-- Add Rescuer Button with Dropdown -->
+                        <v-menu>
+                            <template v-slot:activator="{ props }">
+                                <v-btn 
+                                    color="primary" 
+                                    v-bind="props" 
+                                    rounded="lg"
+                                    :size="isMobile ? 'small' : 'default'"
+                                >
+                                    <v-icon :start="!isMobile">mdi-plus</v-icon>
+                                    <span v-if="!isMobile">Add Rescuer</span>
+                                    <span v-else>Add</span>
+                                    <v-icon end size="small">mdi-chevron-down</v-icon>
+                                </v-btn>
+                            </template>
+                            <v-list density="compact">
+                                <v-list-item @click="openAddDialog" prepend-icon="mdi-account-plus">
+                                    <v-list-item-title>Add Single Rescuer</v-list-item-title>
+                                </v-list-item>
+                                <v-list-item @click="openBulkDialog" prepend-icon="mdi-account-multiple-plus">
+                                    <v-list-item-title>Bulk Add Rescuers</v-list-item-title>
+                                </v-list-item>
+                            </v-list>
+                        </v-menu>
+                    </div>
                 </div>
 
                 <!-- Status Cards -->
@@ -382,26 +397,71 @@
 
                 <!-- Recent Activity -->
                 <v-card rounded="lg" class="mt-6" elevation="2">
-                    <v-card-title class="d-flex align-center pa-4">
-                        <v-icon start color="primary">mdi-history</v-icon>
-                        <span class="font-weight-bold">Recent Activity</span>
+                    <v-card-title class="d-flex align-center justify-space-between pa-4">
+                        <div class="d-flex align-center">
+                            <v-icon start color="primary">mdi-history</v-icon>
+                            <span class="font-weight-bold">Recent Activity</span>
+                            <v-chip size="x-small" color="primary" class="ml-2">{{ auditTrail.length }}</v-chip>
+                        </div>
+                        <v-btn 
+                            v-if="auditTrail.length > 0"
+                            variant="text" 
+                            size="small" 
+                            color="primary"
+                            @click="activityExpanded = !activityExpanded"
+                        >
+                            {{ activityExpanded ? 'Collapse' : 'Expand' }}
+                            <v-icon end>{{ activityExpanded ? 'mdi-chevron-up' : 'mdi-chevron-down' }}</v-icon>
+                        </v-btn>
                     </v-card-title>
                     <v-divider></v-divider>
                     <v-card-text class="pa-4">
-                        <v-timeline v-if="auditTrail.length > 0" density="compact" side="end">
-                            <v-timeline-item
-                                v-for="audit in auditTrail.slice(0, 10)"
-                                :key="audit.id"
-                                :dot-color="getAuditColor(audit.action)"
+                        <div v-if="auditTrail.length > 0">
+                            <v-timeline density="compact" side="end">
+                                <v-timeline-item
+                                    v-for="audit in paginatedAuditTrail"
+                                    :key="audit.id"
+                                    :dot-color="getAuditColor(audit.action)"
+                                    size="small"
+                                >
+                                    <template v-slot:icon>
+                                        <v-icon size="12" color="white">{{ getAuditIcon(audit.action) }}</v-icon>
+                                    </template>
+                                    <v-card variant="tonal" :color="getAuditColor(audit.action)" density="compact" class="mb-1">
+                                        <v-card-text class="pa-2">
+                                            <div class="d-flex align-center justify-space-between">
+                                                <p class="font-weight-medium mb-0 text-body-2">{{ audit.description || audit.action }}</p>
+                                                <v-chip size="x-small" :color="getAuditColor(audit.action)" variant="flat">
+                                                    {{ formatAction(audit.action) }}
+                                                </v-chip>
+                                            </div>
+                                            <p class="text-caption text-grey mt-1 mb-0">
+                                                <v-icon size="12" class="mr-1">mdi-clock-outline</v-icon>
+                                                {{ formatDateTime(audit.created_at) }}
+                                            </p>
+                                        </v-card-text>
+                                    </v-card>
+                                </v-timeline-item>
+                            </v-timeline>
+                            
+                            <!-- Pagination for Activity -->
+                            <v-pagination
+                                v-if="totalActivityPages > 1"
+                                v-model="activityPage"
+                                :length="totalActivityPages"
+                                :total-visible="5"
+                                density="comfortable"
+                                rounded="circle"
+                                class="mt-4"
                                 size="small"
-                            >
-                                <div>
-                                    <p class="font-weight-medium mb-0">{{ audit.description || audit.action }}</p>
-                                    <p class="text-caption text-grey">{{ formatDateTime(audit.created_at) }}</p>
-                                </div>
-                            </v-timeline-item>
-                        </v-timeline>
+                            ></v-pagination>
+                            
+                            <p v-if="auditTrail.length > 0" class="text-caption text-center text-grey mt-2 mb-0">
+                                Showing {{ activityStartIndex + 1 }}-{{ activityEndIndex }} of {{ auditTrail.length }} activities
+                            </p>
+                        </div>
                         <v-alert v-else type="info" variant="tonal" rounded="lg">
+                            <v-icon start>mdi-information-outline</v-icon>
                             No recent activity
                         </v-alert>
                     </v-card-text>
@@ -461,6 +521,10 @@
                             label="Phone Number"
                             variant="outlined"
                             density="compact"
+                            :rules="[rules.phoneNumber]"
+                            hint="Mobile number (e.g., 09171234567)"
+                            persistent-hint
+                            placeholder="09171234567"
                             class="mb-3"
                         />
                         
@@ -772,14 +836,36 @@ const isMobile = computed(() => mobile.value);
 const isDark = ref(false);
 const toggleDarkMode = () => {
     isDark.value = !isDark.value;
-    document.documentElement.classList.toggle('v-theme--dark', isDark.value);
+    
+    // Apply theme to document
+    if (isDark.value) {
+        document.documentElement.classList.add('v-theme--dark');
+        document.documentElement.classList.remove('v-theme--light');
+        document.documentElement.setAttribute('data-theme', 'dark');
+    } else {
+        document.documentElement.classList.add('v-theme--light');
+        document.documentElement.classList.remove('v-theme--dark');
+        document.documentElement.setAttribute('data-theme', 'light');
+    }
+    
+    // Save preference to localStorage
+    localStorage.setItem('darkMode', isDark.value.toString());
+    
+    showSnackbar(`Switched to ${isDark.value ? 'dark' : 'light'} mode`, 'info');
 };
 const goToProfile = () => {
     window.location.href = '/admin/profile';
 };
+const closeDrawerOnMobile = () => {
+    if (isMobile.value) {
+        drawer.value = false;
+    }
+};
 import { ref, computed, onMounted } from 'vue';
 import * as XLSX from 'xlsx';
 import { getProfilePictureUrl } from '@/Composables/useApi';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 const props = defineProps({
     rescuers: { type: Object, default: () => ({ data: [] }) },
@@ -788,7 +874,7 @@ const props = defineProps({
 });
 
 // State
-const drawer = ref(true);
+const drawer = ref(!mobile.value);
 const currentPage = ref('rescuers');
 const loading = ref(false);
 const dialog = ref(false);
@@ -826,21 +912,44 @@ const manualBulkData = ref([{ first_name: '', last_name: '', email: '', phone: '
 // Data
 // Export rescuers as CSV, XLSX, or PDF
 const exportRescuers = (format = 'csv') => {
-    const data = rescuersList.value.map(r => ({
-        'First Name': r.first_name,
-        'Last Name': r.last_name,
-        'Email': r.email,
-        'Phone': r.phone || '',
-        'Status': r.status,
-        'Created': r.created_at
-    }));
-    const worksheet = XLSX.utils.json_to_sheet(data);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Rescuers');
-    if (format === 'csv') {
-        XLSX.writeFile(workbook, 'rescuers_export.csv');
+    if (format === 'pdf') {
+        // Export as PDF using jsPDF
+        const doc = new jsPDF();
+        const headers = ['First Name', 'Last Name', 'Email', 'Phone', 'Status', 'Created'];
+        const data = rescuersList.value.map(r => [
+            r.first_name,
+            r.last_name,
+            r.email,
+            r.phone || '',
+            r.status,
+            r.created_at
+        ]);
+        autoTable(doc, {
+            head: [headers],
+            body: data,
+            styles: { fontSize: 8 },
+            headStyles: { fillColor: [33, 150, 243] },
+            margin: { top: 20 }
+        });
+        doc.save('rescuers_export.pdf');
     } else {
-        XLSX.writeFile(workbook, 'rescuers_export.xlsx');
+        // Export as CSV or XLSX
+        const data = rescuersList.value.map(r => ({
+            'First Name': r.first_name,
+            'Last Name': r.last_name,
+            'Email': r.email,
+            'Phone': r.phone || '',
+            'Status': r.status,
+            'Created': r.created_at
+        }));
+        const worksheet = XLSX.utils.json_to_sheet(data);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'Rescuers');
+        if (format === 'csv') {
+            XLSX.writeFile(workbook, 'rescuers_export.csv');
+        } else {
+            XLSX.writeFile(workbook, 'rescuers_export.xlsx');
+        }
     }
 };
 
@@ -875,6 +984,11 @@ const rescuersList = ref(props.rescuers?.data || []);
 const counts = ref(props.counts);
 const auditTrail = ref(props.auditTrail || []);
 
+// Activity pagination
+const activityPage = ref(1);
+const activityPerPage = ref(5);
+const activityExpanded = ref(false);
+
 const formData = ref({
     first_name: '',
     last_name: '',
@@ -882,6 +996,23 @@ const formData = ref({
     phone: '',
     status: 'available'
 });
+
+// Validation rules
+const rules = {
+    required: (v) => !!v || 'Required',
+    // Phone number validation
+    phoneNumber: (v) => {
+        if (!v) return true; // Optional field
+        const cleaned = v.replace(/[\s\-\(\)]/g, '');
+        
+        // Must start with 09 and have exactly 11 digits
+        if (!/^09[0-9]{9}$/.test(cleaned)) {
+            return 'Please enter a valid mobile number (e.g., 09171234567)';
+        }
+        
+        return true;
+    }
+};
 
 // Computed
 const adminInitials = computed(() => {
@@ -891,6 +1022,23 @@ const adminInitials = computed(() => {
         return `${userData.first_name[0]}${userData.last_name[0]}`.toUpperCase();
     }
     return 'AD';
+});
+
+// Activity pagination computed
+const totalActivityPages = computed(() => {
+    return Math.ceil(auditTrail.value.length / activityPerPage.value);
+});
+
+const activityStartIndex = computed(() => {
+    return (activityPage.value - 1) * activityPerPage.value;
+});
+
+const activityEndIndex = computed(() => {
+    return Math.min(activityStartIndex.value + activityPerPage.value, auditTrail.value.length);
+});
+
+const paginatedAuditTrail = computed(() => {
+    return auditTrail.value.slice(activityStartIndex.value, activityEndIndex.value);
 });
 
 // Table headers
@@ -1010,6 +1158,15 @@ const viewProfile = (rescuer) => {
 };
 
 const saveRescuer = async () => {
+    // Validate phone number if provided
+    if (formData.value.phone) {
+        const phoneValidation = rules.phoneNumber(formData.value.phone);
+        if (phoneValidation !== true) {
+            showSnackbar(phoneValidation, 'error');
+            return;
+        }
+    }
+    
     saving.value = true;
     try {
         const url = isEditing.value ? `/admin/rescuers/${selectedRescuer.value.id}` : '/admin/rescuers';
@@ -1335,8 +1492,45 @@ const getAuditColor = (action) => {
     return colors[action] || 'grey';
 };
 
+const getAuditIcon = (action) => {
+    const icons = { 
+        create: 'mdi-plus', 
+        update: 'mdi-pencil', 
+        delete: 'mdi-delete',
+        login: 'mdi-login',
+        logout: 'mdi-logout'
+    };
+    return icons[action] || 'mdi-information';
+};
+
+const formatAction = (action) => {
+    const labels = { 
+        create: 'Created', 
+        update: 'Updated', 
+        delete: 'Deleted',
+        login: 'Login',
+        logout: 'Logout'
+    };
+    return labels[action] || action;
+};
+
 onMounted(() => {
     // Data comes from Inertia props
+    
+    // Initialize dark mode from localStorage
+    const savedDarkMode = localStorage.getItem('darkMode');
+    if (savedDarkMode !== null) {
+        isDark.value = savedDarkMode === 'true';
+        if (isDark.value) {
+            document.documentElement.classList.add('v-theme--dark');
+            document.documentElement.classList.remove('v-theme--light');
+            document.documentElement.setAttribute('data-theme', 'dark');
+        } else {
+            document.documentElement.classList.add('v-theme--light');
+            document.documentElement.classList.remove('v-theme--dark');
+            document.documentElement.setAttribute('data-theme', 'light');
+        }
+    }
 });
 </script>
 
@@ -1382,5 +1576,43 @@ onMounted(() => {
 
 .gap-3 {
     gap: 12px;
+}
+
+/* Page Header Responsive Styles */
+.page-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.page-header-content {
+    flex: 1;
+    min-width: 200px;
+}
+
+.page-header-actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+/* Mobile Specific Styles */
+@media (max-width: 600px) {
+    .page-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .page-header-content {
+        width: 100%;
+    }
+    
+    .page-header-actions {
+        width: 100%;
+        justify-content: flex-end;
+    }
 }
 </style>

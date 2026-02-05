@@ -50,6 +50,12 @@ class User extends Authenticatable
         'blood_type',
         'allergies',
         'medical_conditions',
+        'must_update_profile',
+        'google_id',
+        'google_token',
+        'contact_number',
+        'email_verified_at',
+        'emergency_contact_relationship',
     ];
 
     /**
@@ -70,6 +76,7 @@ class User extends Authenticatable
     protected $appends = [
         'phone_number',
         'contact_number',
+        'id_number',
     ];
 
     /**
@@ -117,5 +124,46 @@ class User extends Authenticatable
     public function setContactNumberAttribute($value)
     {
         $this->attributes['phone'] = $value;
+    }
+
+    // Accessor for id_number (returns student_id, faculty_id, or staff_id based on role)
+    public function getIdNumberAttribute()
+    {
+        if ($this->role === 'student' && $this->student_id) {
+            return $this->student_id;
+        } elseif (in_array($this->role, ['faculty', 'admin', 'rescuer']) && $this->faculty_id) {
+            return $this->faculty_id;
+        } elseif ($this->staff_id) {
+            return $this->staff_id;
+        }
+        // Return any available ID
+        return $this->student_id ?? $this->faculty_id ?? $this->staff_id ?? null;
+    }
+
+    // Mutator for id_number (sets appropriate ID field based on role or ID pattern)
+    public function setIdNumberAttribute($value)
+    {
+        if (!$value) return;
+        
+        // If exactly 9 digits, determine role from ID
+        if (preg_match('/^\d{9}$/', $value)) {
+            $firstDigit = $value[0];
+            
+            // If starts with digit 2, it's a student
+            if ($firstDigit === '2') {
+                $this->attributes['student_id'] = $value;
+                // Optionally update role if not already set
+                if (!isset($this->attributes['role']) || empty($this->attributes['role'])) {
+                    $this->attributes['role'] = 'student';
+                }
+            } else {
+                // Otherwise (starts with 1,3,4,5,6,7,8,9), it's faculty
+                $this->attributes['faculty_id'] = $value;
+                // Optionally update role if not already set
+                if (!isset($this->attributes['role']) || empty($this->attributes['role'])) {
+                    $this->attributes['role'] = 'faculty';
+                }
+            }
+        }
     }
 }

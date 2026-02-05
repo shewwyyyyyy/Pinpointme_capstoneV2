@@ -30,6 +30,16 @@ Route::post('/verify-otp', [AuthController::class, 'verifyOtp']); // Alias for a
 Route::post('/resend-otp', [AuthController::class, 'resendOtp']);
 Route::post('/activate-account', [AuthController::class, 'activateAccount']);
 
+// Registration Routes
+Route::post('/auth/register-send-otp', [AuthController::class, 'registerSendOtp']);
+Route::post('/auth/register-verify-otp', [AuthController::class, 'registerVerifyOtp']);
+Route::post('/auth/register-complete', [AuthController::class, 'registerComplete']);
+
+// Password Change Routes  
+Route::post('/auth/send-password-change-otp', [AuthController::class, 'sendPasswordChangeOtp']);
+Route::post('/auth/verify-password-change-otp', [AuthController::class, 'verifyPasswordChangeOtp']);
+Route::post('/auth/complete-password-change', [AuthController::class, 'completePasswordChange']);
+
 Route::get('/user', function (Request $request) {
     return $request->user();
 })->middleware('auth:sanctum');
@@ -71,6 +81,8 @@ Route::get('/floors/{floor}', [FloorController::class, 'show']);
 // Rooms API
 Route::get('/rooms', [RoomController::class, 'index']);
 Route::get('/rooms/{room}', [RoomController::class, 'show']);
+Route::put('/rooms/{room}/qr-code', [RoomController::class, 'updateQrCode']);
+Route::post('/rooms/validate-qr', [RoomController::class, 'validateQrCode']);
 
 // Rescue Requests API
 Route::get('/rescue-requests', [RescueRequestController::class, 'index']);

@@ -60,12 +60,12 @@
                     <div class="person-info">
                         <v-avatar 
                             size="56" 
-                            :color="requesterProfilePicture && !isReportingForOthers ? 'transparent' : 'primary'"
+                            :color="requesterProfilePicture ? 'transparent' : 'primary'"
                             class="person-avatar"
-                            @click="requesterProfilePicture && !isReportingForOthers && openPhotoViewer(requesterProfilePicture, getRequesterFullName())"
+                            @click="requesterProfilePicture && openPhotoViewer(requesterProfilePicture, getRequesterFullName())"
                         >
                             <v-img 
-                                v-if="requesterProfilePicture && !isReportingForOthers" 
+                                v-if="requesterProfilePicture" 
                                 :src="requesterProfilePicture" 
                                 cover 
                             />
@@ -133,7 +133,7 @@
                 </div>
 
                 <!-- Additional Info Card -->
-                <div v-if="rescueRequest.people_count || rescueRequest.mobility_status || rescueRequest.injuries || hasMediaAttachments" class="info-card additional-card">
+                <div v-if="rescueRequest.people_count || rescueRequest.mobility_status || rescueRequest.injuries || hasMediaAttachments || hasMedicalInfo || hasEmergencyContact" class="info-card additional-card">
                     <div class="card-header">
                         <v-icon size="20" color="info">mdi-clipboard-list</v-icon>
                         <span>Additional Information</span>
@@ -152,7 +152,88 @@
                             {{ rescueRequest.injuries }}
                         </v-chip>
                     </div>
+
+                    <!-- Medical Information Section -->
+                    <div v-if="hasMedicalInfo" class="medical-section">
+                        <div class="medical-section-header">
+                            <v-icon size="16" color="red">mdi-medical-bag</v-icon>
+                            <span>Medical Information</span>
+                        </div>
+                        <div class="medical-info">
+                            <div v-if="rescueRequest.requester?.blood_type" class="medical-item">
+                                <div class="medical-icon blood">
+                                    <v-icon size="18" color="white">mdi-blood-bag</v-icon>
+                                </div>
+                                <div class="medical-details">
+                                    <span class="medical-label">Blood Type</span>
+                                    <span class="medical-value">{{ rescueRequest.requester.blood_type }}</span>
+                                </div>
+                            </div>
+                            <div v-if="rescueRequest.requester?.allergies" class="medical-item">
+                                <div class="medical-icon allergy">
+                                    <v-icon size="18" color="white">mdi-allergy</v-icon>
+                                </div>
+                                <div class="medical-details">
+                                    <span class="medical-label">Allergies</span>
+                                    <span class="medical-value warning">{{ rescueRequest.requester.allergies }}</span>
+                                </div>
+                            </div>
+                            <div v-if="rescueRequest.requester?.medical_conditions" class="medical-item">
+                                <div class="medical-icon condition">
+                                    <v-icon size="18" color="white">mdi-pill</v-icon>
+                                </div>
+                                <div class="medical-details">
+                                    <span class="medical-label">Medical Conditions</span>
+                                    <span class="medical-value">{{ rescueRequest.requester.medical_conditions }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                     
+                    <!-- Emergency Contact Section -->
+                    <div v-if="hasEmergencyContact" class="emergency-section">
+                        <div class="emergency-section-header">
+                            <v-icon size="16" color="orange-darken-2">mdi-phone-alert</v-icon>
+                            <span>Emergency Contact</span>
+                        </div>
+                        <div class="emergency-info">
+                            <div class="emergency-item">
+                                <div class="medical-icon" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);">
+                                    <v-icon size="18" color="white">mdi-account-alert</v-icon>
+                                </div>
+                                <div class="medical-details">
+                                    <span class="medical-label">Contact Name</span>
+                                    <span class="medical-value">
+                                        {{ rescueRequest.requester?.emergency_contact_name || 'N/A' }}
+                                        <span v-if="rescueRequest.requester?.emergency_contact_relation" class="text-grey text-caption">
+                                            ({{ rescueRequest.requester.emergency_contact_relation }})
+                                        </span>
+                                    </span>
+                                </div>
+                            </div>
+                            <div v-if="rescueRequest.requester?.emergency_contact_phone" class="emergency-item">
+                                <div class="medical-icon" style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);">
+                                    <v-icon size="18" color="white">mdi-phone</v-icon>
+                                </div>
+                                <div class="medical-details">
+                                    <span class="medical-label">Phone Number</span>
+                                    <div class="d-flex align-center gap-2">
+                                        <span class="medical-value">{{ rescueRequest.requester.emergency_contact_phone }}</span>
+                                        <v-btn
+                                            icon
+                                            size="x-small"
+                                            variant="tonal"
+                                            color="success"
+                                            @click="callEmergencyContact"
+                                        >
+                                            <v-icon size="14">mdi-phone</v-icon>
+                                        </v-btn>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Media Attachments Section -->
                     <div v-if="hasMediaAttachments" class="media-section">
                         <div class="media-section-header">
@@ -230,26 +311,16 @@
                             <v-icon start size="24">mdi-shield-check</v-icon>
                             Mark as Safe
                         </v-btn>
-                        <div class="secondary-actions">
-                            <v-btn
-                                variant="outlined"
-                                color="primary"
-                                @click="openChat"
-                                class="secondary-btn"
-                            >
-                                <v-icon start>mdi-message-text</v-icon>
-                                Message User
-                            </v-btn>
-                            <v-btn
-                                variant="outlined"
-                                color="grey"
-                                @click="viewMap"
-                                class="secondary-btn"
-                            >
-                                <v-icon start>mdi-map-marker</v-icon>
-                                View Map
-                            </v-btn>
-                        </div>
+                        <v-btn
+                            variant="outlined"
+                            color="primary"
+                            block
+                            @click="openChat"
+                            class="secondary-btn"
+                        >
+                            <v-icon start>mdi-message-text</v-icon>
+                            Message User
+                        </v-btn>
                     </div>
 
                     <!-- Completed Status -->
@@ -374,59 +445,12 @@
                             <v-list-item-title class="text-body-2">Phone</v-list-item-title>
                             <v-list-item-subtitle>{{ rescueRequest?.requester?.phone || rescueRequest?.contact_number }}</v-list-item-subtitle>
                         </v-list-item>
-                        <v-list-item v-if="rescueRequest?.requester?.blood_type">
-                            <template v-slot:prepend>
-                                <v-icon color="red" size="20">mdi-blood-bag</v-icon>
-                            </template>
-                            <v-list-item-title class="text-body-2">Blood Type</v-list-item-title>
-                            <v-list-item-subtitle>{{ rescueRequest?.requester?.blood_type }}</v-list-item-subtitle>
-                        </v-list-item>
-                        <v-list-item v-if="rescueRequest?.requester?.allergies">
-                            <template v-slot:prepend>
-                                <v-icon color="orange" size="20">mdi-allergy</v-icon>
-                            </template>
-                            <v-list-item-title class="text-body-2">Allergies</v-list-item-title>
-                            <v-list-item-subtitle>{{ rescueRequest?.requester?.allergies }}</v-list-item-subtitle>
-                        </v-list-item>
-                        <v-list-item v-if="rescueRequest?.requester?.medical_conditions">
-                            <template v-slot:prepend>
-                                <v-icon color="blue" size="20">mdi-pill</v-icon>
-                            </template>
-                            <v-list-item-title class="text-body-2">Medical Conditions</v-list-item-title>
-                            <v-list-item-subtitle>{{ rescueRequest?.requester?.medical_conditions }}</v-list-item-subtitle>
-                        </v-list-item>
-                        <v-list-item v-if="rescueRequest?.requester?.emergency_contact_name">
-                            <template v-slot:prepend>
-                                <v-icon color="error" size="20">mdi-phone-in-talk</v-icon>
-                            </template>
-                            <v-list-item-title class="text-body-2">Emergency Contact</v-list-item-title>
-                            <v-list-item-subtitle>
-                                {{ rescueRequest?.requester?.emergency_contact_name }}
-                                <span v-if="rescueRequest?.requester?.emergency_contact_relation" class="text-grey">
-                                    ({{ rescueRequest?.requester?.emergency_contact_relation }})
-                                </span>
-                            </v-list-item-subtitle>
-                            <v-list-item-subtitle v-if="rescueRequest?.requester?.emergency_contact_phone" class="mt-1">
-                                <v-icon size="12" class="mr-1">mdi-phone</v-icon>
-                                {{ rescueRequest?.requester?.emergency_contact_phone }}
-                            </v-list-item-subtitle>
-                        </v-list-item>
                     </v-list>
                 </v-card-text>
                 <v-divider />
                 <v-card-actions>
                     <v-spacer />
                     <v-btn variant="text" @click="showUserProfile = false">Close</v-btn>
-                    <v-btn
-                        v-if="rescueRequest?.requester?.emergency_contact_phone"
-                        color="error"
-                        variant="tonal"
-                        prepend-icon="mdi-phone-alert"
-                        @click="callEmergencyContact"
-                        size="small"
-                    >
-                        Emergency
-                    </v-btn>
                     <v-btn
                         v-if="rescueRequest?.requester?.phone || rescueRequest?.contact_number"
                         color="success"
@@ -973,7 +997,27 @@ const callEmergencyContact = () => {
 };
 
 const goBack = () => {
-    router.visit('/rescuer/dashboard');
+    // Check if there's a 'from' query parameter to determine which tab to return to
+    const urlParams = new URLSearchParams(window.location.search);
+    const from = urlParams.get('from');
+    
+    if (from === 'inProgress') {
+        router.visit('/rescuer/dashboard?tab=inProgress');
+    } else if (from === 'pending') {
+        router.visit('/rescuer/dashboard?tab=pending');
+    } else if (from === 'rescued') {
+        router.visit('/rescuer/dashboard?tab=rescued');
+    } else {
+        // Default: determine tab based on current rescue status
+        const status = rescueRequest.value?.status;
+        if (['assigned', 'in_progress', 'en_route', 'on_scene'].includes(status)) {
+            router.visit('/rescuer/dashboard?tab=inProgress');
+        } else if (['rescued', 'safe', 'completed'].includes(status)) {
+            router.visit('/rescuer/dashboard?tab=rescued');
+        } else {
+            router.visit('/rescuer/dashboard?tab=pending');
+        }
+    }
 };
 
 // Helper methods
@@ -1199,7 +1243,7 @@ onUnmounted(() => {
 
 /* Main Content */
 .rescue-main {
-    padding-bottom: 100px;
+    padding-bottom: 200px;
     background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
     min-height: 100vh;
 }
@@ -1462,6 +1506,25 @@ onUnmounted(() => {
     margin-bottom: 12px;
 }
 
+/* Medical Section within Additional Info */
+.medical-section {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid #e2e8f0;
+}
+
+.medical-section-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 12px;
+}
+
 /* Media Attachments */
 .medical-card {
     border-left: 4px solid #e53935;
@@ -1557,13 +1620,7 @@ onUnmounted(() => {
     background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%) !important;
 }
 
-.secondary-actions {
-    display: flex;
-    gap: 12px;
-}
-
 .secondary-btn {
-    flex: 1;
     height: 48px !important;
     border-radius: 14px !important;
     font-weight: 600 !important;
@@ -1599,6 +1656,37 @@ onUnmounted(() => {
     color: #22c55e;
     font-size: 0.95rem;
     font-weight: 500;
+}
+
+/* Emergency Contact Section */
+.emergency-section {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid #e2e8f0;
+}
+
+.emergency-section-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 12px;
+}
+
+.emergency-info {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.emergency-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
 }
 
 /* Media Attachments */
@@ -1738,14 +1826,6 @@ onUnmounted(() => {
     .main-action-btn {
         height: 54px !important;
         font-size: 1rem !important;
-    }
-    
-    .secondary-actions {
-        flex-direction: column;
-    }
-    
-    .secondary-btn {
-        width: 100%;
     }
     
     .media-grid {

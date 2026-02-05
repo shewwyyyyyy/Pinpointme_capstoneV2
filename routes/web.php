@@ -40,6 +40,12 @@ Route::middleware(['guest'])->group(function () {
             'email' => request('email', ''),
         ]);
     })->name('verify.account');
+    
+    // Google OAuth routes
+    Route::get('/auth/google', [AuthController::class, 'redirectToGoogle'])->name('auth.google');
+    Route::get('/auth/google/callback', [AuthController::class, 'handleGoogleCallback'])->name('auth.google.callback');
+    Route::get('/auth/google/complete', [AuthController::class, 'showGoogleComplete'])->name('auth.google.complete');
+    Route::post('/auth/google/complete', [AuthController::class, 'completeGoogleRegistration']);
 });
 
 Route::post('/login', [AuthController::class, 'login']);
@@ -272,6 +278,9 @@ Route::middleware(['auth'])->group(function () {
     Route::prefix('admin')->name('admin.')->group(function () {
         // Dashboard with analytics
         Route::get('/dashboard', [AdminController::class, 'dashboard'])->name('dashboard');
+        
+        // Admin Profile
+        Route::get('/profile', [AdminController::class, 'profile'])->name('profile');
         
         // Users management
         Route::get('/users', [AdminController::class, 'users'])->name('users');

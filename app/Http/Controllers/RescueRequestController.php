@@ -91,6 +91,22 @@ class RescueRequestController extends Controller
             return redirect()->back()->with('error', $validator->errors()->first());
         }
 
+        // Check if user must complete profile first
+        if (isset($data['user_id'])) {
+            $user = \App\Models\User::find($data['user_id']);
+            if ($user && $this->userMustUpdateProfile($user)) {
+                if ($request->expectsJson() || $request->is('api/*')) {
+                    return response()->json([
+                        'success' => false,
+                        'must_update_profile' => true,
+                        'message' => 'You must complete your profile information before you can submit emergency reports. Please update your personal information, emergency contact, and medical details.'
+                    ], 400);
+                }
+                
+                return redirect()->back()->with('error', 'You must complete your profile information before you can submit emergency reports.');
+            }
+        }
+
         $data['rescue_code'] = $this->generateUniqueRescueCode();
         $data['status'] = $data['status'] ?? 'pending';
 
@@ -478,5 +494,37 @@ class RescueRequestController extends Controller
         } while (RescueRequest::where('rescue_code', $code)->exists());
 
         return $code;
+    }
+
+    /**
+     * Check if user must update profile before creating rescue request
+     *
+     * @param \App\Models\User $user
+     * @return bool
+     */
+    private function userMustUpdateProfile($user): bool
+    {
+        // Check if user has must_update_profile flag (from registration)
+        if (\Schema::hasColumn('users', 'must_update_profile') && $user->must_update_profile) {
+            return true;
+        }
+
+        // Check if essential profile fields are missing
+        $requiredFields = [
+            'first_name',
+            'last_name',
+            'phone',
+            'emergency_contact_name',
+            'emergency_contact_phone',
+            'blood_type'
+        ];
+
+        foreach ($requiredFields as $field) {
+            if (empty($user->$field)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

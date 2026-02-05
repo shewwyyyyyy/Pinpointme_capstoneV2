@@ -153,7 +153,10 @@
                                                 :readonly="!isEditing"
                                                 variant="outlined"
                                                 density="compact"
-                                                hide-details="auto"
+                                                :rules="isEditing ? [rules.phoneNumber] : []"
+                                                hint="Mobile number (e.g., 09171234567)"
+                                                :persistent-hint="isEditing"
+                                                placeholder="09171234567"
                                                 class="mb-3"
                                                 prepend-inner-icon="mdi-phone-outline"
                                             ></v-text-field>
@@ -854,6 +857,18 @@ const rules = {
     hasNumber: v => /[0-9]/.test(v) || 'Must contain a number',
     hasSpecial: v => /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(v) || 'Must contain special character',
     passwordMatch: v => v === passwordForm.value.new_password || 'Passwords do not match',
+    // Phone number validation
+    phoneNumber: (v) => {
+        if (!v) return true; // Optional field
+        const cleaned = v.replace(/[\s\-\(\)]/g, '');
+        
+        // Must start with 09 and have exactly 11 digits
+        if (!/^09[0-9]{9}$/.test(cleaned)) {
+            return 'Please enter a valid mobile number (e.g., 09171234567)';
+        }
+        
+        return true;
+    }
 };
 
 // Password validation checks for visual feedback
@@ -954,6 +969,15 @@ const saveProfile = async () => {
     
     const { valid } = await formRef.value.validate();
     if (!valid) return;
+
+    // Validate phone number before saving
+    if (profile.value.contact_number) {
+        const phoneValidation = rules.phoneNumber(profile.value.contact_number);
+        if (phoneValidation !== true) {
+            showSnackbar(phoneValidation, 'error');
+            return;
+        }
+    }
 
     saving.value = true;
     try {

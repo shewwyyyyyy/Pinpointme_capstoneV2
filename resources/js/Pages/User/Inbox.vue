@@ -27,85 +27,101 @@
 
         <v-main class="messages-main">
             <!-- Loading State -->
-            <div v-if="loading" class="d-flex justify-center align-center" style="min-height: 60vh;">
-                <v-progress-circular indeterminate color="primary" size="64" />
+            <div v-if="loading" class="loading-container">
+                <v-progress-circular indeterminate color="primary" size="48" />
+                <p class="text-grey mt-4">Loading your messages...</p>
             </div>
 
             <!-- Empty State -->
-            <div v-else-if="filteredChats.length === 0" class="pa-4">
-                <v-card variant="tonal" color="grey-lighten-3" class="text-center pa-8">
-                    <v-icon size="64" color="grey">mdi-message-text-outline</v-icon>
-                    <div class="text-h6 mt-4 text-grey-darken-1">No Messages</div>
-                    <div class="text-body-2 text-grey mt-2">
-                        Messages from rescuers will appear here when assigned to your rescue request
+            <div v-else-if="filteredChats.length === 0" class="empty-state-container">
+                <div class="empty-state-card">
+                    <div class="empty-icon-wrapper">
+                        <v-icon size="80" color="primary">mdi-message-text-outline</v-icon>
                     </div>
-                </v-card>
+                    <h3>No Messages Yet</h3>
+                    <p>Messages from rescuers will appear here when you're assigned to a rescue request</p>
+                </div>
             </div>
 
-            <!-- Chat List - like Rescuer's Chats -->
-            <v-list v-else class="pa-0">
-                <template v-for="(chat, index) in filteredChats" :key="chat.id">
-                    <v-list-item
-                        class="py-3"
+            <!-- Chat List -->
+            <div v-else class="chat-list-container" ref="chatListContainer">
+                <div class="chat-list">
+                    <div
+                        v-for="(chat, index) in filteredChats"
+                        :key="chat.id"
+                        class="chat-item"
                         @click="openChat(chat)"
                     >
-                        <template v-slot:prepend>
+                        <!-- Avatar with Badge -->
+                        <div class="chat-avatar">
                             <v-badge
                                 :model-value="chat.unread_count > 0"
                                 color="error"
                                 dot
                                 location="bottom end"
-                                offset-x="3"
-                                offset-y="3"
+                                offset-x="4"
+                                offset-y="4"
                             >
                                 <v-avatar
                                     :color="!chat.other_user_picture ? 'primary' : undefined"
                                     size="48"
+                                    class="avatar-shadow"
                                 >
                                     <v-img 
                                         v-if="chat.other_user_picture"
                                         :src="chat.other_user_picture"
                                         cover
                                     />
-                                    <span v-else class="text-white">{{ getInitials(chat.other_user_name) }}</span>
+                                    <span v-else class="text-white font-weight-bold">{{ getInitials(chat.other_user_name) }}</span>
                                 </v-avatar>
                             </v-badge>
-                        </template>
+                        </div>
 
-                        <v-list-item-title class="font-weight-medium">
-                            {{ chat.other_user_name }}
-                        </v-list-item-title>
-                        <v-list-item-subtitle class="d-flex align-center">
-                            <span :class="{ 'font-weight-medium': chat.unread_count > 0 }">
-                                {{ chat.last_message }}
-                            </span>
-                        </v-list-item-subtitle>
-
-                        <template v-slot:append>
-                            <div class="text-right">
-                                <div class="text-caption text-grey mb-1">
-                                    {{ formatTime(chat.last_message_time) }}
+                        <!-- Chat Content -->
+                        <div class="chat-content">
+                            <div class="chat-header">
+                                <h4 class="chat-name">{{ chat.other_user_name }}</h4>
+                                <div class="chat-meta">
+                                    <span class="chat-time">{{ formatTime(chat.last_message_time) }}</span>
                                 </div>
+                            </div>
+                            
+                            <div class="chat-message">
+                                <p :class="{ 'unread-message': chat.unread_count > 0 }">
+                                    {{ chat.last_message }}
+                                </p>
+                            </div>
+                            
+                            <div class="chat-footer" v-if="chat.rescue_status || chat.unread_count > 0">
                                 <v-chip
                                     v-if="chat.rescue_status"
-                                    size="x-small"
+                                    size="small"
                                     :color="getStatusColor(chat.rescue_status)"
                                     variant="tonal"
+                                    class="status-chip"
                                 >
+                                    <v-icon start size="12">mdi-circle</v-icon>
                                     {{ formatStatus(chat.rescue_status) }}
                                 </v-chip>
-                                <v-badge
+                                <v-chip
                                     v-else-if="chat.unread_count > 0"
-                                    :content="chat.unread_count"
+                                    size="small"
                                     color="primary"
-                                    inline
-                                />
+                                    variant="flat"
+                                    class="unread-chip"
+                                >
+                                    {{ chat.unread_count }}
+                                </v-chip>
                             </div>
-                        </template>
-                    </v-list-item>
-                    <v-divider v-if="index < filteredChats.length - 1" />
-                </template>
-            </v-list>
+                        </div>
+
+                        <!-- Action Arrow -->
+                        <div class="chat-action">
+                            <v-icon color="grey-darken-1" size="20">mdi-chevron-right</v-icon>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
             <!-- Pull to refresh indicator -->
             <div v-if="refreshing" class="d-flex justify-center py-4">
@@ -141,12 +157,15 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue';
 import { router } from '@inertiajs/vue3';
 import { getConversations, getProfilePictureUrl } from '@/Composables/useApi';
 import UserMenu from '@/Components/Pages/User/Menu/UserMenu.vue';
 import UserBottomNav from '@/Components/Pages/User/Menu/UserBottomNav.vue';
 import NotificationPopup from '@/Components/NotificationPopup.vue';
+
+// Scroll position storage key
+const SCROLL_POSITION_KEY = 'user_inbox_scroll_position';
 
 // State
 const drawer = ref(false);
@@ -157,6 +176,7 @@ const searchText = ref('');
 const pollingInterval = ref(null);
 const consecutiveErrors = ref(0);
 const MAX_CONSECUTIVE_ERRORS = 3;
+const chatListContainer = ref(null);
 
 // Popup alert state (for notifications from other sources if needed)
 const popupAlert = ref({
@@ -202,20 +222,44 @@ const handleNotificationClick = () => {
     popupAlert.value.show = false;
 };
 
+// Save scroll position before leaving
+const saveScrollPosition = () => {
+    if (chatListContainer.value) {
+        const scrollTop = chatListContainer.value.scrollTop;
+        sessionStorage.setItem(SCROLL_POSITION_KEY, scrollTop.toString());
+    }
+};
+
+// Restore scroll position
+const restoreScrollPosition = async () => {
+    await nextTick();
+    const savedPosition = sessionStorage.getItem(SCROLL_POSITION_KEY);
+    if (savedPosition && chatListContainer.value) {
+        chatListContainer.value.scrollTop = parseInt(savedPosition, 10);
+    }
+};
+
 // Note: Chat notifications are handled within the Chat module itself
 // Removed triggerNewMessageNotification to avoid duplicate notifications
 
 onMounted(async () => {
     await fetchChats(true);
     
+    // Restore scroll position after data loads
+    await restoreScrollPosition();
+    
     // Poll for new messages every 10 seconds
     pollingInterval.value = setInterval(() => fetchChats(false), 10000);
+    
+    // Save scroll position before page unload
+    window.addEventListener('beforeunload', saveScrollPosition);
 });
 
 onUnmounted(() => {
     if (pollingInterval.value) {
         clearInterval(pollingInterval.value);
     }
+    window.removeEventListener('beforeunload', saveScrollPosition);
 });
 
 const fetchChats = async (showErrorToast = false) => {
@@ -301,8 +345,10 @@ const refreshChats = async () => {
 };
 
 const openChat = (chat) => {
+    // Save scroll position before navigating
+    saveScrollPosition();
     // Navigate to chat using conversation ID
-    router.visit(`/user/chat/${chat.id}`);
+    router.visit(`/user/chat/${chat.id}?from=user-inbox`);
 };
 
 const getInitials = (name) => {
@@ -406,8 +452,215 @@ const totalUnreadCount = computed(() => {
 
 /* Main Content */
 .messages-main {
-    background: #f8fafb;
     min-height: 100vh;
+}
+
+/* Loading State */
+.loading-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 60vh;
+    padding: 2rem;
+}
+
+.loading-container p {
+    font-size: 1rem;
+    font-weight: 500;
+}
+
+/* Empty State */
+.empty-state-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 60vh;
+    padding: 2rem 1rem;
+}
+
+.empty-state-card {
+    background: white;
+    border-radius: 20px;
+    padding: 3rem 2rem;
+    text-align: center;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+    max-width: 400px;
+    width: 100%;
+    border: 1px solid rgba(54, 116, 181, 0.1);
+}
+
+.empty-icon-wrapper {
+    background: linear-gradient(135deg, rgba(54, 116, 181, 0.1) 0%, rgba(54, 116, 181, 0.05) 100%);
+    border-radius: 50%;
+    width: 120px;
+    height: 120px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 1.5rem;
+}
+
+.empty-state-card h3 {
+    color: #1a365d;
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-bottom: 0.75rem;
+}
+
+.empty-state-card p {
+    color: #64748b;
+    font-size: 1rem;
+    line-height: 1.6;
+    margin: 0;
+}
+
+/* Chat List Container */
+.chat-list-container {
+    padding: 1rem;
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.chat-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+/* Chat Item */
+.chat-item {
+    background: white;
+    border-radius: 12px;
+    padding: 0.875rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05);
+    border: 1px solid rgba(54, 116, 181, 0.06);
+    position: relative;
+    overflow: hidden;
+    min-height: 70px;
+}
+
+.chat-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+    border-color: rgba(54, 116, 181, 0.2);
+}
+
+.chat-item:active {
+    transform: translateY(0);
+}
+
+.chat-item::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, #3674B5 0%, #4A90E2 100%);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.chat-item:hover::before {
+    opacity: 1;
+}
+
+/* Avatar */
+.chat-avatar {
+    flex-shrink: 0;
+}
+
+.avatar-shadow {
+    box-shadow: 0 4px 12px rgba(54, 116, 181, 0.25);
+}
+
+/* Chat Content */
+.chat-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.chat-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 0.5rem;
+    gap: 1rem;
+}
+
+.chat-name {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #1a365d;
+    margin: 0;
+    line-height: 1.3;
+}
+
+.chat-meta {
+    flex-shrink: 0;
+    text-align: right;
+}
+
+.chat-time {
+    font-size: 0.75rem;
+    color: #64748b;
+    font-weight: 500;
+}
+
+.chat-message {
+    margin-bottom: 0.75rem;
+}
+
+.chat-message p {
+    font-size: 0.85rem;
+    color: #4a5568;
+    line-height: 1.4;
+    margin: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.unread-message {
+    color: #1a365d !important;
+    font-weight: 600 !important;
+}
+
+.chat-footer {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.status-chip {
+    font-size: 0.75rem;
+    font-weight: 600;
+    height: 24px;
+}
+
+.unread-chip {
+    font-size: 0.75rem;
+    font-weight: 700;
+    height: 24px;
+    min-width: 24px;
+    border-radius: 12px;
+}
+
+/* Action Arrow */
+.chat-action {
+    flex-shrink: 0;
+    opacity: 0.6;
+    transition: opacity 0.3s ease;
+}
+
+.chat-item:hover .chat-action {
+    opacity: 1;
 }
 
 /* Desktop only visibility */
@@ -422,7 +675,55 @@ const totalUnreadCount = computed(() => {
     
     /* Mobile: adequate padding for bottom nav */
     .messages-main {
-        padding-bottom: 100px !important;
+        padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 120px) !important;
+    }
+    
+    .chat-list-container {
+        padding-bottom: 40px !important;
+    }
+}
+
+@media (max-width: 600px) {
+    .messages-main {
+        padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 140px) !important;
+    }
+    
+    .chat-list-container {
+        padding: 0.75rem;
+        padding-bottom: 50px !important;
+    }
+    
+    .chat-item {
+        padding: 0.75rem;
+        border-radius: 10px;
+        min-height: 64px;
+    }
+    
+    .chat-name {
+        font-size: 0.95rem;
+    }
+    
+    .chat-message p {
+        font-size: 0.85rem;
+    }
+    
+    .avatar-shadow {
+        box-shadow: 0 2px 8px rgba(54, 116, 181, 0.2);
+    }
+    
+    .empty-state-card {
+        padding: 2rem 1.5rem;
+        border-radius: 16px;
+    }
+    
+    .empty-icon-wrapper {
+        width: 100px;
+        height: 100px;
+        margin-bottom: 1rem;
+    }
+    
+    .empty-state-card h3 {
+        font-size: 1.25rem;
     }
 }
 
@@ -436,30 +737,33 @@ const totalUnreadCount = computed(() => {
     .messages-main {
         padding-bottom: 40px;
     }
+    
+    .chat-list-container {
+        padding: 1.5rem;
+    }
+    
+    .chat-item {
+        padding: 1rem;
+    }
+    
+    .chat-name {
+        font-size: 1.125rem;
+    }
 }
 
 /* Constrain list width for better readability */
-.v-list {
+.chat-list {
+    width: 100%;
+}
+
+/* Pull to refresh indicator */
+.d-flex.justify-center.py-4 {
     max-width: 800px;
     margin: 0 auto;
-    background: transparent;
 }
 
-.v-list-item {
-    min-height: 72px;
-    background: white;
-    margin: 0 12px 8px;
-    border-radius: 12px;
-}
-
-.v-list-item:last-child {
-    margin-bottom: 16px;
-}
-
-/* Empty state and loading centered */
-.pa-4 {
-    max-width: 800px;
-    margin: 0 auto;
-    padding-bottom: 100px !important;
+/* Toast and notifications */
+.v-snackbar {
+    z-index: 9999;
 }
 </style>

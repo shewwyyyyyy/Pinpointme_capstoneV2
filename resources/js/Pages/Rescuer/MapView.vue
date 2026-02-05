@@ -1,5 +1,5 @@
 <template>
-    <v-app class="map-app">
+    <v-app class="bg-user-gradient-light">
         <!-- Modern Header -->
         <div class="map-header">
             <div class="header-content">

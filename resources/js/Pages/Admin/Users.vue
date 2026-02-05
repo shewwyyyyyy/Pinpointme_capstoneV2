@@ -40,63 +40,75 @@
             app
         >
             <v-list>
-                <v-list-item prepend-icon="mdi-view-dashboard" title="Dashboard" href="/admin/dashboard"></v-list-item>
-                <v-list-item prepend-icon="mdi-account-group" title="Users" href="/admin/users" active></v-list-item>
-                <v-list-item prepend-icon="mdi-lifebuoy" title="Rescuers" href="/admin/rescuers"></v-list-item>
-                <v-list-item prepend-icon="mdi-office-building" title="Buildings" href="/admin/buildings"></v-list-item>
-                <v-list-item prepend-icon="mdi-file-chart" title="Reports" href="/admin/reports"></v-list-item>
-                <v-list-item prepend-icon="mdi-shield-alert" title="Preventive Measures" href="/admin/preventive-measures"></v-list-item>
+                <v-list-item prepend-icon="mdi-view-dashboard" title="Dashboard" href="/admin/dashboard" @click="closeDrawerOnMobile"></v-list-item>
+                <v-list-item prepend-icon="mdi-account-group" title="Users" href="/admin/users" active @click="closeDrawerOnMobile"></v-list-item>
+                <v-list-item prepend-icon="mdi-lifebuoy" title="Rescuers" href="/admin/rescuers" @click="closeDrawerOnMobile"></v-list-item>
+                <v-list-item prepend-icon="mdi-office-building" title="Buildings" href="/admin/buildings" @click="closeDrawerOnMobile"></v-list-item>
+                <v-list-item prepend-icon="mdi-file-chart" title="Reports" href="/admin/reports" @click="closeDrawerOnMobile"></v-list-item>
+                <v-list-item prepend-icon="mdi-shield-alert" title="Preventive Measures" href="/admin/preventive-measures" @click="closeDrawerOnMobile"></v-list-item>
             </v-list>
         </v-navigation-drawer>
 
         <!-- Main Content -->
         <v-main>
-            <v-container fluid class="pa-6">
+            <v-container fluid :class="isMobile ? 'pa-3' : 'pa-6'">
                 <!-- Page Header -->
-                <div class="d-flex align-center mb-6">
-                    <div>
-                        <h1 class="text-h4 font-weight-bold gradient-text">User Management</h1>
-                        <p class="text-grey mt-1">Manage students, faculty, and staff accounts</p>
+                <div class="page-header mb-4 mb-md-6">
+                    <div class="page-header-content">
+                        <h1 :class="isMobile ? 'text-h5' : 'text-h4'" class="font-weight-bold gradient-text">User Management</h1>
+                        <p class="text-grey mt-1 text-body-2">Manage students, faculty, and staff accounts</p>
                     </div>
-                    <v-spacer />
-                    <v-menu>
-                        <template v-slot:activator="{ props }">
-                            <v-btn color="info" class="mr-4" v-bind="props">
-                                <v-icon start>mdi-export-variant</v-icon>
-                                Export
-                                <v-icon end>mdi-chevron-down</v-icon>
-                            </v-btn>
-                        </template>
-                        <v-list density="compact">
-                            <v-list-item @click="handleExport('csv')" prepend-icon="mdi-file-delimited">
-                                <v-list-item-title>Export as CSV</v-list-item-title>
-                            </v-list-item>
-                            <v-list-item @click="handleExport('xlsx')" prepend-icon="mdi-file-excel">
-                                <v-list-item-title>Export as XLSX</v-list-item-title>
-                            </v-list-item>
-                            <v-list-item @click="handleExport('pdf')" prepend-icon="mdi-file-pdf-box">
-                                <v-list-item-title>Export as PDF</v-list-item-title>
-                            </v-list-item>
-                        </v-list>
-                    </v-menu>
-                    <!-- Add User Button with Dropdown -->
-                    <v-menu>
-                        <template v-slot:activator="{ props }">
-                            <v-btn color="primary" v-bind="props" rounded="lg">
-                                <v-icon start>mdi-plus</v-icon>
-                                Add User
-                                <v-icon end>mdi-chevron-down</v-icon>
-                            </v-btn>
-                        </template>
-                        <v-list density="compact">
-                            <v-list-item @click="openAddDialog" prepend-icon="mdi-account-plus">
-                                <v-list-item-title>Add Single User</v-list-item-title>
-                            </v-list-item>
-                            <v-list-item @click="openBulkDialog" prepend-icon="mdi-account-multiple-plus">
-                                <v-list-item-title>Bulk Add Users</v-list-item-title>
-                            </v-list-item>
-                        </v-list>
-                    </v-menu>
+                    <div class="page-header-actions">
+                        <v-menu>
+                            <template v-slot:activator="{ props }">
+                                <v-btn 
+                                    color="info" 
+                                    v-bind="props"
+                                    :size="isMobile ? 'small' : 'default'"
+                                    class="mr-2"
+                                >
+                                    <v-icon :start="!isMobile">mdi-export-variant</v-icon>
+                                    <span v-if="!isMobile">Export</span>
+                                    <v-icon end size="small">mdi-chevron-down</v-icon>
+                                </v-btn>
+                            </template>
+                            <v-list density="compact">
+                                <v-list-item @click="handleExport('csv')" prepend-icon="mdi-file-delimited">
+                                    <v-list-item-title>Export as CSV</v-list-item-title>
+                                </v-list-item>
+                                <v-list-item @click="handleExport('xlsx')" prepend-icon="mdi-file-excel">
+                                    <v-list-item-title>Export as XLSX</v-list-item-title>
+                                </v-list-item>
+                                <v-list-item @click="handleExport('pdf')" prepend-icon="mdi-file-pdf-box">
+                                    <v-list-item-title>Export as PDF</v-list-item-title>
+                                </v-list-item>
+                            </v-list>
+                        </v-menu>
+                        <!-- Add User Button with Dropdown -->
+                        <v-menu>
+                            <template v-slot:activator="{ props }">
+                                <v-btn 
+                                    color="primary" 
+                                    v-bind="props" 
+                                    rounded="lg"
+                                    :size="isMobile ? 'small' : 'default'"
+                                >
+                                    <v-icon :start="!isMobile">mdi-plus</v-icon>
+                                    <span v-if="!isMobile">Add User</span>
+                                    <span v-else>Add</span>
+                                    <v-icon end size="small">mdi-chevron-down</v-icon>
+                                </v-btn>
+                            </template>
+                            <v-list density="compact">
+                                <v-list-item @click="openAddDialog" prepend-icon="mdi-account-plus">
+                                    <v-list-item-title>Add Single User</v-list-item-title>
+                                </v-list-item>
+                                <v-list-item @click="openBulkDialog" prepend-icon="mdi-account-multiple-plus">
+                                    <v-list-item-title>Bulk Add Users</v-list-item-title>
+                                </v-list-item>
+                            </v-list>
+                        </v-menu>
+                    </div>
                 </div>
 
 
@@ -362,23 +374,56 @@
                     <v-card-title class="d-flex align-center pa-4">
                         <v-icon start color="primary">mdi-history</v-icon>
                         <span class="font-weight-bold">Recent Activity</span>
+                        <v-chip size="x-small" color="primary" class="ml-2">{{ auditTrail.length }}</v-chip>
                     </v-card-title>
                     <v-divider></v-divider>
                     <v-card-text class="pa-4">
-                        <v-timeline v-if="auditTrail.length > 0" density="compact" side="end">
-                            <v-timeline-item
-                                v-for="audit in auditTrail.slice(0, 10)"
-                                :key="audit.id"
-                                :dot-color="getAuditColor(audit.action)"
+                        <div v-if="auditTrail.length > 0">
+                            <v-timeline density="compact" side="end">
+                                <v-timeline-item
+                                    v-for="audit in paginatedAuditTrail"
+                                    :key="audit.id"
+                                    :dot-color="getAuditColor(audit.action)"
+                                    size="small"
+                                >
+                                    <template v-slot:icon>
+                                        <v-icon size="12" color="white">{{ getAuditIcon(audit.action) }}</v-icon>
+                                    </template>
+                                    <v-card variant="tonal" :color="getAuditColor(audit.action)" density="compact" class="mb-1">
+                                        <v-card-text class="pa-2">
+                                            <div class="d-flex align-center justify-space-between">
+                                                <p class="font-weight-medium mb-0 text-body-2">{{ audit.description || audit.action }}</p>
+                                                <v-chip size="x-small" :color="getAuditColor(audit.action)" variant="flat">
+                                                    {{ formatAction(audit.action) }}
+                                                </v-chip>
+                                            </div>
+                                            <p class="text-caption text-grey mt-1 mb-0">
+                                                <v-icon size="12" class="mr-1">mdi-clock-outline</v-icon>
+                                                {{ formatDateTime(audit.created_at) }}
+                                            </p>
+                                        </v-card-text>
+                                    </v-card>
+                                </v-timeline-item>
+                            </v-timeline>
+                            
+                            <!-- Pagination for Activity -->
+                            <v-pagination
+                                v-if="totalActivityPages > 1"
+                                v-model="activityPage"
+                                :length="totalActivityPages"
+                                :total-visible="5"
+                                density="comfortable"
+                                rounded="circle"
+                                class="mt-4"
                                 size="small"
-                            >
-                                <div>
-                                    <p class="font-weight-medium mb-0">{{ audit.description || audit.action }}</p>
-                                    <p class="text-caption text-grey">{{ formatDateTime(audit.created_at) }}</p>
-                                </div>
-                            </v-timeline-item>
-                        </v-timeline>
+                            ></v-pagination>
+                            
+                            <p v-if="auditTrail.length > 0" class="text-caption text-center text-grey mt-2 mb-0">
+                                Showing {{ activityStartIndex + 1 }}-{{ activityEndIndex }} of {{ auditTrail.length }} activities
+                            </p>
+                        </div>
                         <v-alert v-else type="info" variant="tonal" rounded="lg">
+                            <v-icon start>mdi-information-outline</v-icon>
                             No recent activity
                         </v-alert>
                     </v-card-text>
@@ -397,7 +442,7 @@
                 </v-card-title>
                 <v-divider></v-divider>
                 <v-card-text class="pa-4">
-                    <v-form ref="form">
+                    <v-form ref="form" v-model="formValid">
                         <v-row>
                             <v-col cols="6">
                                 <v-text-field
@@ -446,13 +491,21 @@
                         <!-- ID Number Field (shown for all roles) -->
                         <v-text-field
                             v-model="formData.id_number"
+                            @input="onIdNumberInput"
+                            @keypress="onIdNumberKeypress"
                             :label="getIdLabel(formData.role)"
                             variant="outlined"
                             density="compact"
-                            :rules="[v => !!v || 'ID number is required']"
-                            :hint="getIdHint(formData.role)"
+                            :rules="[rules.idNumber]"
+                            :hint="`Must be exactly 9 digits (${(formData.id_number || '').length}/9)`"
                             persistent-hint
                             class="mb-3"
+                            :counter="9"
+                            maxlength="9"
+                            inputmode="numeric"
+                            pattern="[0-9]*"
+                            placeholder="123456789"
+                            :error="formData.id_number && formData.id_number.length !== 9"
                         />
                         
                         <v-text-field
@@ -460,6 +513,10 @@
                             label="Phone Number"
                             variant="outlined"
                             density="compact"
+                            :rules="[rules.phoneNumber]"
+                            hint="Mobile number (e.g., 09171234567)"
+                            persistent-hint
+                            placeholder="09171234567"
                             class="mb-3"
                         />
                         
@@ -496,7 +553,7 @@
                 <v-card-actions class="pa-4">
                     <v-spacer />
                     <v-btn variant="text" @click="dialog = false">Cancel</v-btn>
-                    <v-btn color="primary" :loading="saving" @click="saveUser">
+                    <v-btn color="primary" :loading="saving" :disabled="!isFormValid" @click="saveUser">
                         {{ isEditing ? 'Update' : 'Create & Send OTP' }}
                     </v-btn>
                 </v-card-actions>
@@ -835,10 +892,30 @@ const isMobile = computed(() => mobile.value);
 const isDark = ref(false);
 const toggleDarkMode = () => {
     isDark.value = !isDark.value;
-    document.documentElement.classList.toggle('v-theme--dark', isDark.value);
+    
+    // Apply theme to document
+    if (isDark.value) {
+        document.documentElement.classList.add('v-theme--dark');
+        document.documentElement.classList.remove('v-theme--light');
+        document.documentElement.setAttribute('data-theme', 'dark');
+    } else {
+        document.documentElement.classList.add('v-theme--light');
+        document.documentElement.classList.remove('v-theme--dark');
+        document.documentElement.setAttribute('data-theme', 'light');
+    }
+    
+    // Save preference to localStorage
+    localStorage.setItem('darkMode', isDark.value.toString());
+    
+    showSnackbar(`Switched to ${isDark.value ? 'dark' : 'light'} mode`, 'info');
 };
 const goToProfile = () => {
     window.location.href = '/admin/profile';
+};
+const closeDrawerOnMobile = () => {
+    if (isMobile.value) {
+        drawer.value = false;
+    }
 };
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -908,10 +985,12 @@ const props = defineProps({
 });
 
 // State
-const drawer = ref(true);
+const drawer = ref(!mobile.value);
 const currentPage = ref('users');
 const loading = ref(false);
 const dialog = ref(false);
+const form = ref(null);
+const formValid = ref(false);
 const bulkDialog = ref(false);
 const bulkUpdateDialog = ref(false);
 const deleteDialog = ref(false);
@@ -949,6 +1028,11 @@ const usersList = ref(props.users?.data || []);
 const stats = ref(props.stats);
 const auditTrail = ref(props.auditTrail || []);
 
+// Activity pagination
+const activityPage = ref(1);
+const activityPerPage = ref(5);
+const activityExpanded = ref(false);
+
 const formData = ref({
     first_name: '',
     last_name: '',
@@ -959,6 +1043,38 @@ const formData = ref({
     status: 'pending'
 });
 
+// Validation rules
+const rules = {
+    required: (v) => !!v || 'Required',
+    // Phone number validation
+    phoneNumber: (v) => {
+        if (!v) return true; // Optional field
+        const cleaned = v.replace(/[\s\-\(\)]/g, '');
+        
+        // Must start with 09 and have exactly 11 digits
+        if (!/^09[0-9]{9}$/.test(cleaned)) {
+            return 'Please enter a valid mobile number (e.g., 09171234567)';
+        }
+        
+        return true;
+    },
+    // ID Number validation - exactly 9 digits
+    idNumber: (v) => {
+        if (!v || v.toString().trim() === '') return 'ID number is required';
+        const digitsOnly = v.toString().replace(/\D/g, '');
+        if (digitsOnly.length === 0) {
+            return 'ID number is required';
+        }
+        if (digitsOnly.length < 9) {
+            return `ID Number must be exactly 9 digits (${digitsOnly.length} entered)`;
+        }
+        if (digitsOnly.length > 9) {
+            return 'ID Number must be exactly 9 digits';
+        }
+        return true;
+    }
+};
+
 // Computed
 const adminInitials = computed(() => {
     const userData = JSON.parse(localStorage.getItem('userData') || '{}');
@@ -966,6 +1082,52 @@ const adminInitials = computed(() => {
         return `${userData.first_name[0]}${userData.last_name[0]}`.toUpperCase();
     }
     return 'AD';
+});
+
+// Form validation computed - checks all required fields and validations
+const isFormValid = computed(() => {
+    // Check required fields
+    if (!formData.value.first_name || !formData.value.last_name || !formData.value.email || !formData.value.role) {
+        return false;
+    }
+    
+    // Check email format and domain
+    if (!formData.value.email.endsWith('@sdca.edu.ph')) {
+        return false;
+    }
+    
+    // Check ID number - must be exactly 9 digits
+    const cleanedId = (formData.value.id_number || '').replace(/\D/g, '');
+    if (cleanedId.length !== 9) {
+        return false;
+    }
+    
+    // Check phone number if provided
+    if (formData.value.phone) {
+        const phoneResult = rules.phoneNumber(formData.value.phone);
+        if (phoneResult !== true) {
+            return false;
+        }
+    }
+    
+    return formValid.value;
+});
+
+// Activity pagination computed
+const totalActivityPages = computed(() => {
+    return Math.ceil(auditTrail.value.length / activityPerPage.value);
+});
+
+const activityStartIndex = computed(() => {
+    return (activityPage.value - 1) * activityPerPage.value;
+});
+
+const activityEndIndex = computed(() => {
+    return Math.min(activityStartIndex.value + activityPerPage.value, auditTrail.value.length);
+});
+
+const paginatedAuditTrail = computed(() => {
+    return auditTrail.value.slice(activityStartIndex.value, activityEndIndex.value);
 });
 
 // Table headers
@@ -1061,13 +1223,23 @@ const openAddDialog = () => {
     dialog.value = true;
 };
 
+// Track original data to detect changes
+const originalFormData = ref({});
+
 const openEditDialog = (user) => {
     isEditing.value = true;
     selectedUser.value = user;
-    formData.value = { 
+    // Get ID number and clean it (strip non-digits, limit to 9)
+    const rawId = user.student_id || user.faculty_id || user.staff_id || user.id_number || '';
+    const cleanedId = rawId.toString().replace(/\D/g, '').slice(0, 9);
+    const editFormData = { 
         ...user,
-        id_number: user.student_id || user.faculty_id || user.staff_id || user.id_number || ''
+        id_number: cleanedId,
+        phone: user.phone_number || user.phone || ''
     };
+    formData.value = { ...editFormData };
+    // Store original to compare later
+    originalFormData.value = { ...editFormData };
     dialog.value = true;
 };
 
@@ -1109,7 +1281,77 @@ const getIdHint = (role) => {
     return hints[role] || 'Enter ID number';
 };
 
+// Handle ID number input - only allow digits and limit to 9
+const onIdNumberInput = (event) => {
+    const value = event?.target?.value || formData.value.id_number || '';
+    // Strip non-digits and limit to 9 characters
+    const cleaned = value.toString().replace(/\D/g, '').slice(0, 9);
+    formData.value.id_number = cleaned;
+    // Update the input element directly to prevent non-digit display
+    if (event?.target) {
+        event.target.value = cleaned;
+    }
+};
+
+// Prevent non-digit keys from being entered
+const onIdNumberKeypress = (event) => {
+    const char = String.fromCharCode(event.keyCode || event.which);
+    if (!/[0-9]/.test(char)) {
+        event.preventDefault();
+    }
+};
+
+// Check if form has changes from original
+const hasFormChanges = computed(() => {
+    if (!isEditing.value) return true; // New user always has "changes"
+    
+    const orig = originalFormData.value;
+    const curr = formData.value;
+    
+    return (
+        orig.first_name !== curr.first_name ||
+        orig.last_name !== curr.last_name ||
+        orig.email !== curr.email ||
+        orig.role !== curr.role ||
+        orig.id_number !== curr.id_number ||
+        (orig.phone || '') !== (curr.phone || '') ||
+        orig.status !== curr.status
+    );
+});
+
 const saveUser = async () => {
+    // Check if there are any changes when editing
+    if (isEditing.value && !hasFormChanges.value) {
+        showSnackbar('No changes to save', 'info');
+        dialog.value = false;
+        return;
+    }
+    
+    // Clean and validate ID number - strip non-digits and check length
+    const cleanedIdNumber = (formData.value.id_number || '').replace(/\D/g, '');
+    
+    if (!cleanedIdNumber) {
+        showSnackbar('ID number is required', 'error');
+        return;
+    }
+    
+    if (cleanedIdNumber.length !== 9) {
+        showSnackbar('ID Number must be exactly 9 digits (currently ' + cleanedIdNumber.length + ' digits)', 'error');
+        return;
+    }
+    
+    // Update the form data with cleaned ID
+    formData.value.id_number = cleanedIdNumber;
+    
+    // Validate phone number if provided
+    if (formData.value.phone) {
+        const phoneValidation = rules.phoneNumber(formData.value.phone);
+        if (phoneValidation !== true) {
+            showSnackbar(phoneValidation, 'error');
+            return;
+        }
+    }
+    
     saving.value = true;
     try {
         const url = isEditing.value ? `/admin/users/${selectedUser.value.id}` : '/admin/users';
@@ -1118,9 +1360,9 @@ const saveUser = async () => {
         // Prepare data with proper ID field based on role
         const submitData = {
             ...formData.value,
-            student_id: formData.value.role === 'student' ? formData.value.id_number : null,
-            faculty_id: formData.value.role === 'faculty' ? formData.value.id_number : null,
-            staff_id: formData.value.role === 'staff' ? formData.value.id_number : null,
+            student_id: formData.value.role === 'student' ? cleanedIdNumber : null,
+            faculty_id: formData.value.role === 'faculty' ? cleanedIdNumber : null,
+            staff_id: formData.value.role === 'staff' ? cleanedIdNumber : null,
             send_otp: !isEditing.value
         };
         
@@ -1505,8 +1747,45 @@ const getAuditColor = (action) => {
     return colors[action] || 'grey';
 };
 
+const getAuditIcon = (action) => {
+    const icons = { 
+        create: 'mdi-plus', 
+        update: 'mdi-pencil', 
+        delete: 'mdi-delete',
+        login: 'mdi-login',
+        logout: 'mdi-logout'
+    };
+    return icons[action] || 'mdi-information';
+};
+
+const formatAction = (action) => {
+    const labels = { 
+        create: 'Created', 
+        update: 'Updated', 
+        delete: 'Deleted',
+        login: 'Login',
+        logout: 'Logout'
+    };
+    return labels[action] || action;
+};
+
 onMounted(() => {
     // Data comes from Inertia props
+    
+    // Initialize dark mode from localStorage
+    const savedDarkMode = localStorage.getItem('darkMode');
+    if (savedDarkMode !== null) {
+        isDark.value = savedDarkMode === 'true';
+        if (isDark.value) {
+            document.documentElement.classList.add('v-theme--dark');
+            document.documentElement.classList.remove('v-theme--light');
+            document.documentElement.setAttribute('data-theme', 'dark');
+        } else {
+            document.documentElement.classList.add('v-theme--light');
+            document.documentElement.classList.remove('v-theme--dark');
+            document.documentElement.setAttribute('data-theme', 'light');
+        }
+    }
 });
 </script>
 
@@ -1547,5 +1826,43 @@ onMounted(() => {
 
 .gap-3 {
     gap: 12px;
+}
+
+/* Page Header Responsive Styles */
+.page-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.page-header-content {
+    flex: 1;
+    min-width: 200px;
+}
+
+.page-header-actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+/* Mobile Specific Styles */
+@media (max-width: 600px) {
+    .page-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .page-header-content {
+        width: 100%;
+    }
+    
+    .page-header-actions {
+        width: 100%;
+        justify-content: flex-end;
+    }
 }
 </style>

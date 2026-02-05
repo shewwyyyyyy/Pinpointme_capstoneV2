@@ -14,7 +14,14 @@ class Room extends Model
     protected $fillable = [
         'room_name',
         'floor_id',
-        'file'
+        'file',
+        'qr_data',
+        'qr_updated_at',
+        'qr_version'
+    ];
+
+    protected $casts = [
+        'qr_updated_at' => 'datetime',
     ];
 
     /**

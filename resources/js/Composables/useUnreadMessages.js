@@ -3,16 +3,20 @@
  * The count persists in localStorage and is updated when fetching conversations.
  * Count is only reset when the actual chat is opened (via markMessagesAsRead).
  */
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, onMounted, onUnmounted, watch } from 'vue';
 import { getConversations } from '@/Composables/useApi';
 
 // Shared reactive state (persists across component instances)
 const unreadCount = ref(0);
+const previousUnreadCount = ref(0);
 const conversations = ref([]);
 const isLoading = ref(false);
 const lastFetchTime = ref(0);
 let pollingInterval = null;
 let activeInstances = 0;
+
+// Callback for new messages notification
+const newMessageCallbacks = new Set();
 
 // Storage key for persistence
 const STORAGE_KEY = 'unread_message_count';
@@ -23,7 +27,9 @@ const initFromStorage = () => {
     try {
         const stored = localStorage.getItem(STORAGE_KEY);
         if (stored) {
-            unreadCount.value = parseInt(stored, 10) || 0;
+            const count = parseInt(stored, 10) || 0;
+            unreadCount.value = count;
+            previousUnreadCount.value = count;
         }
         const storedConversations = localStorage.getItem(CONVERSATIONS_KEY);
         if (storedConversations) {
@@ -92,6 +98,20 @@ const fetchUnreadMessages = async (forceRefresh = false) => {
         // Calculate total unread count
         const totalUnread = newConversations.reduce((acc, c) => acc + (c.unread_count || 0), 0);
         
+        // Check if there are new messages and trigger callbacks
+        if (totalUnread > previousUnreadCount.value && previousUnreadCount.value >= 0) {
+            const newCount = totalUnread - previousUnreadCount.value;
+            // Trigger all registered callbacks
+            newMessageCallbacks.forEach(callback => {
+                try {
+                    callback(newCount, totalUnread);
+                } catch (e) {
+                    console.error('Error in new message callback:', e);
+                }
+            });
+        }
+        
+        previousUnreadCount.value = totalUnread;
         unreadCount.value = totalUnread;
         conversations.value = newConversations;
         
@@ -108,10 +128,10 @@ const fetchUnreadMessages = async (forceRefresh = false) => {
 const startPolling = () => {
     if (pollingInterval) return;
     
-    // Poll every 15 seconds
+    // Poll every 10 seconds for more responsive message updates
     pollingInterval = setInterval(() => {
         fetchUnreadMessages();
-    }, 15000);
+    }, 10000);
 };
 
 // Stop polling
@@ -164,6 +184,12 @@ export function useUnreadMessages() {
         refresh: () => fetchUnreadMessages(true),
         /** Get the unread count (for non-reactive usage) */
         getCount: () => unreadCount.value,
+        /** Register a callback for new messages */
+        onNewMessages: (callback) => {
+            newMessageCallbacks.add(callback);
+            // Return unregister function
+            return () => newMessageCallbacks.delete(callback);
+        },
     };
 }
 

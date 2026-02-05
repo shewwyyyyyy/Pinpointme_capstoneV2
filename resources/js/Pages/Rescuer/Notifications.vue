@@ -457,9 +457,8 @@ onUnmounted(() => {
 
 /* Main Content */
 .notifications-main {
-    padding-bottom: calc(100px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: calc(140px + env(safe-area-inset-bottom, 0px));
     min-height: 100vh;
-    background: linear-gradient(180deg, #e8f5f3 0%, #f5f9f8 50%, #ffffff 100%);
 }
 
 /* Loading State */
@@ -515,29 +514,33 @@ onUnmounted(() => {
 
 /* Notifications List */
 .notifications-list {
-    padding: 0 16px 16px;
+    padding: 0 16px 32px;
     display: flex;
     flex-direction: column;
     gap: 12px;
 }
 
-/* Notification Card */
+/* Notification Card - Enhanced Design */
 .notification-card {
     position: relative;
-    background: var(--ppm-glass-bg, rgba(255, 255, 255, 0.95));
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
     border-radius: 20px;
     overflow: hidden;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.1);
     cursor: pointer;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .notification-card:active {
-    transform: scale(0.98);
+    transform: translateY(-2px);
 }
 
 .notification-card:hover {
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    transform: translateY(-4px);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+    border-color: rgba(54, 116, 181, 0.3);
 }
 
 /* Status-based card styling */
@@ -593,7 +596,7 @@ onUnmounted(() => {
 
 /* Card Content */
 .card-content {
-    padding: 16px;
+    padding: 20px;
 }
 
 .card-header {
@@ -748,7 +751,7 @@ onUnmounted(() => {
     }
     
     .notifications-main {
-        padding-bottom: calc(100px + env(safe-area-inset-bottom, 0px));
+        padding-bottom: calc(140px + env(safe-area-inset-bottom, 0px));
     }
 }
 
@@ -770,7 +773,7 @@ onUnmounted(() => {
     }
     
     .notifications-main {
-        padding-bottom: calc(90px + env(safe-area-inset-bottom, 0px));
+        padding-bottom: calc(140px + env(safe-area-inset-bottom, 0px));
     }
 }
 </style>

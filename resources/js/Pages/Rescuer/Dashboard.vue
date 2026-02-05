@@ -1,5 +1,5 @@
 <template>
-    <v-app class="app-container">
+    <v-app class="bg-user-gradient-light">
         <!-- Navigation Drawer -->
         <RescuerMenu v-model="drawer" />
 
@@ -101,25 +101,31 @@
             
             <div class="header-section">
 
-                <!-- Tab Pills -->
+                <!-- Tab Pills - Enhanced Design -->
                 <div class="tab-pills-container">
                     <button 
-                        :class="['tab-pill', selectedTab === 'pending' ? 'tab-pill-pending active' : '']"
+                        :class="['tab-pill tab-pill-enhanced', selectedTab === 'pending' ? 'tab-pill-pending active' : '']"
                         @click="selectedTab = 'pending'"
                     >
-                        Need Help ({{ counts.pending }})
+                        <v-icon size="16" class="tab-icon">mdi-alert-circle</v-icon>
+                        <span class="tab-text">Need Help</span>
+                        <v-chip size="x-small" color="white" variant="flat" class="tab-count">{{ counts.pending }}</v-chip>
                     </button>
                     <button 
-                        :class="['tab-pill', selectedTab === 'inProgress' ? 'tab-pill-progress active' : '']"
+                        :class="['tab-pill tab-pill-enhanced', selectedTab === 'inProgress' ? 'tab-pill-progress active' : '']"
                         @click="selectedTab = 'inProgress'"
                     >
-                        In progress ({{ counts.inProgress }})
+                        <v-icon size="16" class="tab-icon">mdi-progress-clock</v-icon>
+                        <span class="tab-text">In Progress</span>
+                        <v-chip size="x-small" color="white" variant="flat" class="tab-count">{{ counts.inProgress }}</v-chip>
                     </button>
                     <button 
-                        :class="['tab-pill', selectedTab === 'rescued' ? 'tab-pill-rescued active' : '']"
+                        :class="['tab-pill tab-pill-enhanced', selectedTab === 'rescued' ? 'tab-pill-rescued active' : '']"
                         @click="selectedTab = 'rescued'"
                     >
-                        Rescued ({{ counts.completed }})
+                        <v-icon size="16" class="tab-icon">mdi-check-circle</v-icon>
+                        <span class="tab-text">Rescued</span>
+                        <v-chip size="x-small" color="white" variant="flat" class="tab-count">{{ counts.completed }}</v-chip>
                     </button>
                 </div>
             </div>
@@ -696,17 +702,17 @@ const markAsSafe = async (request) => {
 
 const viewPendingRequest = (request) => {
     // Navigate to active rescue page to view details
-    router.visit(`/rescuer/active/${request.id}`);
+    router.visit(`/rescuer/active/${request.id}?from=pending`);
 };
 
 const viewInProgressRequest = (request) => {
     // Navigate to active rescue page to manage in-progress rescue
-    router.visit(`/rescuer/active/${request.id}`);
+    router.visit(`/rescuer/active/${request.id}?from=inProgress`);
 };
 
 const viewRescuedRequest = (request) => {
     // Navigate to active rescue page to view completed rescue
-    router.visit(`/rescuer/active/${request.id}`);
+    router.visit(`/rescuer/active/${request.id}?from=rescued`);
 };
 
 const openChat = (request) => {
@@ -858,7 +864,6 @@ const showNotification = (message, color = 'info') => {
 
 /* Main Container */
 .main-container {
-    background: linear-gradient(180deg, #e8f5f3 0%, #f5f9f8 50%, #ffffff 100%);
     height: 100vh !important;
     max-height: 100vh !important;
     overflow: hidden !important;
@@ -911,7 +916,7 @@ const showNotification = (message, color = 'info') => {
 
 /* Header Section (tabs area) */
 .header-section {
-    padding-bottom: 8px;
+    padding: 16px 0 20px 0;
     flex-shrink: 0;
 }
 
@@ -919,8 +924,8 @@ const showNotification = (message, color = 'info') => {
 .tab-pills-container {
     display: flex;
     justify-content: center;
-    gap: 8px;
-    padding: 12px 16px;
+    gap: 12px;
+    padding: 0 16px;
     flex-wrap: wrap;
     flex-shrink: 0;
 }
@@ -937,14 +942,55 @@ const showNotification = (message, color = 'info') => {
     color: #666;
 }
 
-.tab-pill:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+/* Enhanced tab pills with icons and counts */
+.tab-pill-enhanced {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 16px;
+    border-radius: 24px;
+    background: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
 }
 
-.tab-pill.active {
+.tab-pill-enhanced .tab-icon {
+    opacity: 0.7;
+    transition: opacity 0.3s ease;
+}
+
+.tab-pill-enhanced .tab-text {
+    font-weight: 600;
+    font-size: 0.8rem;
+}
+
+.tab-pill-enhanced .tab-count {
+    min-width: 20px;
+    height: 20px;
+    font-size: 0.7rem;
+    font-weight: 700;
+}
+
+.tab-pill:hover,
+.tab-pill-enhanced:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+}
+
+.tab-pill-enhanced:hover .tab-icon {
+    opacity: 1;
+}
+
+.tab-pill.active,
+.tab-pill-enhanced.active {
     color: white;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+    transform: translateY(-1px);
+}
+
+.tab-pill-enhanced.active .tab-icon {
+    opacity: 1;
 }
 
 .tab-pill-pending.active {
@@ -975,32 +1021,35 @@ const showNotification = (message, color = 'info') => {
     padding-bottom: 20px;
 }
 
-/* Request Cards */
+/* Request Cards - Enhanced Design */
 .request-card {
-    background: white;
-    border-radius: 12px;
-    margin-bottom: 12px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border-radius: 16px;
+    margin-bottom: 16px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
     overflow: hidden;
     cursor: pointer;
-    transition: all 0.2s ease;
-    border-left: 4px solid transparent;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    border-left: 5px solid transparent;
+    border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 .request-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+    transform: translateY(-4px);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+    border-color: rgba(54, 116, 181, 0.3);
 }
 
 .request-card:active {
-    transform: translateY(0);
+    transform: translateY(-2px);
 }
 
 .request-card-content {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 16px;
+    padding: 20px;
 }
 
 .request-info {

@@ -1,5 +1,5 @@
 <template>
-    <v-app class="map-app">
+    <v-app class="bg-user-gradient-light">
         <!-- Modern Header -->
         <div class="map-header">
             <div class="header-content">
@@ -1557,11 +1557,17 @@ onMounted(async () => {
 /* Bottom nav padding for mobile */
 @media (max-width: 1023px) {
     .map-main {
-        padding-bottom: 80px;
+        padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 120px);
     }
     
     .map-container {
         padding-bottom: 20px;
+    }
+}
+
+@media (max-width: 600px) {
+    .map-main {
+        padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 130px);
     }
 }
 </style>

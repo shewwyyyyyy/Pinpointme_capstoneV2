@@ -207,8 +207,11 @@ const loading = ref(true);
 const refreshing = ref(false);
 const notifications = ref([]);
 
-// Unread messages count from composable
-const { unreadCount: unreadMessageCount } = useUnreadMessages();
+// Unread messages count from composable with new message callback
+const { unreadCount: unreadMessageCount, onNewMessages } = useUnreadMessages();
+
+// Cleanup function for new message callback
+let unregisterNewMessages = null;
 
 // Toast
 const showToast = ref(false);
@@ -389,6 +392,34 @@ const showToastMessage = (message, color = 'success') => {
     showToast.value = true;
 };
 
+// Handle new message notifications
+const handleNewMessages = (newCount, totalCount) => {
+    // Show popup
+    popupAlert.value = {
+        show: true,
+        title: '💬 New Message',
+        message: `You have ${newCount} new message${newCount > 1 ? 's' : ''}`,
+        type: 'info',
+        icon: 'mdi-message-text',
+    };
+    
+    // Play sound and vibrate
+    playNotificationSound('message');
+    vibrate([100, 50, 100]);
+    
+    // Browser notification
+    notify({
+        title: '💬 New Message',
+        body: `You have ${newCount} new message${newCount > 1 ? 's' : ''}`,
+        icon: '/images/logo.png'
+    });
+    
+    // Auto-hide after 5 seconds
+    setTimeout(() => {
+        popupAlert.value.show = false;
+    }, 5000);
+};
+
 // Helpers
 const isActiveStatus = (status) => {
     return ['pending', 'assigned', 'en_route', 'in_progress', 'on_scene'].includes(status);
@@ -543,6 +574,9 @@ onMounted(async () => {
     await fetchNotifications();
     // unreadMessageCount is now managed by useUnreadMessages composable
     
+    // Register new message callback
+    unregisterNewMessages = onNewMessages(handleNewMessages);
+    
     // Initialize previous statuses
     notifications.value.forEach(n => {
         previousStatuses.value[n.id] = n.status;
@@ -557,6 +591,9 @@ onMounted(async () => {
 onUnmounted(() => {
     if (pollingInterval) {
         clearInterval(pollingInterval);
+    }
+    if (unregisterNewMessages) {
+        unregisterNewMessages();
     }
 });
 </script>
@@ -614,8 +651,7 @@ onUnmounted(() => {
 
 /* Main Content */
 .notifications-main {
-    padding-bottom: 80px;
-    background: #f5f5f5;
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 120px);
     min-height: 100vh;
 }
 
@@ -693,6 +729,7 @@ onUnmounted(() => {
 /* Notifications List */
 .notifications-list {
     padding: 16px;
+    padding-bottom: 32px;
     display: flex;
     flex-direction: column;
     gap: 12px;
@@ -898,9 +935,20 @@ onUnmounted(() => {
 }
 
 /* Responsive */
+@media (max-width: 600px) {
+    .notifications-main {
+        padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 130px);
+    }
+    
+    .notifications-list {
+        padding-bottom: 40px;
+    }
+}
+
 @media (min-width: 1024px) {
     .notifications-main {
         margin-left: 256px;
+        padding-bottom: 40px;
     }
     
     .notifications-list {

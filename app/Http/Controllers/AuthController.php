@@ -17,6 +17,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
 use Inertia\Inertia;
 use Carbon\Carbon;
@@ -759,10 +760,11 @@ class AuthController extends Controller
         $validator = Validator::make($request->all(), [
             'first_name' => 'sometimes|string|max:255',
             'last_name' => 'sometimes|string|max:255',
-            'phone' => 'sometimes|string|max:20',
-            'phone_number' => 'sometimes|string|max:20',
+            'phone' => 'sometimes|string|max:13', // Allow +639XXXXXXXXX format
+            'phone_number' => 'sometimes|string|max:13', // Allow +639XXXXXXXXX format
+            'id_number' => 'sometimes|string|digits:9',
             'emergency_contact_name' => 'sometimes|string|max:255',
-            'emergency_contact_phone' => 'sometimes|string|max:20',
+            'emergency_contact_phone' => 'sometimes|string|max:13', // Allow +639XXXXXXXXX format
             'emergency_contact_relation' => 'sometimes|string|max:255',
             'blood_type' => 'sometimes|string|in:A+,A-,B+,B-,AB+,AB-,O+,O-',
             'allergies' => 'sometimes|string',
@@ -779,6 +781,82 @@ class AuthController extends Controller
         }
 
         $data = $validator->validated();
+
+        // Validate personal phone number if provided
+        if (isset($data['phone_number']) || isset($data['phone'])) {
+            $phoneValue = $data['phone_number'] ?? $data['phone'];
+            $cleanedPhone = preg_replace('/[\s\-\(\)]/', '', $phoneValue);
+            
+            // Valid mobile formats: 09XXXXXXXXX (11 digits total)
+            if (!preg_match('/^09[0-9]{9}$/', $cleanedPhone)) {
+                return response()->json([
+                    'message' => 'Please enter a valid mobile number (e.g., 09171234567)',
+                    'errors' => ['phone_number' => ['Invalid mobile number format. Use 09XXXXXXXXX (11 digits)']]
+                ], 422);
+            }
+        }
+
+        // Validate phone number if provided
+        if (isset($data['phone_number']) || isset($data['phone'])) {
+            $phoneValue = $data['phone_number'] ?? $data['phone'];
+            $cleanedPhone = preg_replace('/[\s\-\(\)]/', '', $phoneValue);
+            
+            // Valid mobile formats: 09XXXXXXXXX (11 digits total)
+            if (!preg_match('/^09[0-9]{9}$/', $cleanedPhone)) {
+                return response()->json([
+                    'message' => 'Please enter a valid mobile number (e.g., 09171234567)',
+                    'errors' => ['phone_number' => ['Invalid mobile number format. Use 09XXXXXXXXX (11 digits)']]
+                ], 422);
+            }
+        }
+
+        // Handle id_number - validate and determine role
+        if (isset($data['id_number'])) {
+            $idNumber = $data['id_number'];
+            
+            // Ensure it's exactly 9 digits
+            if (!preg_match('/^\d{9}$/', $idNumber)) {
+                return response()->json([
+                    'message' => 'ID Number must be exactly 9 digits (numbers only)',
+                    'errors' => ['id_number' => ['ID Number must be exactly 9 digits']]
+                ], 422);
+            }
+            
+            // Determine role based on ID number pattern
+            $firstDigit = $idNumber[0];
+            
+            // If starts with digit 2, it's a student
+            if ($firstDigit === '2') {
+                $data['student_id'] = $idNumber;
+                // Update role to student if not already a higher role
+                if (!in_array($user->role, ['admin', 'rescuer'])) {
+                    $data['role'] = 'student';
+                }
+            } else {
+                // Otherwise (starts with 1,3,4,5,6,7,8,9), it's faculty
+                $data['faculty_id'] = $idNumber;
+                // Update role to faculty if not already a higher role
+                if (!in_array($user->role, ['admin', 'rescuer'])) {
+                    $data['role'] = 'faculty';
+                }
+            }
+            
+            unset($data['id_number']);
+        }
+
+        // Validate emergency contact phone number if provided
+        if (isset($data['emergency_contact_phone'])) {
+            $phoneValue = $data['emergency_contact_phone'];
+            $cleanedPhone = preg_replace('/[\\s\\-\\(\\)]/', '', $phoneValue);
+            
+            // Valid mobile formats: 09XXXXXXXXX (11 digits total)
+            if (!preg_match('/^09[0-9]{9}$/', $cleanedPhone)) {
+                return response()->json([
+                    'message' => 'Please enter a valid mobile number for emergency contact (e.g., 09171234567)',
+                    'errors' => ['emergency_contact_phone' => ['Invalid mobile number format. Use 09XXXXXXXXX (11 digits)']]
+                ], 422);
+            }
+        }
 
         // Map phone_number to phone if provided
         if (isset($data['phone_number'])) {
@@ -1192,6 +1270,557 @@ class AuthController extends Controller
             return response()->json([
                 'status' => 'error',
                 'message' => 'Failed to send reset email. Please try again later.'
+            ], 500);
+        }
+    }
+
+    /**
+     * Send OTP for new user registration
+     */
+    public function registerSendOtp(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'email' => 'required|email',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'message' => 'Invalid email'], 422);
+        }
+
+        $email = trim($request->email);
+        
+        // Validate SDCA email
+        if (!self::isValidSdcaEmail($email)) {
+            return response()->json([
+                'success' => false, 
+                'message' => 'Only SDCA email addresses (@sdca.edu.ph) are allowed for registration'
+            ], 422);
+        }
+
+        // Check if user already exists
+        $existingUser = User::where('email', $email)->first();
+        if ($existingUser) {
+            return response()->json([
+                'success' => false, 
+                'message' => 'An account with this email already exists'
+            ], 422);
+        }
+
+        // Generate 6-digit OTP and temporary password
+        $otp = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+        $tempPassword = 'Temp' . str_pad(random_int(0, 9999), 4, '0', STR_PAD_LEFT) . '!';
+        
+        // Create pending user account
+        $userData = [
+            'email' => $email,
+            'password' => Hash::make($tempPassword),
+            'role' => 'student',
+            'status' => 'pending',
+            'otp_code' => $otp,
+            'otp_expires_at' => Carbon::now()->addMinutes(15),
+            'otp_verified' => false,
+            'force_password_change' => true,
+        ];
+        
+        // Add must_update_profile field if it exists in the database
+        if (\Schema::hasColumn('users', 'must_update_profile')) {
+            $userData['must_update_profile'] = true;
+        }
+        
+        $user = User::create($userData);
+
+        // Send OTP and temporary password via email
+        try {
+            Mail::send([], [], function ($message) use ($user, $otp, $tempPassword) {
+                $message->to($user->email)
+                    ->subject('PinPointMe - Account Registration')
+                    ->html("
+                        <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;'>
+                            <div style='background: linear-gradient(135deg, #3674B5 0%, #2D5F96 100%); padding: 30px; text-align: center;'>
+                                <h1 style='color: white; margin: 0; font-size: 28px;'>Welcome to PinPointMe!</h1>
+                                <p style='color: rgba(255,255,255,0.9); margin: 10px 0 0 0; font-size: 16px;'>Your Emergency Rescue System</p>
+                            </div>
+                            <div style='padding: 30px; background-color: #f8f9fa;'>
+                                <h2 style='color: #333; margin-bottom: 20px;'>Registration Details</h2>
+                                <p style='color: #666; font-size: 16px; line-height: 1.6;'>Thank you for registering with PinPointMe. Here are your registration details:</p>
+                                
+                                <div style='background: white; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #3674B5;'>
+                                    <h3 style='color: #3674B5; margin-top: 0;'>Verification Code (OTP):</h3>
+                                    <p style='font-size: 24px; font-weight: bold; color: #333; margin: 10px 0;'>{$otp}</p>
+                                </div>
+                                
+                                <div style='background: white; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #e74c3c;'>
+                                    <h3 style='color: #e74c3c; margin-top: 0;'>Temporary Password:</h3>
+                                    <p style='font-size: 18px; font-weight: bold; color: #333; margin: 10px 0; font-family: monospace; background: #f5f5f5; padding: 10px; border-radius: 4px;'>{$tempPassword}</p>
+                                </div>
+                                
+                                <div style='background: #fff3cd; padding: 15px; border-radius: 8px; margin: 20px 0; border: 1px solid #ffeaa7;'>
+                                    <p style='color: #856404; margin: 0; font-size: 14px;'>
+                                        <strong>Important:</strong> You must change this temporary password immediately after your first login for security reasons.
+                                    </p>
+                                </div>
+                                
+                                <h3 style='color: #333; margin-top: 30px;'>Next Steps:</h3>
+                                <ol style='color: #666; line-height: 1.8;'>
+                                    <li>Enter the verification code in the registration form</li>
+                                    <li>Set your new secure password</li>
+                                    <li>Log in with your new password</li>
+                                    <li>Complete your profile information</li>
+                                </ol>
+                                
+                                <p style='color: #666; font-size: 14px; margin-top: 30px;'>
+                                    This verification code will expire in 15 minutes. If you need a new code, please request one from the registration form.
+                                </p>
+                            </div>
+                            <div style='background: #333; padding: 20px; text-align: center;'>
+                                <p style='color: #ccc; margin: 0; font-size: 14px;'>PinPointMe Emergency Rescue System</p>
+                                <p style='color: #999; margin: 5px 0 0 0; font-size: 12px;'>This is an automated message. Please do not reply to this email.</p>
+                            </div>
+                        </div>
+                    ");
+            });
+
+            return response()->json([
+                'success' => true, 
+                'message' => 'Registration code and temporary password sent to your email',
+                'expires_in' => 900 // 15 minutes in seconds
+            ]);
+        } catch (\Exception $e) {
+            // Delete the user if email failed to send
+            $user->delete();
+            \Log::error('Failed to send registration email: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Failed to send registration email'], 500);
+        }
+    }
+
+    /**
+     * Verify OTP for registration
+     */
+    public function registerVerifyOtp(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'email' => 'required|email',
+            'otp' => 'required|string|size:6',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'message' => 'Invalid input'], 422);
+        }
+
+        $user = User::where('email', $request->email)->where('status', 'pending')->first();
+        
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Registration not found or already completed'], 404);
+        }
+
+        // Check if OTP matches and hasn't expired
+        if ($user->otp_code !== $request->otp) {
+            return response()->json(['success' => false, 'message' => 'Invalid verification code'], 400);
+        }
+
+        if (Carbon::now()->isAfter($user->otp_expires_at)) {
+            return response()->json(['success' => false, 'message' => 'Verification code has expired'], 400);
+        }
+
+        // Generate a registration token for password change step
+        $registrationToken = bin2hex(random_bytes(32));
+        
+        // Store token temporarily
+        $user->update([
+            'otp_verified' => true,
+            'otp_code' => $registrationToken, // Repurpose for registration token
+            'otp_expires_at' => Carbon::now()->addMinutes(30), // 30 min for password change
+        ]);
+
+        return response()->json([
+            'success' => true, 
+            'message' => 'Verification code confirmed successfully',
+            'token' => $registrationToken,
+        ]);
+    }
+
+    /**
+     * Complete registration with new password
+     */
+    public function registerComplete(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'email' => 'required|email',
+            'token' => 'required|string',
+            'password' => 'required|string|min:8|confirmed',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false, 
+                'message' => 'Invalid input', 
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        $user = User::where('email', $request->email)->where('status', 'pending')->first();
+        
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Registration not found or already completed'], 404);
+        }
+
+        // Verify the token
+        if ($user->otp_code !== $request->token) {
+            return response()->json(['success' => false, 'message' => 'Invalid registration token'], 400);
+        }
+
+        if (!$user->otp_verified) {
+            return response()->json(['success' => false, 'message' => 'Email not verified'], 400);
+        }
+
+        if ($user->otp_expires_at && Carbon::now()->isAfter($user->otp_expires_at)) {
+            return response()->json(['success' => false, 'message' => 'Registration token expired. Please start registration again.'], 400);
+        }
+
+        // Complete registration
+        $updateData = [
+            'password' => Hash::make($request->password),
+            'status' => 'active',
+            'otp_code' => null,
+            'otp_expires_at' => null,
+            'otp_verified' => true,
+            'force_password_change' => false,
+            'password_changed_at' => Carbon::now(),
+            'email_verified_at' => Carbon::now(),
+        ];
+        
+        // Keep must_update_profile => true to force profile completion if column exists
+        if (\Schema::hasColumn('users', 'must_update_profile')) {
+            $updateData['must_update_profile'] = true;
+        }
+        
+        $user->update($updateData);
+        
+        // Send welcome email
+        try {
+            Mail::send([], [], function ($message) use ($user) {
+                $message->to($user->email)
+                    ->subject('Welcome to PinPointMe!')
+                    ->html("
+                        <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;'>
+                            <div style='background: linear-gradient(135deg, #3674B5 0%, #2D5F96 100%); padding: 30px; text-align: center;'>
+                                <h1 style='color: white; margin: 0; font-size: 28px;'>Welcome to PinPointMe!</h1>
+                                <p style='color: rgba(255,255,255,0.9); margin: 10px 0 0 0; font-size: 16px;'>Your account is ready!</p>
+                            </div>
+                            <div style='padding: 30px; background-color: #f8f9fa;'>
+                                <h2 style='color: #333; margin-bottom: 20px;'>Account Activated Successfully</h2>
+                                <p style='color: #666; font-size: 16px; line-height: 1.6;'>Congratulations! Your PinPointMe account has been successfully created and activated.</p>
+                                
+                                <div style='background: #d4edda; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #28a745;'>
+                                    <h3 style='color: #155724; margin-top: 0;'>What's Next?</h3>
+                                    <ul style='color: #155724; margin: 10px 0;'>
+                                        <li>Log in to your account</li>
+                                        <li>Complete your profile information</li>
+                                        <li>Start using the emergency rescue system</li>
+                                    </ul>
+                                </div>
+                                
+                                <p style='color: #666; font-size: 16px; line-height: 1.6;'>Please note that you'll need to complete your profile information before you can submit emergency reports.</p>
+                                
+                                <div style='text-align: center; margin: 30px 0;'>
+                                    <a href='" . url('/login') . "' style='background: #3674B5; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;'>Login Now</a>
+                                </div>
+                            </div>
+                            <div style='background: #333; padding: 20px; text-align: center;'>
+                                <p style='color: #ccc; margin: 0; font-size: 14px;'>PinPointMe Emergency Rescue System</p>
+                                <p style='color: #999; margin: 5px 0 0 0; font-size: 12px;'>This is an automated message. Please do not reply to this email.</p>
+                            </div>
+                        </div>
+                    ");
+            });
+        } catch (\Exception $e) {
+            // Log email error but don't fail the registration
+            \Log::error('Failed to send welcome email: ' . $e->getMessage());
+        }
+
+        return response()->json([
+            'success' => true, 
+            'message' => 'Registration completed successfully! You can now log in.'
+        ]);
+    }
+
+    /**
+     * Redirect to Google OAuth
+     */
+    public function redirectToGoogle()
+    {
+        return \Laravel\Socialite\Facades\Socialite::driver('google')
+            ->with(['hd' => 'sdca.edu.ph']) // Restrict to SDCA domain at OAuth level
+            ->redirect();
+    }
+
+    /**
+     * Handle Google OAuth callback
+     */
+    public function handleGoogleCallback(Request $request)
+    {
+        try {
+            $googleUser = \Laravel\Socialite\Facades\Socialite::driver('google')->user();
+            
+            // Verify SDCA domain
+            $email = strtolower($googleUser->getEmail());
+            $domain = substr($email, strpos($email, '@') + 1);
+            
+            if ($domain !== 'sdca.edu.ph') {
+                return redirect('/login')->withErrors([
+                    'google' => 'Only SDCA email addresses (@sdca.edu.ph) are allowed to sign in with Google.'
+                ]);
+            }
+            
+            // Check if user already exists
+            $user = User::where('email', $email)->first();
+            
+            if ($user) {
+                // Existing user - update Google OAuth data and login
+                $user->update([
+                    'google_id' => $googleUser->getId(),
+                    'google_token' => $googleUser->token,
+                    'profile_picture' => $googleUser->getAvatar() ?? $user->profile_picture,
+                    'last_login_at' => Carbon::now(),
+                ]);
+                
+                Auth::login($user);
+                $request->session()->regenerate();
+                
+                // Check if user needs to complete profile
+                if ($user->must_update_profile) {
+                    return redirect('/user/profile')->with('message', 'Please complete your profile information.');
+                }
+                
+                // Redirect based on role
+                if ($user->isAdmin == 1 || $user->isAdmin === true || $user->role === 'admin') {
+                    return redirect()->intended('/admin/dashboard');
+                } elseif ($user->role === 'rescuer') {
+                    return redirect()->intended('/rescuer/dashboard');
+                } else {
+                    return redirect()->intended('/user/scanner');
+                }
+            }
+            
+            // New user - store Google data in session and redirect to complete registration
+            $request->session()->put('google_user', [
+                'google_id' => $googleUser->getId(),
+                'email' => $email,
+                'first_name' => $googleUser->offsetGet('given_name') ?? $googleUser->getName(),
+                'last_name' => $googleUser->offsetGet('family_name') ?? '',
+                'profile_picture' => $googleUser->getAvatar(),
+                'google_token' => $googleUser->token,
+            ]);
+            
+            return redirect('/auth/google/complete');
+            
+        } catch (\Exception $e) {
+            \Log::error('Google OAuth error: ' . $e->getMessage());
+            return redirect('/login')->withErrors([
+                'google' => 'Failed to authenticate with Google. Please try again.'
+            ]);
+        }
+    }
+
+    /**
+     * Show Google OAuth registration completion form
+     */
+    public function showGoogleComplete(Request $request)
+    {
+        $googleUser = $request->session()->get('google_user');
+        
+        if (!$googleUser) {
+            return redirect('/login')->withErrors([
+                'google' => 'Session expired. Please try signing in with Google again.'
+            ]);
+        }
+        
+        return Inertia::render('User/GoogleComplete', [
+            'googleUser' => [
+                'email' => $googleUser['email'],
+                'first_name' => $googleUser['first_name'],
+                'last_name' => $googleUser['last_name'],
+                'profile_picture' => $googleUser['profile_picture'],
+            ]
+        ]);
+    }
+
+    /**
+     * Complete Google OAuth registration with additional user data
+     */
+    public function completeGoogleRegistration(Request $request)
+    {
+        $googleUser = $request->session()->get('google_user');
+        
+        if (!$googleUser) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Session expired. Please try signing in with Google again.'
+            ], 400);
+        }
+        
+        // Validate the additional fields
+        $validator = Validator::make($request->all(), [
+            'id_number' => [
+                'required',
+                'string',
+                'digits:9',
+                'regex:/^[0-9]{9}$/',
+            ],
+            'phone_number' => [
+                'required',
+                'string',
+                'regex:/^(09|\+639|639)[0-9]{9}$/',
+                function ($attribute, $value, $fail) {
+                    // Normalize the phone number
+                    $normalized = preg_replace('/[^0-9]/', '', $value);
+                    if (str_starts_with($normalized, '63')) {
+                        $normalized = '0' . substr($normalized, 2);
+                    }
+                    if (str_starts_with($normalized, '9') && strlen($normalized) === 10) {
+                        $normalized = '0' . $normalized;
+                    }
+                    
+                    // Valid Philippine mobile prefixes
+                    $validPrefixes = [
+                        // Globe/TM
+                        '0905', '0906', '0915', '0916', '0917', '0926', '0927', '0935', '0936', '0937', 
+                        '0945', '0953', '0954', '0955', '0956', '0965', '0966', '0967', '0975', '0976', 
+                        '0977', '0978', '0979', '0995', '0996', '0997',
+                        // Smart/TNT/Sun
+                        '0908', '0909', '0910', '0911', '0912', '0913', '0914', '0918', '0919', '0920', 
+                        '0921', '0928', '0929', '0930', '0938', '0939', '0940', '0946', '0947', '0948', 
+                        '0949', '0950', '0951', '0961', '0963', '0968', '0969', '0970', '0981', '0989', 
+                        '0992', '0998', '0999',
+                        // DITO
+                        '0895', '0896', '0897', '0898', '0991', '0992', '0993', '0994',
+                    ];
+                    
+                    $prefix = substr($normalized, 0, 4);
+                    if (!in_array($prefix, $validPrefixes)) {
+                        $fail('Please enter a valid Philippine mobile number with a recognized network prefix.');
+                    }
+                },
+            ],
+            'emergency_contact_name' => 'nullable|string|max:255',
+            'emergency_contact_phone' => [
+                'nullable',
+                'string',
+                'regex:/^(09|\+639|639)[0-9]{9}$/',
+            ],
+            'emergency_contact_relationship' => 'nullable|string|max:100',
+        ], [
+            'id_number.required' => 'ID number is required.',
+            'id_number.digits' => 'ID number must be exactly 9 digits.',
+            'id_number.regex' => 'ID number must contain only numbers.',
+            'phone_number.required' => 'Phone number is required.',
+            'phone_number.regex' => 'Please enter a valid Philippine mobile number (e.g., 09171234567).',
+        ]);
+        
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed.',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+        
+        // Determine role based on ID number first digit
+        $idNumber = $request->id_number;
+        $firstDigit = substr($idNumber, 0, 1);
+        $role = ($firstDigit === '2') ? 'student' : 'faculty';
+        
+        // Create the user
+        $userData = [
+            'email' => $googleUser['email'],
+            'first_name' => $googleUser['first_name'],
+            'last_name' => $googleUser['last_name'],
+            'profile_picture' => $googleUser['profile_picture'],
+            'google_id' => $googleUser['google_id'],
+            'google_token' => $googleUser['google_token'],
+            'role' => $role,
+            'contact_number' => $request->phone_number,
+            'password' => Hash::make(\Illuminate\Support\Str::random(32)), // Random password since they use Google
+            'status' => 'active',
+            'otp_verified' => true,
+            'email_verified_at' => Carbon::now(),
+            'must_update_profile' => false,
+        ];
+        
+        // Set appropriate ID field based on role
+        if ($role === 'student') {
+            $userData['student_id'] = $idNumber;
+        } else {
+            $userData['faculty_id'] = $idNumber;
+        }
+        
+        // Add emergency contact if provided
+        if ($request->emergency_contact_name) {
+            $userData['emergency_contact_name'] = $request->emergency_contact_name;
+        }
+        if ($request->emergency_contact_phone) {
+            $userData['emergency_contact_phone'] = $request->emergency_contact_phone;
+        }
+        if ($request->emergency_contact_relationship) {
+            $userData['emergency_contact_relationship'] = $request->emergency_contact_relationship;
+        }
+        
+        try {
+            $user = User::create($userData);
+            
+            // Clear the Google session data
+            $request->session()->forget('google_user');
+            
+            // Login the user
+            Auth::login($user);
+            $request->session()->regenerate();
+            
+            // Send welcome email
+            try {
+                Mail::send([], [], function ($message) use ($user) {
+                    $message->to($user->email)
+                        ->subject('Welcome to PinPointMe!')
+                        ->html("
+                            <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;'>
+                                <div style='background: linear-gradient(135deg, #3674B5 0%, #2D5F96 100%); padding: 30px; text-align: center;'>
+                                    <h1 style='color: white; margin: 0; font-size: 28px;'>Welcome to PinPointMe!</h1>
+                                    <p style='color: rgba(255,255,255,0.9); margin: 10px 0 0 0; font-size: 16px;'>Your SDCA Google account is connected!</p>
+                                </div>
+                                <div style='padding: 30px; background-color: #f8f9fa;'>
+                                    <h2 style='color: #333; margin-bottom: 20px;'>Account Created Successfully</h2>
+                                    <p style='color: #666; font-size: 16px; line-height: 1.6;'>Your PinPointMe account has been created using your SDCA Google account.</p>
+                                    
+                                    <div style='background: #d4edda; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #28a745;'>
+                                        <h3 style='color: #155724; margin-top: 0;'>Account Details</h3>
+                                        <ul style='color: #155724; margin: 10px 0;'>
+                                            <li>Role: " . ucfirst($user->role) . "</li>
+                                            <li>ID Number: " . ($user->student_id ?? $user->faculty_id) . "</li>
+                                        </ul>
+                                    </div>
+                                    
+                                    <p style='color: #666; font-size: 16px; line-height: 1.6;'>You can now use PinPointMe's emergency rescue system.</p>
+                                </div>
+                                <div style='background: #333; padding: 20px; text-align: center;'>
+                                    <p style='color: #ccc; margin: 0; font-size: 14px;'>PinPointMe Emergency Rescue System</p>
+                                </div>
+                            </div>
+                        ");
+                });
+            } catch (\Exception $e) {
+                \Log::error('Failed to send Google registration welcome email: ' . $e->getMessage());
+            }
+            
+            return response()->json([
+                'success' => true,
+                'message' => 'Registration completed successfully!',
+                'redirect' => '/user/scanner'
+            ]);
+            
+        } catch (\Exception $e) {
+            \Log::error('Google registration error: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to create account. Please try again.'
             ], 500);
         }
     }

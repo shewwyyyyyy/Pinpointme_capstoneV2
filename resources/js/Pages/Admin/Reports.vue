@@ -9,33 +9,55 @@
                 <span class="text-white font-weight-bold">PinPointMe Admin</span>
             </v-app-bar-title>
             <v-spacer />
-            <v-btn icon @click="logout">
-                <v-icon>mdi-logout</v-icon>
-            </v-btn>
+            <!-- Profile Avatar Menu -->
+            <v-menu offset-y>
+                <template v-slot:activator="{ props }">
+                    <v-btn icon v-bind="props">
+                        <v-avatar color="white" size="36">
+                            <span class="text-primary font-weight-bold">{{ adminInitials }}</span>
+                        </v-avatar>
+                    </v-btn>
+                </template>
+                <v-list>
+                    <v-list-item @click="goToProfile" prepend-icon="mdi-account">
+                        <v-list-item-title>Profile</v-list-item-title>
+                    </v-list-item>
+                    <v-list-item @click="toggleDarkMode" prepend-icon="mdi-theme-light-dark">
+                        <v-list-item-title>{{ isDark ? 'Light Mode' : 'Dark Mode' }}</v-list-item-title>
+                    </v-list-item>
+                    <v-list-item @click="logout" prepend-icon="mdi-logout">
+                        <v-list-item-title>Logout</v-list-item-title>
+                    </v-list-item>
+                </v-list>
+            </v-menu>
         </v-app-bar>
 
         <!-- Navigation Drawer (Unified) -->
-        <v-navigation-drawer v-model="drawer" permanent>
+        <v-navigation-drawer
+            v-model="drawer"
+            :permanent="!isMobile"
+            :temporary="isMobile"
+            app
+        >
             <v-list>
-                <v-list-item prepend-icon="mdi-view-dashboard" title="Dashboard" href="/admin/dashboard"></v-list-item>
-                <v-list-item prepend-icon="mdi-account-group" title="Users" href="/admin/users"></v-list-item>
-                <v-list-item prepend-icon="mdi-lifebuoy" title="Rescuers" href="/admin/rescuers"></v-list-item>
-                <v-list-item prepend-icon="mdi-office-building" title="Buildings" href="/admin/buildings"></v-list-item>
-                <v-list-item prepend-icon="mdi-file-chart" title="Reports" href="/admin/reports" active></v-list-item>
-                <v-list-item prepend-icon="mdi-shield-alert" title="Preventive Measures" href="/admin/preventive-measures"></v-list-item>
+                <v-list-item prepend-icon="mdi-view-dashboard" title="Dashboard" href="/admin/dashboard" @click="closeDrawerOnMobile"></v-list-item>
+                <v-list-item prepend-icon="mdi-account-group" title="Users" href="/admin/users" @click="closeDrawerOnMobile"></v-list-item>
+                <v-list-item prepend-icon="mdi-lifebuoy" title="Rescuers" href="/admin/rescuers" @click="closeDrawerOnMobile"></v-list-item>
+                <v-list-item prepend-icon="mdi-office-building" title="Buildings" href="/admin/buildings" @click="closeDrawerOnMobile"></v-list-item>
+                <v-list-item prepend-icon="mdi-file-chart" title="Reports" href="/admin/reports" active @click="closeDrawerOnMobile"></v-list-item>
+                <v-list-item prepend-icon="mdi-shield-alert" title="Preventive Measures" href="/admin/preventive-measures" @click="closeDrawerOnMobile"></v-list-item>
             </v-list>
         </v-navigation-drawer>
 
         <!-- Main Content -->
         <v-main>
-            <v-container fluid class="pa-6">
+            <v-container fluid :class="isMobile ? 'pa-3' : 'pa-6'">
                 <!-- Page Header -->
-                <div class="d-flex align-center mb-6">
-                    <div>
-                        <h1 class="text-h4 font-weight-bold">Rescue Reports</h1>
-                        <p class="text-grey mt-1">View and analyze rescue request data</p>
+                <div class="page-header mb-4 mb-md-6">
+                    <div class="page-header-content">
+                        <h1 :class="isMobile ? 'text-h5' : 'text-h4'" class="font-weight-bold">Rescue Reports</h1>
+                        <p class="text-grey mt-1 text-body-2">View and analyze rescue request data</p>
                     </div>
-                    <v-spacer />
                 </div>
 
                 <!-- Filters -->
@@ -357,13 +379,31 @@ import { ref, computed, onMounted } from 'vue';
 import { router } from '@inertiajs/vue3';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { useDisplay } from 'vuetify';
+
+const { mobile } = useDisplay();
+const isMobile = computed(() => mobile.value);
+
+const isDark = ref(false);
+const toggleDarkMode = () => {
+    isDark.value = !isDark.value;
+    document.documentElement.classList.toggle('v-theme--dark', isDark.value);
+};
+const goToProfile = () => {
+    window.location.href = '/admin/profile';
+};
+const closeDrawerOnMobile = () => {
+    if (isMobile.value) {
+        drawer.value = false;
+    }
+};
 
 const props = defineProps({
     reportData: { type: Array, default: () => [] },
     counts: { type: Object, default: () => ({ total: 0, pending: 0, in_progress: 0, completed: 0 }) }
 });
 
-const drawer = ref(true);
+const drawer = ref(!mobile.value);
 const loading = ref(false);
 const exporting = ref(false);
 const search = ref('');
@@ -701,5 +741,31 @@ onMounted(() => {
 
 .gap-2 {
     gap: 8px;
+}
+
+/* Page Header Responsive Styles */
+.page-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.page-header-content {
+    flex: 1;
+    min-width: 200px;
+}
+
+/* Mobile Specific Styles */
+@media (max-width: 600px) {
+    .page-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .page-header-content {
+        width: 100%;
+    }
 }
 </style>

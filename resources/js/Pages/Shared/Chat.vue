@@ -27,10 +27,6 @@
                     {{ rescueRequest.room?.room_name || rescueRequest.room?.name }} • {{ formatStatus(rescueRequest.status) }}
                 </div>
             </div>
-            
-            <v-btn v-if="rescueRequest" icon @click="viewRescue">
-                <v-icon>mdi-information-outline</v-icon>
-            </v-btn>
         </v-app-bar>
 
         <!-- Main Content -->
@@ -100,9 +96,8 @@
                                         <v-icon>{{ playingAudioId === message.id ? 'mdi-pause' : 'mdi-play' }}</v-icon>
                                     </v-btn>
                                     <div class="audio-waveform flex-grow-1 mx-2">
-                                        <div class="waveform-bar" v-for="n in 20" :key="n" :style="{ height: `${Math.random() * 100}%` }"></div>
+                                        <div class="waveform-bar" v-for="n in 15" :key="n" :style="{ height: `${Math.random() * 16 + 4}px` }"></div>
                                     </div>
-                                    <span class="text-caption">{{ formatDuration(audioElements[message.id]?.duration) }}</span>
                                 </div>
 
                                 <!-- Image Message -->
@@ -120,8 +115,8 @@
                                     </div>
                                 </div>
 
-                                <!-- Other Attachments -->
-                                <div v-else-if="message.attachment_url" class="attachment-message">
+                                <!-- Other Attachments (non-audio, non-image) -->
+                                <div v-else-if="message.attachment_url && !isAudioAttachment(message) && !isImageAttachment(message)" class="attachment-message">
                                     <v-btn
                                         variant="tonal"
                                         :color="isOwnMessage(message) ? 'white' : 'primary'"
@@ -739,7 +734,9 @@ const triggerCameraCapture = async () => {
     
     if (isMobile) {
         // Use native file input with capture on mobile
-        cameraInput.value?.click();
+        if (cameraInput.value) {
+            cameraInput.value.click();
+        }
     } else {
         // Use webcam dialog on desktop
         try {
@@ -753,6 +750,12 @@ const triggerCameraCapture = async () => {
             
             if (cameraVideo.value) {
                 cameraVideo.value.srcObject = stream;
+                try {
+                    await cameraVideo.value.play();
+                } catch (playError) {
+                    // Video may auto-play, ignore error
+                    console.log('Video autoplay handled');
+                }
             }
         } catch (error) {
             console.error('Camera access error:', error);
@@ -795,11 +798,15 @@ const closeCameraDialog = () => {
 };
 
 const triggerImageUpload = () => {
-    imageInput.value?.click();
+    if (imageInput.value) {
+        imageInput.value.click();
+    }
 };
 
 const triggerFileUpload = () => {
-    fileInput.value?.click();
+    if (fileInput.value) {
+        fileInput.value.click();
+    }
 };
 
 const handleCameraCapture = async (event) => {
@@ -854,22 +861,51 @@ const toggleAudio = (message) => {
     const audioUrl = getAttachmentUrl(message.attachment_url);
     
     if (playingAudioId.value === message.id) {
-        // Pause
-        audioElements.value[message.id]?.pause();
+        // Pause current audio
+        if (audioElements.value[message.id]) {
+            audioElements.value[message.id].pause();
+        }
         playingAudioId.value = null;
     } else {
-        // Stop any playing audio
-        Object.values(audioElements.value).forEach(audio => audio?.pause());
+        // Stop any currently playing audio
+        Object.entries(audioElements.value).forEach(([id, audio]) => {
+            if (audio) {
+                audio.pause();
+                audio.currentTime = 0;
+            }
+        });
         
         // Play new audio
         if (!audioElements.value[message.id]) {
-            audioElements.value[message.id] = new Audio(audioUrl);
-            audioElements.value[message.id].onended = () => {
+            const audio = new Audio();
+            audio.src = audioUrl;
+            audio.preload = 'metadata';
+            
+            audio.addEventListener('loadedmetadata', () => {
+                // Audio loaded successfully
+            });
+            
+            audio.addEventListener('ended', () => {
                 playingAudioId.value = null;
-            };
+            });
+            
+            audio.addEventListener('error', (e) => {
+                console.error('Audio playback error:', e);
+                showSnackbar('Failed to play audio', 'error');
+                playingAudioId.value = null;
+            });
+            
+            audioElements.value[message.id] = audio;
         }
-        audioElements.value[message.id].play();
-        playingAudioId.value = message.id;
+        
+        const audio = audioElements.value[message.id];
+        audio.play().then(() => {
+            playingAudioId.value = message.id;
+        }).catch((error) => {
+            console.error('Audio play error:', error);
+            showSnackbar('Failed to play audio', 'error');
+            playingAudioId.value = null;
+        });
     }
 };
 
@@ -880,6 +916,9 @@ const showImagePreview = (url) => {
 
 const markMessagesAsRead = async () => {
     if (!conversation.value?.id || !currentUserId.value) return;
+    
+    // Only mark as read if the document is visible (user is actively viewing)
+    if (document.hidden) return;
     
     const unreadMessages = messages.value.filter(
         m => m.status !== 'read' && m.sender_id !== currentUserId.value
@@ -906,16 +945,65 @@ const goBack = () => {
     const urlParams = new URLSearchParams(window.location.search);
     const from = urlParams.get('from');
     
+    // Handle specific 'from' parameters first
     if (from === 'dashboard-inprogress') {
         // Go back to dashboard with inProgress tab selected
         router.visit('/rescuer/dashboard?tab=inProgress');
-    } else if (from === 'active-rescue' && rescueRequest.value?.id) {
+        return;
+    } 
+    
+    if (from === 'dashboard-pending') {
+        // Go back to dashboard with pending tab selected
+        router.visit('/rescuer/dashboard?tab=pending');
+        return;
+    }
+    
+    if (from === 'dashboard-rescued') {
+        // Go back to dashboard with rescued tab selected
+        router.visit('/rescuer/dashboard?tab=rescued');
+        return;
+    }
+    
+    if (from === 'rescuer-chats') {
+        // Go back to rescuer chats page
+        router.visit('/rescuer/chats');
+        return;
+    }
+    
+    if (from === 'user-inbox') {
+        // Go back to user inbox page
+        router.visit('/user/inbox');
+        return;
+    }
+    
+    if (from === 'active-rescue' && rescueRequest.value?.id) {
         // Go back to active rescue page
         router.visit(`/rescuer/active/${rescueRequest.value.id}`);
-    } else if (props.userRole === 'rescuer') {
+        return;
+    }
+    
+    // Try to use browser history first (if user navigated within the app)
+    if (window.history.length > 1) {
+        const referrer = document.referrer;
+        const currentOrigin = window.location.origin;
+        
+        // Only go back if the referrer is from the same origin (same app)
+        if (referrer && referrer.startsWith(currentOrigin)) {
+            window.history.back();
+            return;
+        }
+    }
+    
+    // Fallback to role-specific default pages
+    if (props.userRole === 'rescuer') {
         router.visit('/rescuer/chats');
     } else {
-        router.visit('/user/inbox');
+        // For users, go back to messages/inbox first, then help-coming if available
+        if (rescueRequest.value?.rescue_code) {
+            router.visit(`/user/help-coming/${rescueRequest.value.rescue_code}`);
+        } else {
+            router.visit('/user/inbox');
+        }
     }
 };
 
@@ -942,7 +1030,20 @@ const getMessageSenderName = (message) => {
 };
 
 const isAudioAttachment = (message) => {
-    return message.attachment_type?.includes('audio');
+    // Check attachment_type first
+    if (message.attachment_type?.includes('audio')) {
+        return true;
+    }
+    
+    // Fallback: check file extension or name for audio files
+    const attachmentName = message.attachment_name || message.attachment_url || '';
+    const audioExtensions = ['.webm', '.mp3', '.wav', '.ogg', '.m4a', '.aac'];
+    const isAudioFile = audioExtensions.some(ext => attachmentName.toLowerCase().includes(ext));
+    
+    // Also check if content mentions voice message
+    const isVoiceMessage = message.content && message.content.includes('Voice message');
+    
+    return isAudioFile || isVoiceMessage;
 };
 
 const isImageAttachment = (message) => {
@@ -952,9 +1053,13 @@ const isImageAttachment = (message) => {
 const getAttachmentUrl = (url) => {
     if (!url) return '';
     if (url.startsWith('http')) return url;
-    // Use empty string for same-origin requests to avoid CORS issues
-    const baseUrl = import.meta.env.VITE_API_BASE_URL || '';
-    return `${baseUrl}${url.startsWith('/') ? '' : '/'}${url}`;
+    
+    // Get base URL from environment or use current origin
+    const baseUrl = import.meta.env.VITE_API_BASE_URL || window.location.origin;
+    
+    // Ensure proper URL construction
+    const cleanUrl = url.startsWith('/') ? url : `/${url}`;
+    return `${baseUrl}${cleanUrl}`;
 };
 
 const getEmergencyColor = (type) => {
@@ -1021,7 +1126,17 @@ onMounted(async () => {
     if (conversation.value?.id) {
         pollingInterval.value = setInterval(() => fetchMessages(), 5000);
     }
+    
+    // Add visibility change listener to mark messages as read when user returns to tab
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 });
+
+// Handle visibility change - mark messages as read when user returns to tab
+const handleVisibilityChange = () => {
+    if (!document.hidden && conversation.value?.id) {
+        markMessagesAsRead();
+    }
+};
 
 onUnmounted(() => {
     if (pollingInterval.value) {
@@ -1033,6 +1148,8 @@ onUnmounted(() => {
     Object.values(audioElements.value).forEach(audio => {
         audio?.pause();
     });
+    // Remove visibility change listener
+    document.removeEventListener('visibilitychange', handleVisibilityChange);
 });
 
 // Watch for conversation changes to start polling

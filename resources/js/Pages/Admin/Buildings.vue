@@ -9,36 +9,64 @@
                 <span class="text-white font-weight-bold">PinPointMe Admin</span>
             </v-app-bar-title>
             <v-spacer />
-            <v-btn icon @click="logout">
-                <v-icon>mdi-logout</v-icon>
-            </v-btn>
+            <!-- Profile Avatar Menu -->
+            <v-menu offset-y>
+                <template v-slot:activator="{ props }">
+                    <v-btn icon v-bind="props">
+                        <v-avatar color="white" size="36">
+                            <span class="text-primary font-weight-bold">{{ adminInitials }}</span>
+                        </v-avatar>
+                    </v-btn>
+                </template>
+                <v-list>
+                    <v-list-item @click="goToProfile" prepend-icon="mdi-account">
+                        <v-list-item-title>Profile</v-list-item-title>
+                    </v-list-item>
+                    <v-list-item @click="toggleDarkMode" prepend-icon="mdi-theme-light-dark">
+                        <v-list-item-title>{{ isDark ? 'Light Mode' : 'Dark Mode' }}</v-list-item-title>
+                    </v-list-item>
+                    <v-list-item @click="logout" prepend-icon="mdi-logout">
+                        <v-list-item-title>Logout</v-list-item-title>
+                    </v-list-item>
+                </v-list>
+            </v-menu>
         </v-app-bar>
 
         <!-- Navigation Drawer (Unified) -->
-        <v-navigation-drawer v-model="drawer" permanent>
+        <v-navigation-drawer
+            v-model="drawer"
+            :permanent="!isMobile"
+            :temporary="isMobile"
+            app
+        >
             <v-list>
-                <v-list-item prepend-icon="mdi-view-dashboard" title="Dashboard" href="/admin/dashboard"></v-list-item>
-                <v-list-item prepend-icon="mdi-account-group" title="Users" href="/admin/users"></v-list-item>
-                <v-list-item prepend-icon="mdi-lifebuoy" title="Rescuers" href="/admin/rescuers"></v-list-item>
-                <v-list-item prepend-icon="mdi-office-building" title="Buildings" href="/admin/buildings" active></v-list-item>
-                <v-list-item prepend-icon="mdi-file-chart" title="Reports" href="/admin/reports"></v-list-item>
-                <v-list-item prepend-icon="mdi-shield-alert" title="Preventive Measures" href="/admin/preventive-measures"></v-list-item>
+                <v-list-item prepend-icon="mdi-view-dashboard" title="Dashboard" href="/admin/dashboard" @click="closeDrawerOnMobile"></v-list-item>
+                <v-list-item prepend-icon="mdi-account-group" title="Users" href="/admin/users" @click="closeDrawerOnMobile"></v-list-item>
+                <v-list-item prepend-icon="mdi-lifebuoy" title="Rescuers" href="/admin/rescuers" @click="closeDrawerOnMobile"></v-list-item>
+                <v-list-item prepend-icon="mdi-office-building" title="Buildings" href="/admin/buildings" active @click="closeDrawerOnMobile"></v-list-item>
+                <v-list-item prepend-icon="mdi-file-chart" title="Reports" href="/admin/reports" @click="closeDrawerOnMobile"></v-list-item>
+                <v-list-item prepend-icon="mdi-shield-alert" title="Preventive Measures" href="/admin/preventive-measures" @click="closeDrawerOnMobile"></v-list-item>
             </v-list>
         </v-navigation-drawer>
 
         <!-- Main Content -->
         <v-main>
-            <v-container fluid class="pa-6">
+            <v-container fluid :class="isMobile ? 'pa-3' : 'pa-6'">
                 <!-- Page Header -->
-                <div class="d-flex align-center mb-6">
-                    <div>
-                        <h1 class="text-h4 font-weight-bold">Building Management</h1>
-                        <p class="text-grey mt-1">Manage buildings, floors, and rooms</p>
+                <div class="page-header mb-4 mb-md-6">
+                    <div class="page-header-content">
+                        <h1 :class="isMobile ? 'text-h5' : 'text-h4'" class="font-weight-bold">Building Management</h1>
+                        <p class="text-grey mt-1 text-body-2">Manage buildings, floors, and rooms</p>
                     </div>
-                    <v-spacer />
-                    <v-btn color="primary" @click="openAddBuildingDialog">
+                    <v-btn 
+                        color="primary" 
+                        @click="openAddBuildingDialog"
+                        :size="isMobile ? 'small' : 'default'"
+                        class="add-building-btn"
+                    >
                         <v-icon start>mdi-plus</v-icon>
-                        Add Building
+                        <span v-if="!isMobile">Add Building</span>
+                        <span v-else>Add</span>
                     </v-btn>
                 </div>
 
@@ -120,6 +148,18 @@
                                                 Generate All QR Codes
                                             </v-list-item-title>
                                         </v-list-item>
+                                        <v-list-item @click="expandAllFloors(building)">
+                                            <v-list-item-title>
+                                                <v-icon start size="small" color="info">mdi-chevron-double-down</v-icon>
+                                                Expand All Floors
+                                            </v-list-item-title>
+                                        </v-list-item>
+                                        <v-list-item @click="collapseAllFloors(building)">
+                                            <v-list-item-title>
+                                                <v-icon start size="small" color="info">mdi-chevron-double-up</v-icon>
+                                                Collapse All Floors
+                                            </v-list-item-title>
+                                        </v-list-item>
                                         <v-divider />
                                         <v-list-item @click="openEditBuildingDialog(building)">
                                             <v-list-item-title>
@@ -143,75 +183,100 @@
                                     <v-card-text>
                                         <!-- Floors -->
                                         <div v-for="floor in building.floors" :key="floor.id" class="mb-4">
-                                            <div class="d-flex align-center pa-3 bg-grey-lighten-4 rounded mb-2">
-                                                <v-icon class="mr-2" color="info">mdi-layers</v-icon>
-                                                <span class="font-weight-medium">{{ floor.floor_name }}</span>
-                                                <v-chip size="x-small" class="ml-2" color="grey">
-                                                    {{ floor.rooms?.length || 0 }} rooms
-                                                </v-chip>
-                                                <v-chip 
-                                                    v-if="floor.floor_plan_url" 
-                                                    size="x-small" 
-                                                    class="ml-2" 
-                                                    color="success"
-                                                >
-                                                    <v-icon start size="x-small">mdi-floor-plan</v-icon>
-                                                    Floor Plan
-                                                </v-chip>
-                                                <v-spacer />
-                                                <v-btn 
-                                                    v-if="floor.floor_plan_url && floor.floor_plan_data?.evacuation_paths?.length"
-                                                    variant="text" 
-                                                    size="x-small" 
-                                                    color="warning"
-                                                    @click="openEvacuationPathDialog(building, floor)"
-                                                    title="View Evacuation Paths"
-                                                >
-                                                    <v-icon start size="small">mdi-routes</v-icon>
-                                                    Evacuation
-                                                </v-btn>
-                                                <v-btn 
-                                                    variant="text" 
-                                                    size="x-small" 
-                                                    color="primary"
-                                                    @click="openFloorPlanEditor(floor)"
-                                                    title="Edit Floor Plan"
-                                                >
-                                                    <v-icon start size="small">mdi-floor-plan</v-icon>
-                                                    Floor Plan
-                                                </v-btn>
-                                                <v-btn variant="text" size="x-small" @click="openAddRoomDialog(building, floor)">
-                                                    <v-icon start size="small">mdi-plus</v-icon>
-                                                    Add Room
-                                                </v-btn>
-                                                <v-btn icon size="x-small" @click="openEditFloorDialog(building, floor)">
-                                                    <v-icon size="small">mdi-pencil</v-icon>
-                                                </v-btn>
-                                                <v-btn icon size="x-small" color="error" @click="confirmDeleteFloor(building, floor)">
-                                                    <v-icon size="small">mdi-delete</v-icon>
-                                                </v-btn>
+                                            <div class="floor-header pa-3 bg-grey-lighten-4 rounded mb-2">
+                                                <div class="floor-info">
+                                                    <v-btn 
+                                                        icon 
+                                                        size="x-small" 
+                                                        variant="text" 
+                                                        @click="toggleFloor(floor.id)"
+                                                        class="mr-1"
+                                                    >
+                                                        <v-icon size="small" color="info">
+                                                            {{ expandedFloors.includes(floor.id) ? 'mdi-chevron-down' : 'mdi-chevron-right' }}
+                                                        </v-icon>
+                                                    </v-btn>
+                                                    <v-icon class="mr-1" color="info" size="small">mdi-layers</v-icon>
+                                                    <span class="font-weight-medium text-body-2">{{ floor.floor_name }}</span>
+                                                    <v-chip size="x-small" class="ml-2" color="grey">
+                                                        {{ floor.rooms?.length || 0 }}
+                                                    </v-chip>
+                                                    <v-chip 
+                                                        v-if="floor.floor_plan_url" 
+                                                        size="x-small" 
+                                                        class="ml-1" 
+                                                        color="success"
+                                                    >
+                                                        <v-icon size="x-small">mdi-floor-plan</v-icon>
+                                                    </v-chip>
+                                                </div>
+                                                <div class="floor-actions">
+                                                    <v-btn 
+                                                        v-if="floor.floor_plan_url && floor.floor_plan_data?.evacuation_paths?.length"
+                                                        variant="text" 
+                                                        size="x-small" 
+                                                        color="warning"
+                                                        @click="openEvacuationPathDialog(building, floor)"
+                                                        title="View Evacuation Paths"
+                                                        :icon="isMobile"
+                                                    >
+                                                        <v-icon :start="!isMobile" size="small">mdi-routes</v-icon>
+                                                        <span v-if="!isMobile">Evacuation</span>
+                                                    </v-btn>
+                                                    <v-btn 
+                                                        variant="text" 
+                                                        size="x-small" 
+                                                        color="primary"
+                                                        @click="openFloorPlanEditor(floor)"
+                                                        title="Edit Floor Plan"
+                                                        :icon="isMobile"
+                                                    >
+                                                        <v-icon :start="!isMobile" size="small">mdi-floor-plan</v-icon>
+                                                        <span v-if="!isMobile">Floor Plan</span>
+                                                    </v-btn>
+                                                    <v-btn 
+                                                        variant="text" 
+                                                        size="x-small" 
+                                                        @click="openAddRoomDialog(building, floor)"
+                                                        :icon="isMobile"
+                                                    >
+                                                        <v-icon :start="!isMobile" size="small">mdi-plus</v-icon>
+                                                        <span v-if="!isMobile">Add Room</span>
+                                                    </v-btn>
+                                                    <v-btn icon size="x-small" @click="openEditFloorDialog(building, floor)">
+                                                        <v-icon size="small">mdi-pencil</v-icon>
+                                                    </v-btn>
+                                                    <v-btn icon size="x-small" color="error" @click="confirmDeleteFloor(building, floor)">
+                                                        <v-icon size="small">mdi-delete</v-icon>
+                                                    </v-btn>
+                                                </div>
                                             </div>
 
-                                            <!-- Rooms -->
-                                            <v-row class="ml-6">
-                                                <v-col v-for="room in floor.rooms" :key="room.id" cols="6" sm="4" md="3" lg="2">
-                                                    <v-card variant="outlined" class="pa-2 text-center">
-                                                        <v-icon color="success" size="small">mdi-door</v-icon>
-                                                        <div class="text-caption font-weight-medium">{{ room.room_name }}</div>
-                                                        <div class="d-flex justify-center mt-1">
-                                                            <v-btn icon size="x-small" color="primary" @click="openQrDialog(building, floor, room)" title="Generate QR Code">
-                                                                <v-icon size="x-small">mdi-qrcode</v-icon>
-                                                            </v-btn>
-                                                            <v-btn icon size="x-small" @click="openEditRoomDialog(building, floor, room)">
-                                                                <v-icon size="x-small">mdi-pencil</v-icon>
-                                                            </v-btn>
-                                                            <v-btn icon size="x-small" color="error" @click="confirmDeleteRoom(building, floor, room)">
-                                                                <v-icon size="x-small">mdi-delete</v-icon>
-                                                            </v-btn>
-                                                        </div>
-                                                    </v-card>
-                                                </v-col>
-                                            </v-row>
+                                            <!-- Rooms with Collapse -->
+                                            <v-expand-transition>
+                                                <div v-show="expandedFloors.includes(floor.id)">
+                                                    <v-row class="ml-6">
+                                                        <v-col v-for="room in floor.rooms" :key="room.id" cols="6" sm="4" md="3" lg="2">
+                                                            <v-card variant="outlined" class="pa-2 text-center">
+                                                                <v-icon color="success" size="small">mdi-door</v-icon>
+                                                                <div class="text-caption font-weight-medium mb-2">{{ room.room_name }}</div>
+                                                                
+                                                                <div class="d-flex justify-center mt-1 flex-wrap gap-1">
+                                                                    <v-btn icon size="x-small" color="primary" @click="openQrDialog(building, floor, room)" title="View QR Code">
+                                                                        <v-icon size="x-small">mdi-qrcode</v-icon>
+                                                                    </v-btn>
+                                                                    <v-btn icon size="x-small" @click="openEditRoomDialog(building, floor, room)">
+                                                                        <v-icon size="x-small">mdi-pencil</v-icon>
+                                                                    </v-btn>
+                                                                    <v-btn icon size="x-small" color="error" @click="confirmDeleteRoom(building, floor, room)">
+                                                                        <v-icon size="x-small">mdi-delete</v-icon>
+                                                                    </v-btn>
+                                                                </div>
+                                                            </v-card>
+                                                        </v-col>
+                                                    </v-row>
+                                                </div>
+                                            </v-expand-transition>
                                         </div>
 
                                         <v-alert v-if="!building.floors?.length" type="info" variant="tonal" density="compact">
@@ -342,19 +407,6 @@
                     <div class="d-flex justify-center mb-4">
                         <canvas ref="qrCanvas" id="qr-canvas"></canvas>
                     </div>
-                    
-                    <!-- QR Data Preview -->
-                    <v-expansion-panels variant="accordion" class="mb-4">
-                        <v-expansion-panel>
-                            <v-expansion-panel-title>
-                                <v-icon start size="small">mdi-code-json</v-icon>
-                                View QR Data
-                            </v-expansion-panel-title>
-                            <v-expansion-panel-text>
-                                <pre class="text-left text-caption bg-grey-lighten-4 pa-2 rounded">{{ qrDataPreview }}</pre>
-                            </v-expansion-panel-text>
-                        </v-expansion-panel>
-                    </v-expansion-panels>
                 </v-card-text>
                 <v-card-actions>
                     <v-btn variant="text" @click="printQrCode">
@@ -512,12 +564,39 @@
 import { ref, computed, onMounted, nextTick } from 'vue';
 import { router } from '@inertiajs/vue3';
 import QRCode from 'qrcode';
+import { useDisplay } from 'vuetify';
+
+const { mobile } = useDisplay();
+const isMobile = computed(() => mobile.value);
+
+const isDark = ref(false);
+const toggleDarkMode = () => {
+    isDark.value = !isDark.value;
+    document.documentElement.classList.toggle('v-theme--dark', isDark.value);
+};
+const goToProfile = () => {
+    window.location.href = '/admin/profile';
+};
+const closeDrawerOnMobile = () => {
+    if (isMobile.value) {
+        drawer.value = false;
+    }
+};
+
+// Admin initials for profile
+const adminInitials = computed(() => {
+    const userData = JSON.parse(localStorage.getItem('userData') || '{}');
+    if (userData.first_name && userData.last_name) {
+        return `${userData.first_name[0]}${userData.last_name[0]}`.toUpperCase();
+    }
+    return 'AD';
+});
 
 const props = defineProps({
     buildings: { type: Array, default: () => [] }
 });
 
-const drawer = ref(true);
+const drawer = ref(!mobile.value);
 const saving = ref(false);
 const deleting = ref(false);
 const snackbar = ref(false);
@@ -526,6 +605,7 @@ const snackbarColor = ref('success');
 
 const buildingsList = ref(props.buildings || []);
 const expandedBuildings = ref([]);
+const expandedFloors = ref([]);
 
 // Building dialog
 const buildingDialog = ref(false);
@@ -556,7 +636,7 @@ const qrDialog = ref(false);
 const qrCanvas = ref(null);
 const qrRoomInfo = ref({ building: '', floor: '', room: '' });
 const qrData = ref(null);
-const qrDataPreview = computed(() => JSON.stringify(qrData.value, null, 2));
+
 
 // Bulk QR dialog
 const bulkQrDialog = ref(false);
@@ -614,6 +694,36 @@ const toggleBuilding = (id) => {
         expandedBuildings.value.push(id);
     } else {
         expandedBuildings.value.splice(index, 1);
+    }
+};
+
+const toggleFloor = (id) => {
+    const index = expandedFloors.value.indexOf(id);
+    if (index === -1) {
+        expandedFloors.value.push(id);
+    } else {
+        expandedFloors.value.splice(index, 1);
+    }
+};
+
+const expandAllFloors = (building) => {
+    if (building.floors) {
+        building.floors.forEach(floor => {
+            if (!expandedFloors.value.includes(floor.id)) {
+                expandedFloors.value.push(floor.id);
+            }
+        });
+    }
+};
+
+const collapseAllFloors = (building) => {
+    if (building.floors) {
+        building.floors.forEach(floor => {
+            const index = expandedFloors.value.indexOf(floor.id);
+            if (index !== -1) {
+                expandedFloors.value.splice(index, 1);
+            }
+        });
     }
 };
 
@@ -821,7 +931,34 @@ const saveRoom = async () => {
             })
         });
         
-        showSnackbar(isEditingRoom.value ? 'Room updated' : 'Room created', 'success');
+        // If editing a room, regenerate QR code with new data  
+        if (isEditingRoom.value && response.ok) {
+            console.log('🔄 Room edited, regenerating QR code...');
+            console.log('📋 Building:', selectedBuilding.value.name);
+            console.log('📋 Floor:', selectedFloor.value.floor_name);
+            console.log('📋 Room (old):', selectedRoom.value.room_name);
+            console.log('📋 Room (new):', roomForm.value.room_name);
+            
+            const roomWithUpdatedName = {
+                id: selectedRoom.value.id,
+                room_name: roomForm.value.room_name // Use the new room name
+            };
+            
+            await regenerateQrCodeForRoom(
+                selectedBuilding.value, 
+                selectedFloor.value, 
+                roomWithUpdatedName
+            );
+            
+            console.log('✅ QR code regenerated successfully');
+        }
+        
+        showSnackbar(
+            isEditingRoom.value 
+                ? 'Room updated - Please print new QR code' 
+                : 'Room created', 
+            'success'
+        );
         roomDialog.value = false;
         fetchBuildings();
     } catch (error) {
@@ -878,21 +1015,79 @@ const showSnackbar = (text, color) => {
 // ============================================================
 
 const openQrDialog = async (building, floor, room) => {
+    // Store references for QR dialog
+    selectedBuilding.value = building;
+    selectedFloor.value = floor;
+    selectedRoom.value = room;
+    
     qrRoomInfo.value = {
         building: building.name,
         floor: floor.floor_name,
         room: room.room_name
     };
     
-    // Create QR data with both IDs and names for maximum compatibility
-    qrData.value = {
-        building_id: building.id,
-        building_name: building.name,
-        floor_id: floor.id,
-        floor_name: floor.floor_name,
-        room_id: room.id,
-        room_name: room.room_name
-    };
+    // Check if room has stored QR version, otherwise create one and save it
+    let roomQrVersion = room.qr_version;
+    
+    if (!roomQrVersion) {
+        // First time generating QR for this room - create and save version
+        roomQrVersion = Date.now(); // Use timestamp as version
+        
+        const uniqueHash = `${building.id}-${floor.id}-${room.id}-v${roomQrVersion}`;
+        
+        const qrCodeData = {
+            building_id: parseInt(building.id),
+            building_name: building.name,
+            floor_id: parseInt(floor.id),
+            floor_name: floor.floor_name,
+            room_id: parseInt(room.id),
+            room_name: room.room_name,
+            unique_hash: uniqueHash,
+            version: roomQrVersion
+        };
+        
+        // Save to backend so validation will work
+        try {
+            const response = await fetch(`/api/rooms/${room.id}/qr-code`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content'),
+                },
+                credentials: 'include',
+                body: JSON.stringify({ qr_data: qrCodeData })
+            });
+            
+            if (response.ok) {
+                // Update local room data
+                room.qr_version = roomQrVersion;
+                console.log('✅ Initial QR version saved to backend:', roomQrVersion);
+            }
+        } catch (error) {
+            console.warn('⚠️ Failed to save initial QR version:', error);
+        }
+        
+        qrData.value = qrCodeData;
+    } else {
+        // Room already has a version - use it
+        const uniqueHash = `${building.id}-${floor.id}-${room.id}-v${roomQrVersion}`;
+        
+        qrData.value = {
+            building_id: parseInt(building.id),
+            building_name: building.name,
+            floor_id: parseInt(floor.id),
+            floor_name: floor.floor_name,
+            room_id: parseInt(room.id),
+            room_name: room.room_name,
+            unique_hash: uniqueHash,
+            version: roomQrVersion
+        };
+    }
+    
+    console.log('🏗️ Opening QR dialog for room:', room.room_name);
+    console.log('📋 QR Data object:', qrData.value);
+    console.log('🔑 Version:', roomQrVersion);
     
     qrDialog.value = true;
     
@@ -908,18 +1103,27 @@ const generateQrCode = async () => {
         return;
     }
     
+    // Debug: Log the QR data being encoded
+    console.log('🔍 Generating QR code with data:', qrData.value);
+    console.log('📝 QR JSON string:', JSON.stringify(qrData.value));
+    
     try {
-        await QRCode.toCanvas(canvas, JSON.stringify(qrData.value), {
-            width: 250,
-            margin: 2,
+        const qrString = JSON.stringify(qrData.value);
+        console.log('📊 QR string length:', qrString.length);
+        
+        await QRCode.toCanvas(canvas, qrString, {
+            width: 300, // Larger QR code for easier scanning
+            margin: 3,  // More margin for better detection
             color: {
                 dark: '#000000',
                 light: '#ffffff'
             },
-            errorCorrectionLevel: 'M'
+            errorCorrectionLevel: 'H' // Highest error correction for better scanning
         });
+        
+        console.log('✅ QR code generated successfully');
     } catch (error) {
-        console.error('Error generating QR code:', error);
+        console.error('❌ Error generating QR code:', error);
         showSnackbar('Error generating QR code', 'error');
     }
 };
@@ -988,6 +1192,66 @@ const printQrCode = () => {
         printWindow.close();
     }, 250);
 };
+
+const regenerateQrCodeForRoom = async (building, floor, room) => {
+    try {
+        // Create completely new QR data that invalidates old codes
+        const newVersion = Date.now(); // New version timestamp
+        const uniqueHash = `${building.id}-${floor.id}-${room.id}-v${newVersion}`;
+        
+        // Generate new QR data with unique identifiers (simplified structure)
+        const newQrData = {
+            building_id: parseInt(building.id),
+            building_name: building.name,
+            floor_id: parseInt(floor.id),
+            floor_name: floor.floor_name,
+            room_id: parseInt(room.id),
+            room_name: room.room_name, // Updated room name
+            unique_hash: uniqueHash,
+            version: newVersion, // New version - this invalidates old QR codes
+            updated: true // Flag to indicate this was updated
+        };
+        
+        console.log('🔄 Regenerating QR for room:', room.room_name);
+        console.log('📋 New QR Data:', newQrData);
+        console.log('🔑 New unique hash:', uniqueHash);
+        console.log('📊 New version:', newVersion);
+        
+        // Save updated QR data to backend to invalidate old codes
+        try {
+            const response = await fetch(`/api/rooms/${room.id}/qr-code`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content'),
+                },
+                credentials: 'include',
+                body: JSON.stringify({ qr_data: newQrData })
+            });
+            
+            if (response.ok) {
+                const result = await response.json();
+                console.log('✅ New QR data saved successfully:', result);
+                
+                // Update the local room data with new version so next QR view shows new code
+                room.qr_version = newVersion;
+                
+                console.log('✅ Room qr_version updated locally to:', newVersion);
+            } else {
+                const error = await response.text();
+                console.warn('⚠️ Failed to save QR data to backend:', error);
+            }
+        } catch (backendError) {
+            console.warn('⚠️ Backend save failed:', backendError);
+        }
+        
+    } catch (error) {
+        console.error('❌ Error regenerating QR code for room:', error);
+    }
+};
+
+
 
 const openBulkQrDialog = async (building) => {
     bulkQrItems.value = [];
@@ -1423,5 +1687,81 @@ onMounted(() => {
 
 .gap-4 {
     gap: 16px;
+}
+
+/* Page Header Responsive Styles */
+.page-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.page-header-content {
+    flex: 1;
+    min-width: 200px;
+}
+
+.add-building-btn {
+    flex-shrink: 0;
+}
+
+/* Floor Header Responsive Styles */
+.floor-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+}
+
+.floor-info {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    flex: 1;
+    min-width: 150px;
+    gap: 2px;
+}
+
+.floor-actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 2px;
+    margin-left: auto;
+}
+
+/* Mobile Specific Styles */
+@media (max-width: 600px) {
+    .page-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .page-header-content {
+        width: 100%;
+    }
+    
+    .add-building-btn {
+        align-self: flex-end;
+        margin-top: -32px;
+    }
+    
+    .floor-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .floor-info {
+        width: 100%;
+        margin-bottom: 8px;
+    }
+    
+    .floor-actions {
+        width: 100%;
+        justify-content: flex-end;
+        margin-left: 0;
+    }
 }
 </style>

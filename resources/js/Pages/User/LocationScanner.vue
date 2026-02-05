@@ -1,5 +1,5 @@
 <template>
-    <v-app class="app-container">
+    <v-app class="bg-user-gradient-light">
         <!-- Header - matches Rescuer Dashboard style -->
         <div class="scanner-header">
             <div class="header-content">
@@ -647,56 +647,76 @@
                             <v-icon color="white">mdi-close</v-icon>
                         </v-btn>
                         <span class="qr-title">Scan QR Code</span>
-                        <v-chip v-if="isScanning" color="success" size="small">
-                            <v-icon start size="12">mdi-circle</v-icon>
-                            Scanning
-                        </v-chip>
+                        
+                        <!-- Camera Control Buttons -->
+                        <div class="camera-controls-header">
+                            <v-btn 
+                                icon 
+                                variant="text" 
+                                @click="toggleFlash"
+                                :color="flashEnabled ? 'yellow' : 'white'"
+                                :disabled="!flashSupported"
+                                :title="flashSupported ? (flashEnabled ? 'Turn off flash' : 'Turn on flash') : 'Flash not supported'"
+                            >
+                                <v-icon>{{ flashEnabled ? 'mdi-flashlight' : 'mdi-flashlight-off' }}</v-icon>
+                            </v-btn>
+                            <v-btn 
+                                icon 
+                                variant="text" 
+                                color="white"
+                                @click="flipCamera"
+                                title="Switch camera"
+                            >
+                                <v-icon>mdi-camera-flip</v-icon>
+                            </v-btn>
+                        </div>
                     </div>
                     <v-card-text class="d-flex flex-column align-center justify-center fill-height pa-0 qr-scanner-content">
                         <div id="qr-reader" style="width: 100%; max-width: 500px;"></div>
-                        <p class="text-white text-center mt-4 mb-2">Point your camera at a room QR code</p>
                         
-                        <!-- Zoom Controls -->
-                        <div class="zoom-controls" v-if="isScanning && zoomSupported">
-                            <div class="zoom-label">
-                                <v-icon size="16" color="white">mdi-magnify</v-icon>
-                                <span>Zoom: {{ Math.round(currentZoom * 10) / 10 }}x</span>
-                            </div>
-                            <div class="zoom-slider-container">
+                        <!-- Scanning Tips -->
+                        <div class="scanning-tips">
+                            <p class="text-white text-center mt-3 mb-1" style="font-size: 1rem; font-weight: 500;">
+                                <v-icon color="white" size="18" class="mr-1">mdi-qrcode-scan</v-icon>
+                                Point camera at QR code
+                            </p>
+                            <p class="text-white text-center mb-2" style="font-size: 0.8rem; opacity: 0.8;">
+                                Keep the QR code within the frame • Move closer if needed
+                            </p>
+                        </div>
+                        
+                        <!-- Camera Controls Bottom Panel -->
+                        <div class="camera-controls-panel" v-if="isScanning">
+                            <!-- Zoom Controls -->
+                            <div class="zoom-controls-inline">
                                 <v-btn 
                                     icon 
                                     size="small" 
-                                    variant="text" 
+                                    variant="tonal" 
                                     color="white"
                                     @click="decreaseZoom"
                                     :disabled="currentZoom <= minZoom"
                                 >
-                                    <v-icon size="20">mdi-minus</v-icon>
+                                    <v-icon size="20">mdi-magnify-minus</v-icon>
                                 </v-btn>
-                                <v-slider
-                                    v-model="currentZoom"
-                                    :min="minZoom"
-                                    :max="maxZoom"
-                                    :step="0.1"
-                                    color="white"
-                                    track-color="rgba(255,255,255,0.3)"
-                                    thumb-color="white"
-                                    hide-details
-                                    class="zoom-slider"
-                                    @update:model-value="applyZoom"
-                                />
+                                <div class="zoom-value">{{ Math.round(currentZoom * 10) / 10 }}x</div>
                                 <v-btn 
                                     icon 
                                     size="small" 
-                                    variant="text" 
+                                    variant="tonal" 
                                     color="white"
                                     @click="increaseZoom"
                                     :disabled="currentZoom >= maxZoom"
                                 >
-                                    <v-icon size="20">mdi-plus</v-icon>
+                                    <v-icon size="20">mdi-magnify-plus</v-icon>
                                 </v-btn>
                             </div>
-                            <p class="zoom-hint">Use slider or pinch to zoom</p>
+                            
+                            <!-- Flash indicator when on -->
+                            <div v-if="flashEnabled" class="flash-indicator">
+                                <v-icon color="yellow" size="16">mdi-flashlight</v-icon>
+                                <span>Flash ON</span>
+                            </div>
                         </div>
                     </v-card-text>
                 </v-card>
@@ -1026,6 +1046,11 @@ const currentZoom = ref(1);
 const minZoom = ref(1);
 const maxZoom = ref(4);
 let videoTrack = null;
+
+// Camera flash and flip controls
+const flashSupported = ref(false);
+const flashEnabled = ref(false);
+const currentFacingMode = ref('environment'); // 'environment' (back) or 'user' (front)
 
 // Active rescue request check
 const hasActiveRequest = ref(false);
@@ -1493,12 +1518,21 @@ const startQrScan = async () => {
     try {
         html5QrCode = new Html5Qrcode('qr-reader');
         
+        // Get screen dimensions for responsive QR box
+        const screenWidth = window.innerWidth;
+        const qrBoxSize = Math.min(screenWidth * 0.7, 300); // 70% of screen width, max 300px
+        
         await html5QrCode.start(
             { facingMode: 'environment' },
             {
-                fps: 10,
-                qrbox: { width: 250, height: 250 },
+                fps: 15, // Higher FPS for faster detection
+                qrbox: { width: qrBoxSize, height: qrBoxSize }, // Larger, responsive scan area
                 aspectRatio: 1.0,
+                disableFlip: false, // Allow flipped QR codes
+                experimentalFeatures: {
+                    useBarCodeDetectorIfSupported: true // Use native detector if available
+                },
+                formatsToSupport: [ 0 ] // QR_CODE format only for faster scanning
             },
             onQrCodeScanned,
             (errorMessage) => {
@@ -1542,6 +1576,7 @@ const setupZoomCapabilities = async () => {
         
         console.log('Camera capabilities:', capabilities);
         
+        // Check zoom support
         if (capabilities.zoom) {
             zoomSupported.value = true;
             minZoom.value = capabilities.zoom.min || 1;
@@ -1552,9 +1587,19 @@ const setupZoomCapabilities = async () => {
             console.log('Zoom not supported by this camera');
             zoomSupported.value = false;
         }
+        
+        // Check flash/torch support
+        if (capabilities.torch) {
+            flashSupported.value = true;
+            console.log('Flash/torch supported');
+        } else {
+            flashSupported.value = false;
+            console.log('Flash/torch not supported by this camera');
+        }
     } catch (error) {
-        console.log('Error setting up zoom:', error);
+        console.log('Error setting up camera capabilities:', error);
         zoomSupported.value = false;
+        flashSupported.value = false;
     }
 };
 
@@ -1569,6 +1614,100 @@ const applyZoom = async (zoomLevel) => {
         console.log('Zoom applied:', zoomLevel);
     } catch (error) {
         console.error('Error applying zoom:', error);
+    }
+};
+
+// Toggle flash/torch
+const toggleFlash = async () => {
+    if (!videoTrack || !flashSupported.value) {
+        showNotification('Flash not supported on this device', 'warning');
+        return;
+    }
+    
+    try {
+        const newFlashState = !flashEnabled.value;
+        await videoTrack.applyConstraints({
+            advanced: [{ torch: newFlashState }]
+        });
+        flashEnabled.value = newFlashState;
+        console.log('Flash toggled:', newFlashState ? 'ON' : 'OFF');
+    } catch (error) {
+        console.error('Error toggling flash:', error);
+        showNotification('Failed to toggle flash', 'error');
+    }
+};
+
+// Flip camera (front/back)
+const flipCamera = async () => {
+    try {
+        // Stop current scanner
+        await stopQrScanner();
+        
+        // Toggle facing mode
+        currentFacingMode.value = currentFacingMode.value === 'environment' ? 'user' : 'environment';
+        
+        // Reset flash when flipping (front camera usually doesn't have flash)
+        flashEnabled.value = false;
+        flashSupported.value = false;
+        
+        // Restart scanner with new camera
+        await startQrScanWithFacingMode(currentFacingMode.value);
+        
+        console.log('Camera flipped to:', currentFacingMode.value);
+    } catch (error) {
+        console.error('Error flipping camera:', error);
+        showNotification('Failed to switch camera', 'error');
+        // Try to restart with original camera
+        await startQrScanWithFacingMode('environment');
+    }
+};
+
+// Start QR scan with specific facing mode
+const startQrScanWithFacingMode = async (facingMode) => {
+    isScanning.value = true;
+    
+    // Reset values
+    currentZoom.value = 1;
+    zoomSupported.value = false;
+    videoTrack = null;
+
+    await nextTick();
+
+    try {
+        html5QrCode = new Html5Qrcode('qr-reader');
+        
+        // Get screen dimensions for responsive QR box
+        const screenWidth = window.innerWidth;
+        const qrBoxSize = Math.min(screenWidth * 0.7, 300);
+        
+        await html5QrCode.start(
+            { facingMode: facingMode },
+            {
+                fps: 15,
+                qrbox: { width: qrBoxSize, height: qrBoxSize },
+                aspectRatio: 1.0,
+                disableFlip: false,
+                experimentalFeatures: {
+                    useBarCodeDetectorIfSupported: true
+                },
+                formatsToSupport: [ 0 ]
+            },
+            onQrCodeScanned,
+            (errorMessage) => {
+                // QR code not found - this is normal, ignore
+            }
+        );
+        
+        // Setup camera capabilities after a short delay
+        await nextTick();
+        setTimeout(() => {
+            setupZoomCapabilities();
+        }, 500);
+    } catch (error) {
+        console.error('QR scan error:', error);
+        showNotification('Failed to start camera. Please allow camera permissions.', 'error');
+        isScanning.value = false;
+        showQrScanner.value = false;
     }
 };
 
@@ -1589,13 +1728,39 @@ const decreaseZoom = () => {
 
 // Close QR scanner properly
 const closeQrScanner = async () => {
+    // Turn off flash before closing
+    if (flashEnabled.value && videoTrack) {
+        try {
+            await videoTrack.applyConstraints({
+                advanced: [{ torch: false }]
+            });
+        } catch (e) {
+            console.log('Error turning off flash');
+        }
+    }
+    
     await stopQrScanner();
     showQrScanner.value = false;
     videoTrack = null;
     zoomSupported.value = false;
+    flashSupported.value = false;
+    flashEnabled.value = false;
+    currentFacingMode.value = 'environment';
 };
 
 const stopQrScanner = async () => {
+    // Turn off flash before stopping
+    if (flashEnabled.value && videoTrack) {
+        try {
+            await videoTrack.applyConstraints({
+                advanced: [{ torch: false }]
+            });
+            flashEnabled.value = false;
+        } catch (e) {
+            console.log('Error turning off flash');
+        }
+    }
+    
     if (html5QrCode) {
         try {
             await html5QrCode.stop();
@@ -1635,6 +1800,21 @@ const onQrCodeScanned = async (decodedText, decodedResult) => {
             locationData = JSON.parse(decodedText);
             parseMethod = 'JSON';
             console.log('✅ Parsed as JSON:', locationData);
+            
+            // Validate QR code structure
+            if (locationData.building_id && locationData.floor_id && locationData.room_id) {
+                console.log('✅ Valid QR code structure detected');
+                console.log(`📍 Location: ${locationData.building_name} > ${locationData.floor_name} > ${locationData.room_name}`);
+                
+                if (locationData.version) {
+                    console.log(`📊 QR Version: ${locationData.version}`);
+                }
+                
+                if (locationData.unique_hash) {
+                    console.log(`🔑 Unique Hash: ${locationData.unique_hash}`);
+                }
+            }
+            
         } catch (jsonError) {
             console.log('❌ Not valid JSON:', jsonError.message);
             
@@ -1678,6 +1858,39 @@ const onQrCodeScanned = async (decodedText, decodedResult) => {
             throw new Error('QR code contains no valid location data');
         }
         
+        // Validate QR code with backend to check if it's still valid (not expired)
+        if (locationData.room_id && locationData.version && locationData.unique_hash) {
+            console.log('🔍 Validating QR code with backend...');
+            
+            const isValid = await validateQrCodeWithBackend(locationData);
+            
+            if (!isValid.valid) {
+                locationScanned.value = false;
+                console.error('❌ QR code validation failed:', isValid.error);
+                showNotification(isValid.message || 'This QR code is expired or invalid. Please use the updated QR code.', 'error');
+                return;
+            }
+            
+            console.log('✅ QR code validated successfully');
+        } else if (locationData.room_id) {
+            // QR code without version - could be an old format
+            // Check if room has a newer version in database
+            console.log('⚠️ QR code has no version info - checking if room has been updated...');
+            
+            const checkResult = await validateQrCodeWithBackend({
+                room_id: locationData.room_id,
+                version: 0, // Version 0 means "no version" - should fail if room has a version
+                unique_hash: 'legacy'
+            });
+            
+            if (!checkResult.valid && checkResult.error === 'QR code expired') {
+                locationScanned.value = false;
+                console.error('❌ Old QR code - room has been updated');
+                showNotification('This QR code is outdated. The room has been updated. Please use the new QR code.', 'error');
+                return;
+            }
+        }
+        
         // Find and select the location
         const found = await selectLocationFromQr(locationData);
         
@@ -1706,6 +1919,43 @@ const onQrCodeScanned = async (decodedText, decodedResult) => {
         showNotification(`Invalid QR code: ${error.message}`, 'error');
     }
     console.log('=====================================');
+};
+
+// Validate QR code with backend to check if it's still valid
+const validateQrCodeWithBackend = async (qrData) => {
+    try {
+        const response = await fetch('/api/rooms/validate-qr', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+            },
+            credentials: 'include',
+            body: JSON.stringify({
+                room_id: qrData.room_id,
+                version: qrData.version,
+                unique_hash: qrData.unique_hash
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            return { valid: true, data: result };
+        } else {
+            // QR code is invalid or expired
+            return { 
+                valid: false, 
+                error: result.error,
+                message: result.message || 'QR code is no longer valid'
+            };
+        }
+    } catch (error) {
+        console.error('❌ Error validating QR code:', error);
+        // On network error, allow scanning to proceed (offline support)
+        console.log('⚠️ Could not validate QR with backend, allowing scan to proceed');
+        return { valid: true, offline: true };
+    }
 };
 
 // Scroll to the emergency form section
@@ -2528,7 +2778,25 @@ const submitRescueRequest = async () => {
         }
     } catch (error) {
         console.error('Failed to submit rescue request:', error);
-        showNotification('Failed to submit rescue request', 'error');
+        
+        // Check if it's a profile completion error from the API response
+        const errorData = error.data || {};
+        if (errorData.must_update_profile === true) {
+            showNotification(
+                errorData.message || 
+                'You must complete your profile information before you can submit emergency reports. Please update your personal information, emergency contact, and medical details.',
+                'warning'
+            );
+            
+            // Redirect to profile page after showing the message
+            setTimeout(() => {
+                router.visit('/user/profile');
+            }, 3000);
+        } else {
+            // Check if there's a specific error message from the API
+            const errorMessage = errorData.message || 'Failed to submit rescue request';
+            showNotification(errorMessage, 'error');
+        }
     } finally {
         isSubmitting.value = false;
     }
@@ -2802,7 +3070,6 @@ const showNotification = (message, color = 'info') => {
 
 /* Main Container */
 .main-container {
-    background: linear-gradient(180deg, #e3f0f7 0%, #f5f9fb 50%, #ffffff 100%);
     flex: 1;
     display: flex;
     flex-direction: column;
@@ -3669,8 +3936,81 @@ const showNotification = (message, color = 'info') => {
     font-weight: 600;
 }
 
+.camera-controls-header {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
 .qr-scanner-content {
     position: relative;
+}
+
+/* Scanner styling for better visibility */
+.qr-scanner-content :deep(#qr-reader) {
+    border-radius: 16px;
+    overflow: hidden;
+}
+
+.qr-scanner-content :deep(#qr-reader video) {
+    border-radius: 16px;
+}
+
+.qr-scanner-content :deep(#qr-reader__scan_region) {
+    background: transparent !important;
+}
+
+/* Make the scanning box more visible */
+.qr-scanner-content :deep(#qr-shaded-region) {
+    border-color: rgba(54, 116, 181, 0.7) !important;
+}
+
+.scanning-tips {
+    background: rgba(0, 0, 0, 0.3);
+    padding: 8px 16px;
+    border-radius: 12px;
+    backdrop-filter: blur(5px);
+}
+
+/* Camera Controls Bottom Panel */
+.camera-controls-panel {
+    width: 100%;
+    max-width: 350px;
+    padding: 12px 16px;
+    background: rgba(0, 0, 0, 0.5);
+    border-radius: 16px;
+    margin-top: 16px;
+    backdrop-filter: blur(10px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+}
+
+.zoom-controls-inline {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.zoom-value {
+    color: white;
+    font-size: 1rem;
+    font-weight: 600;
+    min-width: 50px;
+    text-align: center;
+}
+
+.flash-indicator {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(255, 235, 59, 0.2);
+    padding: 4px 12px;
+    border-radius: 20px;
+    color: #ffeb3b;
+    font-size: 0.8rem;
+    font-weight: 500;
 }
 
 /* Zoom Controls */

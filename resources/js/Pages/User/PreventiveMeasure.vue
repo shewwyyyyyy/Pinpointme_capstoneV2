@@ -1,5 +1,5 @@
 <template>
-    <v-app class="app-container">
+    <v-app class="bg-user-gradient-light">
         <!-- Header - matches Dashboard style -->
         <div class="page-header">
             <div class="header-content">
@@ -607,10 +607,10 @@ onMounted(() => {
 
 /* Main Content */
 .main-content {
-    background: linear-gradient(180deg, #e8f5f3 0%, #f5f9f8 50%, #ffffff 100%);
     height: 100%;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 120px) !important;
 }
 
 /* Desktop-only elements */
@@ -624,14 +624,40 @@ onMounted(() => {
         display: none !important;
     }
     
+    .main-content {
+        padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 120px) !important;
+    }
+    
     .main-content :deep(.v-container) {
-        padding-bottom: 80px !important;
+        padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 120px) !important;
+    }
+    
+    .main-content :deep(.v-row) {
+        margin-bottom: 40px !important;
+    }
+}
+
+@media (max-width: 600px) {
+    .main-content {
+        padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 140px) !important;
+    }
+    
+    .main-content :deep(.v-container) {
+        padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 140px) !important;
+    }
+    
+    .main-content :deep(.v-row) {
+        margin-bottom: 50px !important;
     }
 }
 
 @media (min-width: 1024px) {
     .desktop-only {
         display: flex;
+    }
+    
+    .main-content {
+        padding-bottom: 40px !important;
     }
 }
 </style>

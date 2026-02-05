@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
 use App\Models\Floor;
+use Illuminate\Support\Facades\DB;
 
 class FloorSeeder extends Seeder
 {
@@ -33,13 +34,29 @@ class FloorSeeder extends Seeder
                 continue;
             }
 
-            Floor::firstOrCreate([
-                'building_id' => $data['building_id'],
-                'floor_name' => $data['floor_name'],
-            ], [
-                'floor_plan_url' => $data['floor_plan_url'] !== 'NULL' ? $data['floor_plan_url'] : null,
-                'floor_plan_data' => $data['floor_plan_data'] !== 'NULL' ? $data['floor_plan_data'] : null,
-            ]);
+            // Check if floor with this ID already exists
+            $existing = Floor::find($data['id']);
+            
+            if ($existing) {
+                // Update existing record
+                $existing->update([
+                    'building_id' => $data['building_id'],
+                    'floor_name' => $data['floor_name'],
+                    'floor_plan_url' => $data['floor_plan_url'] !== 'NULL' ? $data['floor_plan_url'] : null,
+                    'floor_plan_data' => $data['floor_plan_data'] !== 'NULL' ? $data['floor_plan_data'] : null,
+                ]);
+            } else {
+                // Insert with exact CSV ID using raw DB insert
+                DB::table('floors')->insert([
+                    'id' => $data['id'],
+                    'building_id' => $data['building_id'],
+                    'floor_name' => $data['floor_name'],
+                    'floor_plan_url' => $data['floor_plan_url'] !== 'NULL' ? $data['floor_plan_url'] : null,
+                    'floor_plan_data' => $data['floor_plan_data'] !== 'NULL' ? $data['floor_plan_data'] : null,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
         }
 
         fclose($file);

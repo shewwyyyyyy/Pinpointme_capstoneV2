@@ -94,8 +94,14 @@ const userId = computed(() => {
     return authUser.value?.id || userData.value?.id || null;
 });
 
-// Menu items (Profile removed - use avatar in navbar instead)
+// Menu items with profile included
 const menuItems = computed(() => [
+    {
+        id: 'profile',
+        name: 'My Profile',
+        icon: 'mdi-account-circle',
+        path: '/user/profile',
+    },
     {
         id: 'dashboard',
         name: 'Dashboard',

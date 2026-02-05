@@ -1,5 +1,5 @@
 <template>
-    <v-app>
+    <v-app class="bg-user-gradient-light">
         <!-- Clean Header -->
         <div class="help-page-header">
             <div class="header-content">
@@ -192,52 +192,80 @@
                             </v-card-text>
                         </v-card>
 
-                        <!-- Emergency Details (Collapsible) -->
-                        <v-expansion-panels v-if="rescue.description || rescue.urgency_level" class="mb-3" variant="accordion">
-                            <v-expansion-panel elevation="0" class="rounded-xl">
-                                <v-expansion-panel-title class="py-3">
-                                    <div class="d-flex align-center">
-                                        <v-avatar color="error" size="40" class="mr-3">
-                                            <v-icon color="white" size="20">mdi-alert-circle</v-icon>
-                                        </v-avatar>
-                                        <div>
-                                            <h3 class="text-subtitle-1 font-weight-bold">Emergency Details</h3>
-                                            <p class="text-caption text-grey mb-0">View request information</p>
-                                        </div>
+                        <!-- Emergency Details -->
+                        <v-card v-if="rescue.description || rescue.urgency_level || rescue.mobility_status || rescue.injuries" class="mb-3 rounded-xl" elevation="0">
+                            <div class="card-header-icon">
+                                <v-avatar color="error" size="40">
+                                    <v-icon color="white" size="20">mdi-alert-circle</v-icon>
+                                </v-avatar>
+                                <div class="card-header-text">
+                                    <h3>Emergency Details</h3>
+                                    <p>Request information and status</p>
+                                </div>
+                            </div>
+                            
+                            <v-card-text class="pt-0">
+                                <div class="emergency-details">
+                                    <!-- Description -->
+                                    <div v-if="rescue.description" class="detail-item">
+                                        <span class="detail-label">Description</span>
+                                        <p class="detail-value">{{ rescue.description }}</p>
                                     </div>
-                                </v-expansion-panel-title>
-                                <v-expansion-panel-text>
-                                    <div class="emergency-details">
-                                        <div v-if="rescue.description" class="detail-item">
-                                            <span class="detail-label">Description</span>
-                                            <p class="detail-value">{{ rescue.description }}</p>
-                                        </div>
-                                        <div class="detail-row" v-if="rescue.urgency_level || rescue.mobility_status">
-                                            <div v-if="rescue.urgency_level" class="detail-item half">
-                                                <span class="detail-label">Urgency</span>
-                                                <v-chip :color="getUrgencyColor(rescue.urgency_level)" variant="tonal" size="small">
-                                                    {{ rescue.urgency_level }}
+
+                                    <!-- Urgency & Mobility Row -->
+                                    <div class="detail-row" v-if="rescue.urgency_level || rescue.mobility_status || rescue.emergency_type">
+                                        <div v-if="rescue.urgency_level" class="detail-item half">
+                                            <span class="detail-label">Urgency Level</span>
+                                            <div class="detail-chip-value">
+                                                <v-chip 
+                                                    :color="getUrgencyColor(rescue.urgency_level)" 
+                                                    variant="flat" 
+                                                    size="small"
+                                                >
+                                                    <v-icon start size="12">{{ getUrgencyIcon(rescue.urgency_level) }}</v-icon>
+                                                    {{ rescue.urgency_level?.toUpperCase() }}
                                                 </v-chip>
                                             </div>
-                                            <div v-if="rescue.mobility_status" class="detail-item half">
-                                                <span class="detail-label">Mobility</span>
-                                                <v-chip color="info" variant="tonal" size="small">
+                                        </div>
+
+                                        <div v-if="rescue.mobility_status" class="detail-item half">
+                                            <span class="detail-label">Mobility Status</span>
+                                            <div class="detail-chip-value">
+                                                <v-chip color="info" variant="flat" size="small">
+                                                    <v-icon start size="12">mdi-wheelchair-accessibility</v-icon>
                                                     {{ rescue.mobility_status }}
                                                 </v-chip>
                                             </div>
                                         </div>
-                                        <div v-if="rescue.injuries" class="detail-item">
-                                            <span class="detail-label">Injuries</span>
-                                            <p class="detail-value">{{ rescue.injuries }}</p>
-                                        </div>
-                                        <div v-if="(rescue.status === 'rescued' || rescue.status === 'safe') && rescue.updated_at" class="detail-item">
-                                            <span class="detail-label">Completed At</span>
-                                            <p class="detail-value">{{ formatRescueDateTime(rescue.updated_at) }}</p>
+
+                                        <div v-if="rescue.emergency_type" class="detail-item half">
+                                            <span class="detail-label">Emergency Type</span>
+                                            <div class="detail-chip-value">
+                                                <v-chip color="orange" variant="flat" size="small">
+                                                    <v-icon start size="12">{{ getEmergencyTypeIcon(rescue.emergency_type) }}</v-icon>
+                                                    {{ rescue.emergency_type }}
+                                                </v-chip>
+                                            </div>
                                         </div>
                                     </div>
-                                </v-expansion-panel-text>
-                            </v-expansion-panel>
-                        </v-expansion-panels>
+
+                                    <!-- Injuries -->
+                                    <div v-if="rescue.injuries" class="detail-item">
+                                        <span class="detail-label">Injuries Reported</span>
+                                        <p class="detail-value">{{ rescue.injuries }}</p>
+                                    </div>
+
+                                    <!-- Completion Time -->
+                                    <div v-if="(rescue.status === 'rescued' || rescue.status === 'safe') && rescue.updated_at" class="detail-item">
+                                        <span class="detail-label">Rescue Completed</span>
+                                        <p class="detail-value">
+                                            <v-icon color="success" size="16" class="mr-2">mdi-clock-check</v-icon>
+                                            {{ formatRescueDateTime(rescue.updated_at) }}
+                                        </p>
+                                    </div>
+                                </div>
+                            </v-card-text>
+                        </v-card>
 
                         <!-- Action Buttons -->
                         <div v-if="rescue.status !== 'rescued' && rescue.status !== 'safe'" class="action-buttons pb-safe">
@@ -383,7 +411,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { router } from '@inertiajs/vue3';
 import {
     getRescueRequestByCode,
@@ -409,8 +437,11 @@ const props = defineProps({
 // Navigation drawer
 const drawer = ref(false);
 
-// Unread messages count for bottom nav
-const { unreadCount } = useUnreadMessages();
+// Unread messages count for bottom nav with new message callback
+const { unreadCount, onNewMessages } = useUnreadMessages();
+
+// Cleanup function for new message callback
+let unregisterNewMessages = null;
 
 // State
 const rescue = ref(null);
@@ -545,6 +576,17 @@ const showNotification = (options) => {
     }, 5000);
 };
 
+// Handle new message notifications
+const handleNewMessages = (newCount, totalCount) => {
+    showNotification({
+        title: '💬 New Message',
+        message: `You have ${newCount} new message${newCount > 1 ? 's' : ''} from your rescuer`,
+        type: 'info',
+        icon: 'mdi-message-text',
+        sound: 'message',
+        vibratePattern: [100, 50, 100]
+    });
+};
 // Trigger notification on status change
 const triggerStatusNotification = (oldStatus, newStatus) => {
     let notificationData = null;
@@ -615,6 +657,9 @@ const triggerStatusNotification = (oldStatus, newStatus) => {
 const rescueCode = ref('');
 const rescueId = ref('');
 
+// Store poll interval for cleanup
+let pollInterval = null;
+
 onMounted(async () => {
     // Get from props (Inertia) first, then localStorage
     rescueCode.value = props.code || localStorage.getItem('lastRescueCode') || '';
@@ -622,8 +667,11 @@ onMounted(async () => {
 
     await fetchRescueData();
 
+    // Register new message callback
+    unregisterNewMessages = onNewMessages(handleNewMessages);
+
     // Set up polling for status updates
-    const pollInterval = setInterval(async () => {
+    pollInterval = setInterval(async () => {
         if (rescue.value && !['rescued', 'safe', 'cancelled', 'completed'].includes(rescue.value.status)) {
             try {
                 await fetchRescueData(true);
@@ -632,9 +680,16 @@ onMounted(async () => {
             }
         }
     }, 5000); // Poll every 5 seconds for faster updates
+});
 
-    // Cleanup on unmount
-    return () => clearInterval(pollInterval);
+// Cleanup on unmount
+onUnmounted(() => {
+    if (pollInterval) {
+        clearInterval(pollInterval);
+    }
+    if (unregisterNewMessages) {
+        unregisterNewMessages();
+    }
 });
 
 const fetchRescueData = async (silent = false) => {
@@ -734,10 +789,13 @@ const getStatusColor = (status) => {
         pending: 'warning',
         open: 'info',
         assigned: 'primary',
+        accepted: 'primary',
+        in_progress: 'secondary',
         en_route: 'secondary',
         on_scene: 'success',
         rescued: 'success',
         safe: 'success',
+        completed: 'success',
         cancelled: 'grey',
     };
     return colors[status] || 'grey';
@@ -748,10 +806,13 @@ const getStatusIcon = (status) => {
         pending: 'mdi-clock-outline',
         open: 'mdi-alert-circle-outline',
         assigned: 'mdi-account-check',
+        accepted: 'mdi-account-check',
+        in_progress: 'mdi-run-fast',
         en_route: 'mdi-run-fast',
         on_scene: 'mdi-map-marker-check',
         rescued: 'mdi-check-circle',
         safe: 'mdi-shield-check',
+        completed: 'mdi-check-circle',
         cancelled: 'mdi-close-circle',
     };
     return icons[status] || 'mdi-help-circle-outline';
@@ -762,10 +823,13 @@ const getStatusText = (status) => {
         pending: 'Your request is pending',
         open: 'Help request is open',
         assigned: 'A rescuer has been assigned',
+        accepted: 'Rescuer has accepted your request',
+        in_progress: 'Rescue is in progress',
         en_route: 'Rescuer is on the way',
         on_scene: 'Rescuer has arrived',
         rescued: 'You have been rescued',
         safe: 'Marked as safe',
+        completed: 'Rescue completed',
         cancelled: 'Request cancelled',
     };
     return texts[status] || 'Unknown status';
@@ -835,6 +899,39 @@ const getUrgencyColor = (urgency) => {
         critical: 'error',
     };
     return colors[urgency] || 'grey';
+};
+
+const getUrgencyIcon = (urgency) => {
+    const icons = {
+        low: 'mdi-speedometer-slow',
+        medium: 'mdi-speedometer-medium',
+        high: 'mdi-speedometer',
+        critical: 'mdi-alert-octagon',
+    };
+    return icons[urgency] || 'mdi-alert-circle';
+};
+
+const getUrgencyIconColor = (urgency) => {
+    const colors = {
+        low: 'success',
+        medium: 'warning',
+        high: 'orange',
+        critical: 'error',
+    };
+    return colors[urgency] || 'grey';
+};
+
+const getEmergencyTypeIcon = (type) => {
+    const icons = {
+        'Fire': 'mdi-fire',
+        'Medical': 'mdi-medical-bag',
+        'Earthquake': 'mdi-earthquake',
+        'Flood': 'mdi-waves',
+        'Violence': 'mdi-shield-alert',
+        'Accident': 'mdi-car-crash',
+        'Other': 'mdi-alert-circle',
+    };
+    return icons[type] || 'mdi-alert-circle';
 };
 
 const getRescuerName = () => {
@@ -945,8 +1042,8 @@ const viewMap = () => {
 };
 
 const handleGoBack = () => {
-    // Navigate to history instead of scanner
-    router.visit('/user/history');
+    // Navigate back to dashboard (scanner)
+    router.visit('/user/scanner');
 };
 </script>
 
@@ -1227,15 +1324,14 @@ const handleGoBack = () => {
 .content-area {
     margin-top: -20px;
     border-radius: 24px 24px 0 0;
-    background: #f5f5f5;
     position: relative;
     z-index: 2;
-    padding-bottom: 100px !important; /* Space for bottom nav */
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 120px) !important; /* Space for bottom nav */
 }
 
 /* Safe area bottom padding for buttons */
 .pb-safe {
-    padding-bottom: calc(env(safe-area-inset-bottom) + 90px) !important;
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 100px) !important;
 }
 
 /* Card Header with Icon */
@@ -1343,7 +1439,7 @@ const handleGoBack = () => {
 .detail-item {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 6px;
 }
 
 .detail-item.half {
@@ -1353,19 +1449,41 @@ const handleGoBack = () => {
 .detail-row {
     display: flex;
     gap: 16px;
+    flex-wrap: wrap;
 }
 
 .detail-label {
-    font-size: 0.7rem;
-    color: #888;
+    font-size: 0.75rem;
+    color: #666;
     text-transform: uppercase;
     letter-spacing: 0.5px;
+    font-weight: 600;
 }
 
 .detail-value {
     font-size: 0.9rem;
     color: #333;
     margin: 0;
+    line-height: 1.5;
+}
+
+.detail-chip-value {
+    margin-top: 4px;
+}
+
+.detail-chip-value .v-chip {
+    font-weight: 600;
+}
+
+@media (max-width: 600px) {
+    .detail-row {
+        flex-direction: column;
+        gap: 12px;
+    }
+    
+    .detail-item.half {
+        width: 100%;
+    }
 }
 
 /* Action Buttons */
@@ -1409,7 +1527,13 @@ const handleGoBack = () => {
     }
     
     .content-area {
-        padding-bottom: 100px !important;
+        padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 120px) !important;
+    }
+}
+
+@media (max-width: 600px) {
+    .content-area {
+        padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 130px) !important;
     }
 }
 
@@ -1453,7 +1577,7 @@ const handleGoBack = () => {
     
     .content-area {
         margin-top: -16px;
-        padding-bottom: 100px !important;
+        padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 130px) !important;
     }
     
     .card-header-icon {

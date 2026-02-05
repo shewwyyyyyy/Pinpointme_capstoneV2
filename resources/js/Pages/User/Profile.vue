@@ -132,26 +132,36 @@
                                     <v-text-field
                                         v-model="editData.phone_number"
                                         label="Phone Number"
+                                        :rules="[rules.phoneNumber]"
                                         variant="outlined"
                                         density="comfortable"
                                         hide-details="auto"
                                         class="mb-3 mobile-input"
                                         prepend-inner-icon="mdi-phone-outline"
+                                        placeholder="09171234567"
+                                        hint="Mobile number (e.g., 09171234567)"
+                                        persistent-hint
+                                        @input="formatPhoneNumber('phone_number')"
                                     ></v-text-field>
                                 </v-col>
                                 <v-col cols="12">
                                     <v-text-field
-                                        :model-value="formatDate(user?.created_at)"
-                                        label="Member Since"
-                                        readonly
-                                        disabled
+                                        v-model="editData.id_number"
+                                        label="ID Number"
+                                        :rules="[rules.idNumber]"
                                         variant="outlined"
                                         density="comfortable"
                                         hide-details="auto"
-                                        class="non-editable-field mobile-input"
-                                        prepend-inner-icon="mdi-calendar-outline"
-                                        bg-color="grey-lighten-3"
+                                        class="mb-3 mobile-input"
+                                        prepend-inner-icon="mdi-card-account-details-outline"
+                                        placeholder="Enter 9-digit ID number"
+                                        maxlength="9"
+                                        @input="formatIdNumber"
                                     ></v-text-field>
+                                    <p v-if="editData.id_number && isValidIdNumber" class="text-caption mt-1 px-2" :class="userRoleFromId === 'student' ? 'text-primary' : 'text-success'">
+                                        <v-icon size="14" class="mr-1">{{ userRoleFromId === 'student' ? 'mdi-school' : 'mdi-account-tie' }}</v-icon>
+                                        This ID belongs to a <strong>{{ userRoleFromId === 'student' ? 'Student' : 'Faculty' }}</strong>
+                                    </p>
                                 </v-col>
                             </v-row>
                         </v-form>
@@ -211,12 +221,16 @@
                                         <v-text-field
                                             v-model="editData.emergency_contact_phone"
                                             label="Contact Phone"
+                                            :rules="[rules.phoneNumber]"
                                             variant="outlined"
                                             density="comfortable"
                                             hide-details="auto"
                                             class="mb-3 mobile-input"
                                             prepend-inner-icon="mdi-phone-outline"
-                                            placeholder="Enter phone number"
+                                            placeholder="09171234567"
+                                            hint="Mobile number (e.g., 09171234567)"
+                                            persistent-hint
+                                            @input="formatPhoneNumber('emergency_contact_phone')"
                                         ></v-text-field>
                                     </v-col>
                                     <v-col cols="12" sm="6">
@@ -1034,6 +1048,7 @@ const user = ref({
     last_name: '',
     email: '',
     phone_number: '',
+    id_number: '',
     profile_picture: null,
     emergency_contact_name: '',
     emergency_contact_phone: '',
@@ -1050,6 +1065,7 @@ const editData = reactive({
     first_name: '',
     last_name: '',
     phone_number: '',
+    id_number: '',
     emergency_contact_name: '',
     emergency_contact_phone: '',
     emergency_contact_relation: '',
@@ -1097,6 +1113,29 @@ const rules = {
     hasNumber: (v) => /[0-9]/.test(v) || 'Must contain a number',
     hasSpecial: (v) => /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(v) || 'Must contain special character',
     passwordMatch: (v) => v === passwordData.new_password || 'Passwords do not match',
+    // Phone number validation (used for all phone fields)
+    phoneNumber: (v) => {
+        if (!v) return true; // Optional field
+        // Remove spaces, dashes, and parentheses
+        const cleaned = v.replace(/[\s\-\(\)]/g, '');
+        
+        // Must start with 09 and have exactly 11 digits
+        if (!/^09[0-9]{9}$/.test(cleaned)) {
+            return 'Please enter a valid mobile number (e.g., 09171234567)';
+        }
+        
+        return true;
+    },
+    // ID Number validation - exactly 9 digits, no letters
+    idNumber: (v) => {
+        if (!v) return true; // Optional field
+        // Must be exactly 9 digits, no letters or special characters
+        const idRegex = /^\d{9}$/;
+        if (!idRegex.test(v)) {
+            return 'ID Number must be exactly 9 digits (numbers only)';
+        }
+        return true;
+    },
 };
 
 // Password validation checks for visual feedback
@@ -1144,8 +1183,31 @@ const hasPersonalChanges = computed(() => {
     return (
         editData.first_name !== (user.value.first_name || '') ||
         editData.last_name !== (user.value.last_name || '') ||
-        editData.phone_number !== (user.value.phone_number || '')
+        editData.phone_number !== (user.value.phone_number || '') ||
+        editData.id_number !== (user.value.id_number || '')
     );
+});
+
+// Computed property to check if ID number is valid
+const isValidIdNumber = computed(() => {
+    const id = editData.id_number;
+    return id && /^\d{9}$/.test(id);
+});
+
+// Computed property to determine user role based on ID number
+const userRoleFromId = computed(() => {
+    const id = editData.id_number;
+    if (!id || !/^\d{9}$/.test(id)) return null;
+    
+    // Get the first digit
+    const firstDigit = id.charAt(0);
+    
+    // If starts with digit 2, it's a student
+    if (firstDigit === '2') {
+        return 'student';
+    }
+    // Otherwise (starts with 1,3,4,5,6,7,8,9), it's faculty
+    return 'faculty';
 });
 
 const hasEmergencyChanges = computed(() => {
@@ -1197,6 +1259,7 @@ const loadUser = async () => {
             first_name: inertiaUser.first_name || '',
             last_name: inertiaUser.last_name || '',
             phone_number: inertiaUser.phone_number || inertiaUser.contact_number || '',
+            id_number: inertiaUser.id_number || '',
             profile_picture: inertiaUser.profile_picture || null,
             emergency_contact_name: inertiaUser.emergency_contact_name || '',
             emergency_contact_phone: inertiaUser.emergency_contact_phone || '',
@@ -1236,12 +1299,52 @@ const syncEditData = () => {
     editData.first_name = user.value.first_name || '';
     editData.last_name = user.value.last_name || '';
     editData.phone_number = user.value.phone_number || '';
+    editData.id_number = user.value.id_number || '';
     editData.emergency_contact_name = user.value.emergency_contact_name || '';
     editData.emergency_contact_phone = user.value.emergency_contact_phone || '';
     editData.emergency_contact_relation = user.value.emergency_contact_relation || '';
     editData.blood_type = user.value.blood_type || '';
     editData.allergies = user.value.allergies || '';
     editData.medical_conditions = user.value.medical_conditions || '';
+};
+
+// Format ID number input to only allow digits
+const formatIdNumber = () => {
+    // Remove any non-digit characters
+    if (editData.id_number) {
+        editData.id_number = editData.id_number.replace(/\D/g, '').substring(0, 9);
+    }
+};
+
+// Format phone number for Philippine mobile numbers (used for all phone fields)
+const formatPhoneNumber = (field) => {
+    let value = editData[field] || '';
+    
+    // Remove all non-digit characters except + at the beginning
+    if (value.startsWith('+')) {
+        value = '+' + value.substring(1).replace(/\D/g, '');
+    } else {
+        value = value.replace(/\D/g, '');
+    }
+    
+    // If it starts with +63, limit to 13 characters
+    if (value.startsWith('+63')) {
+        value = value.substring(0, 13);
+    }
+    // If it starts with 63 (without +), limit to 12 characters  
+    else if (value.startsWith('63')) {
+        value = value.substring(0, 12);
+    }
+    // If it starts with 09, limit to 11 characters
+    else if (value.startsWith('09') || value.startsWith('9')) {
+        value = value.substring(0, 11);
+    }
+    // For other cases, limit to 11 characters max (standard PH mobile)
+    else {
+        value = value.substring(0, 11);
+    }
+    
+    editData[field] = value;
 };
 
 const fetchLocationHistory = async () => {
@@ -1347,10 +1450,29 @@ const cancelEdit = () => {
     editData.first_name = user.value.first_name || '';
     editData.last_name = user.value.last_name || '';
     editData.phone_number = user.value.phone_number || '';
+    editData.id_number = user.value.id_number || '';
 };
 
 const saveProfile = async () => {
     if (!formValid.value) return;
+
+    // Validate phone number before saving
+    if (editData.phone_number) {
+        const phoneValidation = rules.phoneNumber(editData.phone_number);
+        if (phoneValidation !== true) {
+            showSnackbar(phoneValidation, 'error');
+            return;
+        }
+    }
+
+    // Validate ID number before saving
+    if (editData.id_number) {
+        const idValidation = rules.idNumber(editData.id_number);
+        if (idValidation !== true) {
+            showSnackbar(idValidation, 'error');
+            return;
+        }
+    }
 
     saving.value = true;
     try {
@@ -1359,7 +1481,13 @@ const saveProfile = async () => {
             first_name: editData.first_name,
             last_name: editData.last_name,
             phone_number: editData.phone_number,
+            id_number: editData.id_number,
         };
+
+        // Include role determination based on ID number
+        if (editData.id_number && isValidIdNumber.value) {
+            updateData.role = userRoleFromId.value;
+        }
 
         console.log('Updating personal info with data:', updateData);
         
@@ -1369,6 +1497,7 @@ const saveProfile = async () => {
         user.value.first_name = editData.first_name;
         user.value.last_name = editData.last_name;
         user.value.phone_number = editData.phone_number;
+        user.value.id_number = editData.id_number;
         
         // Update localStorage
         localStorage.setItem('userData', JSON.stringify(user.value));
@@ -1385,6 +1514,15 @@ const saveProfile = async () => {
 
 // Save Emergency Contact
 const saveEmergencyContact = async () => {
+    // Validate emergency contact phone number before saving
+    if (editData.emergency_contact_phone) {
+        const phoneValidation = rules.phoneNumber(editData.emergency_contact_phone);
+        if (phoneValidation !== true) {
+            showSnackbar(phoneValidation, 'error');
+            return;
+        }
+    }
+
     savingEmergency.value = true;
     try {
         // Build update data - only include non-empty string values
@@ -2051,18 +2189,26 @@ onMounted(async () => {
 /* Mobile responsiveness */
 @media (max-width: 600px) {
     .pb-20 {
-        padding-bottom: 100px !important;
+        padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 140px) !important;
     }
     
     /* Ensure buttons stack nicely on very small screens */
     .d-flex.flex-column.flex-sm-row .v-btn {
         width: 100%;
     }
+    
+    .v-main :deep(.v-container) {
+        padding-bottom: 50px !important;
+    }
 }
 
 @media (max-width: 1024px) {
     .v-main {
-        padding-bottom: 80px !important;
+        padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 120px) !important;
+    }
+    
+    .v-main :deep(.v-container) {
+        padding-bottom: 40px !important;
     }
 }
 </style>

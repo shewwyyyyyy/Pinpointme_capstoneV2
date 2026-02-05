@@ -75,6 +75,7 @@ export default defineConfig({
                 ]
             },
             workbox: {
+                maximumFileSizeToCacheInBytes: 5000000,
                 globPatterns: ['**/*.{js,css,html,ico,png,svg,jpg,jpeg}'],
                 runtimeCaching: [
                     {
@@ -126,4 +127,38 @@ export default defineConfig({
             "@": path.resolve(__dirname, "./resources/js"),
         },
     },
+    build: {
+        chunkSizeWarningLimit: 1000,
+        rollupOptions: {
+            output: {
+                manualChunks(id) {
+                    // Node modules vendor chunks
+                    if (id.includes('node_modules')) {
+                        // Vue ecosystem
+                        if (id.includes('vue') || id.includes('@inertiajs')) {
+                            return 'vue-vendor';
+                        }
+                        // Vuetify
+                        if (id.includes('vuetify')) {
+                            return 'vuetify-vendor';
+                        }
+                        // MDI icons
+                        if (id.includes('@mdi')) {
+                            return 'mdi-vendor';
+                        }
+                        // PDF and QR libraries
+                        if (id.includes('jspdf') || id.includes('qrcode') || id.includes('html5-qrcode')) {
+                            return 'pdf-qr-vendor';
+                        }
+                        // Other utilities
+                        if (id.includes('axios') || id.includes('@jamescoyle')) {
+                            return 'utils-vendor';
+                        }
+                        // Default vendor chunk for other node_modules
+                        return 'vendor';
+                    }
+                }
+            }
+        }
+    }
 });
