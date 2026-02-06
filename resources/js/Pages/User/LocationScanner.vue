@@ -1,27 +1,18 @@
 <template>
     <v-app class="bg-user-gradient-light">
-        <!-- Header - matches Rescuer Dashboard style -->
-        <div class="scanner-header">
-            <div class="header-content">
-                <v-btn icon variant="text" @click="drawer = !drawer" class="menu-btn desktop-only">
-                    <v-icon>mdi-menu</v-icon>
+        <!-- App Bar -->
+        <UserAppBar 
+            title="PinPointMe" 
+            subtitle="COMING YOUR WAY."
+            :notification-count="totalNotificationCount"
+            @toggle-drawer="drawer = !drawer"
+        >
+            <template #actions>
+                <v-btn icon variant="text" @click="replayWizardTour" class="bar-btn" style="color: white;">
+                    <v-icon>mdi-help-circle-outline</v-icon>
                 </v-btn>
-                <div class="header-title">
-                    <h1>PinPointMe</h1>
-                    <p>COMING YOUR WAY.</p>
-                </div>
-                <div class="header-actions">
-                    <v-btn icon variant="text" @click="showHelp = true" class="action-btn">
-                        <v-icon>mdi-help-circle-outline</v-icon>
-                    </v-btn>
-                    <v-btn icon variant="text" @click="showNotificationPanel = !showNotificationPanel" class="desktop-only action-btn">
-                        <v-badge :content="totalNotificationCount" :model-value="totalNotificationCount > 0" color="error" overlap>
-                            <v-icon>mdi-bell</v-icon>
-                        </v-badge>
-                    </v-btn>
-                </div>
-            </div>
-        </div>
+            </template>
+        </UserAppBar>
 
         <!-- Navigation Drawer - handles its own visibility -->
         <UserMenu v-model="drawer" />
@@ -838,6 +829,9 @@
             :show-notification-panel="showNotificationPanel"
             @toggle-notifications="showNotificationPanel = !showNotificationPanel"
         />
+
+        <!-- Guided Wizard for New Users -->
+        <UserGuideWizard ref="guideWizardRef" />
     </v-app>
 </template>
 
@@ -857,8 +851,10 @@ import {
 import { useAudioRecording } from '@/Composables/useAudioRecording';
 import { useNotificationAlert } from '@/Composables/useNotificationAlert';
 import UserMenu from '@/Components/Pages/User/Menu/UserMenu.vue';
+import UserAppBar from '@/Components/Pages/User/Menu/UserAppBar.vue';
 import UserBottomNav from '@/Components/Pages/User/Menu/UserBottomNav.vue';
 import NotificationPopup from '@/Components/NotificationPopup.vue';
+import UserGuideWizard from '@/Components/UserGuideWizard.vue';
 
 // Get Inertia page for auth
 const page = usePage();
@@ -1166,6 +1162,14 @@ const showToast = ref(false);
 const toastMessage = ref('');
 const toastColor = ref('success');
 
+// Guide Wizard
+const guideWizardRef = ref(null);
+const replayWizardTour = () => {
+    if (guideWizardRef.value) {
+        guideWizardRef.value.showWizard();
+    }
+};
+
 // Load user data
 onMounted(async () => {
     // Check authentication via Inertia first
@@ -1330,15 +1334,30 @@ const triggerStatusChangeNotification = (oldStatus, newStatus, request) => {
 // Note: Chat notifications are handled within the Chat module itself
 // Removed triggerChatNotification to avoid duplicate notifications
 
-// Trigger notification for new messages (generic count-based)
+// Trigger notification for new messages (with sender name like rescuer side)
 const triggerNewMessageNotification = (newCount) => {
+    // Find the conversation with new unread messages to get sender name
+    const senderConv = conversations.value.find(c => c.unread_count > 0);
+    const senderName = senderConv?.other_user_name || 'your rescuer';
+    const lastMsg = senderConv?.last_message || 'New message';
+    
     showPopupNotification(
         '💬 New Message',
-        `You have ${newCount} new message${newCount > 1 ? 's' : ''}`,
+        `${senderName}: ${lastMsg}`,
         'info',
         'mdi-message-text',
         () => goToInbox()
     );
+    
+    // Browser notification for consistency
+    try {
+        if (Notification.permission === 'granted') {
+            new Notification(`New message from ${senderName}`, {
+                body: lastMsg,
+                icon: '/icons/icon-192x192.png'
+            });
+        }
+    } catch (e) { /* non-critical */ }
 };
 
 // Show popup notification with sound and vibration

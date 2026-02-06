@@ -30,7 +30,7 @@
         </v-app-bar>
 
         <!-- Main Content -->
-        <v-main>
+        <v-main class="chat-main">
             <!-- Loading State -->
             <div v-if="loading" class="d-flex justify-center align-center" style="min-height: 60vh;">
                 <v-progress-circular indeterminate color="primary" size="64" />
@@ -186,27 +186,20 @@
                     </div>
 
                     <!-- Normal Input -->
-                    <div v-else class="d-flex align-center ga-2">
-                        <!-- Attachment Button -->
+                    <div v-else class="chat-input-container d-flex align-center ga-2">
+                        <!-- Plus Button -->
                         <v-menu offset-y>
                             <template v-slot:activator="{ props }">
-                                <v-btn icon variant="text" color="grey" v-bind="props">
-                                    <v-icon>mdi-plus</v-icon>
+                                <v-btn 
+                                    icon 
+                                    color="primary" 
+                                    class="chat-icon-btn"
+                                    v-bind="props"
+                                >
+                                    <v-icon color="white">mdi-plus</v-icon>
                                 </v-btn>
                             </template>
                             <v-list density="compact">
-                                <v-list-item @click="triggerCameraCapture">
-                                    <template v-slot:prepend>
-                                        <v-icon>mdi-camera</v-icon>
-                                    </template>
-                                    <v-list-item-title>Camera</v-list-item-title>
-                                </v-list-item>
-                                <v-list-item @click="triggerImageUpload">
-                                    <template v-slot:prepend>
-                                        <v-icon>mdi-image</v-icon>
-                                    </template>
-                                    <v-list-item-title>Gallery</v-list-item-title>
-                                </v-list-item>
                                 <v-list-item @click="triggerFileUpload">
                                     <template v-slot:prepend>
                                         <v-icon>mdi-file</v-icon>
@@ -216,29 +209,58 @@
                             </v-list>
                         </v-menu>
                         
-                        <v-btn icon variant="text" color="primary" @click="startRecording">
-                            <v-icon>mdi-microphone</v-icon>
+                        <!-- Camera Button -->
+                        <v-btn 
+                            icon 
+                            color="primary" 
+                            class="chat-icon-btn"
+                            @click="triggerCameraCapture"
+                        >
+                            <v-icon color="white">mdi-camera</v-icon>
                         </v-btn>
                         
+                        <!-- Gallery Button -->
+                        <v-btn 
+                            icon 
+                            color="primary" 
+                            class="chat-icon-btn"
+                            @click="triggerImageUpload"
+                        >
+                            <v-icon color="white">mdi-image</v-icon>
+                        </v-btn>
+                        
+                        <!-- Microphone Button -->
+                        <v-btn 
+                            icon 
+                            color="primary" 
+                            class="chat-icon-btn"
+                            @click="startRecording"
+                        >
+                            <v-icon color="white">mdi-microphone</v-icon>
+                        </v-btn>
+                        
+                        <!-- Text Input -->
                         <v-text-field
                             v-model="messageInput"
-                            placeholder="Type a message..."
+                            placeholder="Aa"
                             variant="outlined"
                             density="compact"
                             hide-details
                             rounded
-                            class="flex-grow-1"
+                            class="flex-grow-1 chat-text-input"
                             @keyup.enter="sendTextMessage"
                         />
                         
+                        <!-- Send Button -->
                         <v-btn
                             icon
                             color="primary"
-                            :disabled="!messageInput.trim()"
+                            class="chat-icon-btn"
+                            :disabled="!messageInput.trim() || isSending"
                             :loading="isSending"
-                            @click="sendTextMessage"
+                            @click="sendTextMessage()"
                         >
-                            <v-icon>mdi-send</v-icon>
+                            <v-icon color="white">mdi-send</v-icon>
                         </v-btn>
                     </div>
                 </div>
@@ -305,21 +327,107 @@
         </v-dialog>
 
         <!-- Profile Photo Viewer Dialog -->
-        <v-dialog v-model="showPhotoViewer" max-width="350">
-            <v-card rounded="xl" class="pa-4 text-center">
-                <v-avatar size="200" :color="!otherParticipantPicture ? avatarColor : undefined" class="mb-4">
-                    <v-img
-                        v-if="otherParticipantPicture"
-                        :src="otherParticipantPicture"
-                        cover
-                    />
-                    <span v-else class="text-h2 text-white font-weight-bold">{{ initials }}</span>
-                </v-avatar>
-                <h3 class="text-h6 mb-1">{{ chatTitle }}</h3>
-                <p v-if="otherParticipantRole" class="text-caption text-grey mb-3">
-                    {{ otherParticipantRole === 'rescuer' ? 'Emergency Rescuer' : 'User' }}
-                </p>
-                <v-btn variant="text" color="primary" @click="showPhotoViewer = false">Close</v-btn>
+        <v-dialog v-model="showPhotoViewer" max-width="400">
+            <v-card rounded="xl" class="profile-dialog">
+                <!-- Header -->
+                <v-card-title class="profile-header">
+                    <div class="d-flex align-center">
+                        <v-icon class="mr-2">mdi-account-circle</v-icon>
+                        <span>Profile Information</span>
+                    </div>
+                </v-card-title>
+
+                <!-- Profile Content -->
+                <v-card-text class="profile-content">
+                    <!-- Avatar Section -->
+                    <div class="profile-avatar-section">
+                        <v-avatar 
+                            size="120" 
+                            :color="!otherParticipantPicture ? avatarColor : undefined" 
+                            class="profile-avatar"
+                        >
+                            <v-img
+                                v-if="otherParticipantPicture"
+                                :src="otherParticipantPicture"
+                                cover
+                            />
+                            <span v-else class="text-h3 text-white font-weight-bold">{{ initials }}</span>
+                        </v-avatar>
+                    </div>
+
+                    <!-- User Information -->
+                    <div class="profile-info">
+                        <h2 class="profile-name">{{ chatTitle }}</h2>
+                        <div class="profile-role">
+                            <v-chip 
+                                :color="getRoleColor(otherParticipantRole)" 
+                                size="small" 
+                                variant="tonal"
+                                class="mb-3"
+                            >
+                                <v-icon start size="14">
+                                    {{ getRoleIcon(otherParticipantRole) }}
+                                </v-icon>
+                                {{ formatRole(otherParticipantRole) }}
+                            </v-chip>
+                        </div>
+
+                        <!-- Additional Info if available -->
+                        <div v-if="rescueRequest" class="rescue-info">
+                            <v-divider class="my-3"></v-divider>
+                            <h3 class="text-subtitle-2 mb-2">Emergency Details</h3>
+                            
+                            <div class="info-item">
+                                <v-icon size="16" class="mr-2 text-grey">mdi-alert-circle-outline</v-icon>
+                                <span class="text-body-2">{{ rescueRequest.emergency_type || 'Emergency' }}</span>
+                            </div>
+                            
+                            <div v-if="rescueRequest.room" class="info-item">
+                                <v-icon size="16" class="mr-2 text-grey">mdi-map-marker-outline</v-icon>
+                                <span class="text-body-2">{{ rescueRequest.room.room_name || rescueRequest.room.name }}</span>
+                            </div>
+                            
+                            <div class="info-item">
+                                <v-icon size="16" class="mr-2 text-grey">mdi-information-outline</v-icon>
+                                <v-chip 
+                                    :color="getEmergencyColor(rescueRequest.emergency_type)" 
+                                    size="x-small" 
+                                    variant="tonal"
+                                >
+                                    {{ formatStatus(rescueRequest.status) }}
+                                </v-chip>
+                            </div>
+                        </div>
+
+                        <!-- Contact Actions -->
+                        <div class="contact-actions">
+                            <v-divider class="my-3"></v-divider>
+                            <div class="d-flex gap-2">
+                                <v-btn 
+                                    v-if="rescueRequest" 
+                                    variant="outlined" 
+                                    color="primary" 
+                                    size="small"
+                                    class="flex-1"
+                                    @click="viewRescue"
+                                >
+                                    <v-icon start>mdi-eye</v-icon>
+                                    View Details
+                                </v-btn>
+                                <v-btn 
+                                    variant="outlined" 
+                                    color="grey" 
+                                    size="small"
+                                    :class="rescueRequest ? 'flex-1' : 'w-100'"
+                                    @click="showPhotoViewer = false"
+                                >
+                                    <v-icon start>mdi-close</v-icon>
+                                    Close
+                                </v-btn>
+                            </div>
+                        </div>
+                    </div>
+                </v-card-text>
             </v-card>
         </v-dialog>
 
@@ -399,6 +507,7 @@ const recordingSeconds = ref(0);
 const { playNotificationSound, vibrate, notify } = useNotificationAlert();
 const lastKnownMessageIds = ref(new Set());
 const isInitialLoad = ref(true);
+const isPageVisible = ref(!document.hidden);
 
 const snackbar = ref({
     show: false,
@@ -580,8 +689,11 @@ const fetchMessages = async (convId = null) => {
         await nextTick();
         scrollToBottom();
         
-        // Mark messages as read
-        markMessagesAsRead();
+        // Only mark as read when the user is actively viewing this chat page
+        // This prevents messages from being marked 'read' when the user hasn't opened the chat
+        if (isPageVisible.value) {
+            markMessagesAsRead();
+        }
     } catch (error) {
         console.error('Error fetching messages:', error);
     } finally {
@@ -917,17 +1029,19 @@ const showImagePreview = (url) => {
 const markMessagesAsRead = async () => {
     if (!conversation.value?.id || !currentUserId.value) return;
     
-    // Only mark as read if the document is visible (user is actively viewing)
-    if (document.hidden) return;
+    // Only mark as read if the document/page is visible (user is actively viewing this chat)
+    if (document.hidden || !isPageVisible.value) return;
     
+    // Find messages sent by the OTHER user that aren't read yet
     const unreadMessages = messages.value.filter(
-        m => m.status !== 'read' && m.sender_id !== currentUserId.value
+        m => m.status !== 'read' && String(m.sender_id) !== String(currentUserId.value)
     );
     
     if (unreadMessages.length === 0) return;
 
     try {
         await markConversationRead(conversation.value.id, currentUserId.value);
+        // Only update local status after successful API call
         unreadMessages.forEach(m => m.status = 'read');
     } catch (error) {
         console.error('Error marking messages as read:', error);
@@ -1086,6 +1200,36 @@ const formatStatus = (status) => {
     return labels[status] || status;
 };
 
+const formatRole = (role) => {
+    const labels = {
+        'student': 'Student',
+        'faculty': 'Faculty',
+        'staff': 'Staff',
+        'rescuer': 'Emergency Rescuer',
+    };
+    return labels[role] || role || 'User';
+};
+
+const getRoleColor = (role) => {
+    const colors = {
+        'student': 'blue',
+        'faculty': 'green',
+        'staff': 'orange',
+        'rescuer': 'primary',
+    };
+    return colors[role] || 'grey';
+};
+
+const getRoleIcon = (role) => {
+    const icons = {
+        'student': 'mdi-school',
+        'faculty': 'mdi-account-tie',
+        'staff': 'mdi-briefcase',
+        'rescuer': 'mdi-shield-account',
+    };
+    return icons[role] || 'mdi-account';
+};
+
 const formatTime = (dateString) => {
     if (!dateString) return '';
     const date = new Date(dateString);
@@ -1131,14 +1275,16 @@ onMounted(async () => {
     document.addEventListener('visibilitychange', handleVisibilityChange);
 });
 
-// Handle visibility change - mark messages as read when user returns to tab
+// Handle visibility change - update page visibility and mark as read when user returns
 const handleVisibilityChange = () => {
+    isPageVisible.value = !document.hidden;
     if (!document.hidden && conversation.value?.id) {
         markMessagesAsRead();
     }
 };
 
 onUnmounted(() => {
+    isPageVisible.value = false;
     if (pollingInterval.value) {
         clearInterval(pollingInterval.value);
     }
@@ -1161,13 +1307,29 @@ watch(() => conversation.value?.id, (newId) => {
 </script>
 
 <style scoped>
-.chat-container {
-    background-color: #f5f5f5;
-    height: calc(100vh - 56px);
-    height: calc(100dvh - 56px);
+.chat-main {
+    height: 100vh;
+    height: 100dvh;
     display: flex;
     flex-direction: column;
     overflow: hidden;
+}
+
+.chat-main :deep(.v-main__wrap) {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    flex: 1;
+    min-height: 0;
+}
+
+.chat-container {
+    background-color: #f5f5f5;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-height: 0;
 }
 
 .messages-area {
@@ -1176,7 +1338,7 @@ watch(() => conversation.value?.id, (newId) => {
     overflow-y: auto;
     overflow-x: hidden;
     -webkit-overflow-scrolling: touch;
-    padding-bottom: env(safe-area-inset-bottom, 0);
+    min-height: 0;
 }
 
 .message-wrapper {
@@ -1321,7 +1483,43 @@ watch(() => conversation.value?.id, (newId) => {
 .input-area {
     border-top: 1px solid rgba(0, 0, 0, 0.08);
     flex-shrink: 0;
-    padding-bottom: env(safe-area-inset-bottom, 8px);
+    padding-bottom: calc(env(safe-area-inset-bottom, 8px) + 4px) !important;
+}
+
+.chat-input-container {
+    padding: 8px 4px;
+}
+
+.chat-icon-btn {
+    width: 40px !important;
+    height: 40px !important;
+    border-radius: 50% !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+    flex-shrink: 0;
+}
+
+.chat-icon-btn .v-icon {
+    font-size: 20px !important;
+}
+
+.chat-text-input {
+    margin: 0 8px;
+}
+
+.chat-text-input :deep(.v-field) {
+    background-color: #f5f5f5;
+    border-radius: 24px;
+    min-height: 40px;
+}
+
+.chat-text-input :deep(.v-field__input) {
+    padding: 8px 16px;
+    font-size: 16px;
+    min-height: auto;
+}
+
+.chat-text-input :deep(.v-field__outline) {
+    --v-field-border-opacity: 0.12;
 }
 
 .cursor-pointer {
@@ -1343,11 +1541,6 @@ watch(() => conversation.value?.id, (newId) => {
 
 /* Mobile Small (< 360px) */
 @media (max-width: 359px) {
-    .chat-container {
-        height: calc(100vh - 48px);
-        height: calc(100dvh - 48px);
-    }
-    
     .messages-area {
         padding: 8px 10px;
     }
@@ -1367,20 +1560,43 @@ watch(() => conversation.value?.id, (newId) => {
     
     .input-area {
         padding: 8px !important;
+        padding-bottom: calc(env(safe-area-inset-bottom, 8px) + 4px) !important;
     }
     
     .input-area .v-text-field {
         font-size: 0.85rem;
     }
+    
+    /* Smaller chat buttons on very small screens */
+    .chat-icon-btn {
+        width: 32px !important;
+        height: 32px !important;
+    }
+    
+    .chat-icon-btn .v-icon {
+        font-size: 16px !important;
+    }
+    
+    .chat-input-container {
+        padding: 6px 2px;
+    }
+    
+    .chat-text-input {
+        margin: 0 4px;
+    }
+    
+    .chat-text-input :deep(.v-field) {
+        min-height: 36px;
+    }
+    
+    .chat-text-input :deep(.v-field__input) {
+        padding: 6px 12px;
+        font-size: 14px;
+    }
 }
 
 /* Mobile (360px - 599px) */
 @media (min-width: 360px) and (max-width: 599px) {
-    .chat-container {
-        height: calc(100vh - 52px);
-        height: calc(100dvh - 52px);
-    }
-    
     .messages-area {
         padding: 12px;
     }
@@ -1399,16 +1615,39 @@ watch(() => conversation.value?.id, (newId) => {
     
     .input-area {
         padding: 10px !important;
+        padding-bottom: calc(env(safe-area-inset-bottom, 8px) + 4px) !important;
+    }
+    
+    /* Slightly smaller chat buttons on mobile */
+    .chat-icon-btn {
+        width: 36px !important;
+        height: 36px !important;
+    }
+    
+    .chat-icon-btn .v-icon {
+        font-size: 18px !important;
+    }
+    
+    .chat-input-container {
+        padding: 6px 3px;
+    }
+    
+    .chat-text-input {
+        margin: 0 6px;
+    }
+    
+    .chat-text-input :deep(.v-field) {
+        min-height: 38px;
+    }
+    
+    .chat-text-input :deep(.v-field__input) {
+        padding: 7px 14px;
+        font-size: 15px;
     }
 }
 
 /* Tablet (600px - 1023px) */
 @media (min-width: 600px) and (max-width: 1023px) {
-    .chat-container {
-        height: calc(100vh - 56px);
-        height: calc(100dvh - 56px);
-    }
-    
     .messages-area {
         padding: 16px 20px;
     }
@@ -1429,7 +1668,6 @@ watch(() => conversation.value?.id, (newId) => {
 /* Desktop (1024px+) */
 @media (min-width: 1024px) {
     .chat-container {
-        height: calc(100vh - 64px);
         max-width: 800px;
         margin: 0 auto;
     }
@@ -1455,22 +1693,77 @@ watch(() => conversation.value?.id, (newId) => {
     }
 }
 
-/* Fix for keyboards on mobile */
-@supports (height: 100dvh) {
-    .chat-container {
-        height: calc(100dvh - 56px);
+/* Profile Dialog Styles */
+.profile-dialog {
+    background: white;
+}
+
+.profile-header {
+    background: linear-gradient(135deg, #3674B5 0%, #4A90E2 100%);
+    color: white;
+    padding: 16px 20px;
+}
+
+.profile-header .v-btn {
+    color: white;
+}
+
+.profile-content {
+    padding: 24px 20px;
+}
+
+.profile-avatar-section {
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+.profile-avatar {
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+    border: 4px solid white;
+}
+
+.profile-info {
+    text-align: center;
+}
+
+.profile-name {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #1a365d;
+    margin-bottom: 8px;
+}
+
+.profile-role {
+    margin-bottom: 16px;
+}
+
+.rescue-info {
+    text-align: left;
+}
+
+.info-item {
+    display: flex;
+    align-items: center;
+    margin-bottom: 8px;
+    padding: 4px 0;
+}
+
+.contact-actions {
+    margin-top: 16px;
+}
+
+@media (max-width: 600px) {
+    .profile-dialog .profile-content {
+        padding: 20px 16px;
     }
     
-    @media (max-width: 359px) {
-        .chat-container {
-            height: calc(100dvh - 48px);
-        }
+    .profile-avatar {
+        width: 100px !important;
+        height: 100px !important;
     }
     
-    @media (min-width: 360px) and (max-width: 599px) {
-        .chat-container {
-            height: calc(100dvh - 52px);
-        }
+    .profile-name {
+        font-size: 1.25rem;
     }
 }
 </style>

@@ -15,6 +15,37 @@ use Inertia\Inertia;
 class ConversationController extends Controller
 {
     /**
+     * Admin: list ALL active conversations with messages (read-only)
+     */
+    public function adminIndex(Request $request)
+    {
+        $conversations = Conversation::with([
+                'participants.user:id,first_name,last_name,email,profile_picture,role',
+                'messages' => function ($q) {
+                    $q->with('sender:id,first_name,last_name,email,profile_picture')
+                      ->orderBy('sent_at', 'desc')
+                      ->limit(50);
+                },
+                'rescueRequest:id,conversation_id,rescue_code,status,urgency_level,user_id,assigned_rescuer,building_id,floor_id,room_id',
+                'rescueRequest.requester:id,first_name,last_name,email,profile_picture',
+                'rescueRequest.rescuer:id,first_name,last_name,email,profile_picture',
+                'rescueRequest.building:id,name',
+                'rescueRequest.floor:id,floor_name',
+                'rescueRequest.room:id,room_name'
+            ])
+            ->orderBy('updated_at', 'desc')
+            ->get();
+
+        // Add total_messages count and latest message info
+        $conversations->transform(function ($conversation) {
+            $conversation->total_messages = $conversation->messages->count();
+            return $conversation;
+        });
+
+        return response()->json(['data' => $conversations]);
+    }
+
+    /**
      * Display conversations for a user (API)
      */
     public function index(Request $request)

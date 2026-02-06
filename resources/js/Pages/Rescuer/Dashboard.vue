@@ -336,6 +336,42 @@
                 @close="popupAlert.show = false"
                 @click="handlePopupClick"
             />
+
+            <!-- Force Alert Overlay (Unstoppable until rescuer accepts) -->
+            <v-overlay
+                v-model="isForceAlertPlaying"
+                persistent
+                :close-on-back="false"
+                class="force-alert-overlay"
+                :scrim="true"
+                scrim-opacity="0.92"
+            >
+                <div class="force-alert-card">
+                    <!-- Animated pulse rings behind icon -->
+                    <div class="fa-icon-area">
+                        <div class="fa-ring fa-ring-1"></div>
+                        <div class="fa-ring fa-ring-2"></div>
+                        <div class="fa-ring fa-ring-3"></div>
+                        <div class="fa-icon-circle">
+                            <v-icon size="40" color="white" class="fa-icon-shake">mdi-alarm-light</v-icon>
+                        </div>
+                    </div>
+
+                    <!-- Text content -->
+                    <div class="fa-label">URGENT</div>
+                    <h2 class="fa-title">Rescue Request Waiting</h2>
+                    <p class="fa-subtitle">
+                        Admin has triggered a force alert.<br>
+                        A request has been pending too long — please accept immediately.
+                    </p>
+
+                    <!-- CTA button -->
+                    <button class="fa-accept-btn" @click="goToPendingAndStopAlert">
+                        <v-icon size="20" class="mr-2">mdi-check-circle</v-icon>
+                        View & Accept Request
+                    </button>
+                </div>
+            </v-overlay>
         </v-main>
     </v-app>
 </template>
@@ -343,8 +379,9 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { router, usePage } from '@inertiajs/vue3';
-import { apiFetch, getProfilePictureUrl, getUnreadMessageCount } from '@/Composables/useApi';
+import { apiFetch, getProfilePictureUrl } from '@/Composables/useApi';
 import { useNotificationAlert } from '@/Composables/useNotificationAlert';
+import { useUnreadMessages } from '@/Composables/useUnreadMessages';
 import RescuerMenu from '@/Components/Pages/Rescuer/Menu/RescuerMenu.vue';
 import RescuerBottomNav from '@/Components/Pages/Rescuer/Menu/RescuerBottomNav.vue';
 import NotificationPopup from '@/Components/NotificationPopup.vue';
@@ -354,7 +391,7 @@ const page = usePage();
 const authUser = computed(() => page.props?.auth?.user);
 
 // Notification Alert System
-const { playNotificationSound, vibrate } = useNotificationAlert();
+const { playNotificationSound, vibrate, stopForceAlert, isForceAlertPlaying } = useNotificationAlert();
 
 // Popup alert state
 const popupAlert = ref({
@@ -382,7 +419,7 @@ const rescuerName = ref('Rescuer');
 const rescuerId = ref('');
 const userData = ref(null);
 const showNotificationPanel = ref(false);
-const unreadMessageCount = ref(0);
+const { unreadCount: unreadMessageCount, onNewMessages } = useUnreadMessages();
 
 // Rescued tab filter state
 const rescuedSearchQuery = ref('');
@@ -459,6 +496,18 @@ const hasActiveAssignment = computed(() => {
     );
 });
 
+// Rescuer's current status (refreshed on each poll)
+const rescuerStatus = ref(authUser.value?.status || 'available');
+
+// Eligibility check — rescuer can receive force alert only if ALL are true:
+// 1. No active rescue (active_request = none)
+// 2. Status is "available"
+// 3. Has not accepted another request (covered by #1)
+const isEligibleForForceAlert = computed(() => {
+    return !hasActiveAssignment.value && 
+           rescuerStatus.value?.toLowerCase() === 'available';
+});
+
 // Toast
 const showToast = ref(false);
 const toastMessage = ref('');
@@ -489,7 +538,17 @@ onMounted(async () => {
     
     loadUserData();
     await fetchRescueRequests();
-    await fetchUnreadMessageCount();
+    
+    // Register new message notification callback
+    const unregisterMessageCallback = onNewMessages((newCount) => {
+        showPopupNotification(
+            '\uD83D\uDCAC New Message',
+            `You have ${newCount} new message${newCount > 1 ? 's' : ''}`,
+            'info',
+            'mdi-message-text',
+            () => { router.visit('/rescuer/chats'); }
+        );
+    });
     
     // Store initial pending state
     previousPendingCount.value = pendingRequests.value.length;
@@ -525,9 +584,9 @@ const pollForNewRequests = async () => {
         const response = await apiFetch(endpoint, { method: 'GET' });
         const data = response?.data || response;
         rescueRequests.value = Array.isArray(data) ? data : [];
-        
-        // Also refresh unread message count during polling
-        await fetchUnreadMessageCount();
+
+        // Refresh rescuer status for eligibility check
+        await refreshRescuerStatus();
         
         // Check for new pending requests
         const currentPending = pendingRequests.value;
@@ -537,8 +596,37 @@ const pollForNewRequests = async () => {
         const newRequests = currentPending.filter(r => !previousPendingIds.value.includes(r.id));
         
         if (newRequests.length > 0) {
-            // Trigger notification for new emergency request
-            triggerNewRequestNotification(newRequests[0], newRequests.length);
+            // If rescuer is not eligible (busy/unavailable) → default sound only
+            // If rescuer is available → emergency alarm
+            if (!isEligibleForForceAlert.value) {
+                triggerSoftRequestNotification(newRequests[0], newRequests.length);
+            } else {
+                triggerNewRequestNotification(newRequests[0], newRequests.length);
+            }
+        }
+        
+        // Check for force-alert requests from admin
+        // Only trigger for ELIGIBLE rescuers — skip entirely if busy
+        const forceAlertRequests = currentPending.filter(r => r.force_alert === true || r.force_alert === 1);
+        if (forceAlertRequests.length > 0 && !isForceAlertPlaying.value && isEligibleForForceAlert.value) {
+            const req = forceAlertRequests[0];
+            const name = req.firstName || 'Someone';
+            const location = getLocationDisplay(req);
+
+            // Eligible — full unstoppable force-alert
+            playNotificationSound('force-alert');
+            vibrate([500, 200, 500, 200, 500, 200, 500, 200, 500]);
+            popupAlert.value = {
+                show: true,
+                title: '\uD83D\uDD14 URGENT: Admin Force Alert!',
+                message: `${name} needs IMMEDIATE help at ${location}! Accept now to stop the alarm.`,
+                type: 'error',
+                icon: 'mdi-alarm-light',
+                callback: () => {
+                    showNotificationPanel.value = false;
+                    selectedTab.value = 'pending';
+                },
+            };
         }
         
         // Update previous state
@@ -568,6 +656,26 @@ const triggerNewRequestNotification = (request, totalNew) => {
     );
 };
 
+// Soft notification for new request when rescuer has an ongoing rescue (default sound only)
+const triggerSoftRequestNotification = (request, totalNew) => {
+    const urgencyText = request.urgency_level || 'Unknown';
+    const location = getLocationDisplay(request);
+    const name = request.firstName || 'Someone';
+
+    popupAlert.value = {
+        show: true,
+        title: `New Request${totalNew > 1 ? ` (${totalNew})` : ''}`,
+        message: `${name} needs help at ${location}. Urgency: ${urgencyText}`,
+        type: 'info',
+        icon: 'mdi-bell',
+        callback: null,
+    };
+    // Use default/message sound instead of emergency alarm
+    playNotificationSound('message');
+    vibrate([100, 50, 100]);
+    setTimeout(() => { popupAlert.value.show = false; }, 5000);
+};
+
 // Show popup notification with sound and vibration
 const showPopupNotification = (title, message, type = 'info', icon = 'mdi-bell', callback = null) => {
     popupAlert.value = {
@@ -579,14 +687,19 @@ const showPopupNotification = (title, message, type = 'info', icon = 'mdi-bell',
         callback,
     };
     
-    // Emergency sound and vibration for new requests
-    playNotificationSound('emergency');
-    vibrate([300, 100, 300, 100, 300, 100, 300]); // Long urgent pattern
+    // Play sound based on notification type
+    if (type === 'error') {
+        playNotificationSound('emergency');
+        vibrate([300, 100, 300, 100, 300, 100, 300]);
+    } else {
+        playNotificationSound('message');
+        vibrate([100, 50, 100]);
+    }
     
-    // Auto-hide after 10 seconds for emergencies
+    // Auto-hide
     setTimeout(() => {
         popupAlert.value.show = false;
-    }, 10000);
+    }, type === 'error' ? 10000 : 5000);
 };
 
 // Handle popup click
@@ -595,6 +708,14 @@ const handlePopupClick = () => {
         popupAlert.value.callback();
     }
     popupAlert.value.show = false;
+};
+
+// Handle force-alert: go to pending tab (ringtone only stops when they actually accept)
+const goToPendingAndStopAlert = () => {
+    stopForceAlert();
+    popupAlert.value.show = false;
+    showNotificationPanel.value = false;
+    selectedTab.value = 'pending';
 };
 
 const loadUserData = () => {
@@ -607,6 +728,22 @@ const loadUserData = () => {
             ? `${parsed.firstName} ${parsed.lastName || ''}`.trim()
             : parsed.name || 'Rescuer';
     }
+    // Also read status from Inertia auth (most up-to-date)
+    if (authUser.value?.status) {
+        rescuerStatus.value = authUser.value.status;
+    }
+};
+
+// Refresh rescuer status from API during each poll cycle
+const refreshRescuerStatus = async () => {
+    if (!rescuerId.value) return;
+    try {
+        const response = await apiFetch(`/api/users/${rescuerId.value}`, { method: 'GET' });
+        const user = response?.data || response;
+        if (user?.status) {
+            rescuerStatus.value = user.status;
+        }
+    } catch { /* silent — status check is non-critical */ }
 };
 
 const fetchRescueRequests = async () => {
@@ -629,24 +766,10 @@ const fetchRescueRequests = async () => {
     }
 };
 
-// Fetch unread message count
-const fetchUnreadMessageCount = async () => {
-    if (!rescuerId.value) {
-        console.warn('fetchUnreadMessageCount: No rescuerId available');
-        return;
-    }
-    try {
-        console.log('Fetching unread message count for rescuer:', rescuerId.value);
-        unreadMessageCount.value = await getUnreadMessageCount(rescuerId.value);
-        console.log('Updated unreadMessageCount:', unreadMessageCount.value);
-    } catch (error) {
-        console.error('Failed to fetch unread message count:', error);
-    }
-};
+// Fetch unread message count is now handled by useUnreadMessages composable
 
 const refreshData = async () => {
     await fetchRescueRequests();
-    await fetchUnreadMessageCount();
     showNotification('Data refreshed', 'success');
 };
 
@@ -669,6 +792,9 @@ const acceptRescue = async (request) => {
                 assigned_rescuer: rescuerId.value,
             }),
         });
+        // Stop force-alert ringtone if it was playing
+        stopForceAlert();
+        popupAlert.value.show = false;
         showNotification('Rescue accepted!', 'success');
         await fetchRescueRequests();
         router.visit(`/rescuer/active/${request.id}`);
@@ -1337,5 +1463,159 @@ const showNotification = (message, color = 'info') => {
 input, textarea {
     -webkit-user-select: auto;
     user-select: auto;
+}
+
+/* ── Force Alert Overlay ── */
+.force-alert-overlay {
+    z-index: 99999 !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.force-alert-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 340px;
+    max-width: calc(100vw - 48px);
+    background: #ffffff;
+    border-radius: 24px;
+    padding: 40px 28px 32px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+    text-align: center;
+    animation: faCardEnter 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Icon area with rings */
+.fa-icon-area {
+    position: relative;
+    width: 100px;
+    height: 100px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 20px;
+}
+
+.fa-ring {
+    position: absolute;
+    border-radius: 50%;
+    border: 2px solid rgba(183, 28, 28, 0.15);
+    animation: faRingPulse 2s ease-out infinite;
+}
+
+.fa-ring-1 {
+    width: 100px;
+    height: 100px;
+    animation-delay: 0s;
+}
+.fa-ring-2 {
+    width: 100px;
+    height: 100px;
+    animation-delay: 0.6s;
+}
+.fa-ring-3 {
+    width: 100px;
+    height: 100px;
+    animation-delay: 1.2s;
+}
+
+.fa-icon-circle {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #EF5350, #b71c1c);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1;
+    box-shadow: 0 4px 20px rgba(183, 28, 28, 0.35);
+}
+
+.fa-icon-shake {
+    animation: faShake 0.5s ease-in-out infinite alternate;
+}
+
+.fa-label {
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 2.5px;
+    color: #b71c1c;
+    background: rgba(183, 28, 28, 0.08);
+    padding: 4px 16px;
+    border-radius: 20px;
+    margin-bottom: 12px;
+}
+
+.fa-title {
+    font-size: 20px;
+    font-weight: 700;
+    color: #13294B;
+    margin: 0 0 8px;
+    line-height: 1.3;
+}
+
+.fa-subtitle {
+    font-size: 13.5px;
+    color: #546E7A;
+    line-height: 1.55;
+    margin: 0 0 28px;
+}
+
+.fa-accept-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    padding: 14px 24px;
+    border: none;
+    border-radius: 14px;
+    background: linear-gradient(135deg, #3674B5, #2196F3);
+    color: #ffffff;
+    font-size: 14.5px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    box-shadow: 0 4px 16px rgba(54, 116, 181, 0.3);
+}
+
+.fa-accept-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(54, 116, 181, 0.4);
+}
+
+.fa-accept-btn:active {
+    transform: translateY(0);
+}
+
+@keyframes faCardEnter {
+    from {
+        opacity: 0;
+        transform: scale(0.9) translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+@keyframes faRingPulse {
+    0% {
+        transform: scale(0.6);
+        opacity: 0.6;
+        border-color: rgba(183, 28, 28, 0.3);
+    }
+    100% {
+        transform: scale(1.5);
+        opacity: 0;
+        border-color: rgba(183, 28, 28, 0);
+    }
+}
+
+@keyframes faShake {
+    0%   { transform: rotate(-6deg); }
+    100% { transform: rotate(6deg); }
 }
 </style>

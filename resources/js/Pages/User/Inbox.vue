@@ -1,26 +1,18 @@
 <template>
     <v-app class="bg-user-gradient-light">
-        <!-- Header - like Rescuer's Chats -->
-        <div class="messages-header">
-            <div class="header-content">
-                <v-btn icon variant="text" @click="drawer = true" class="menu-btn desktop-only">
-                    <v-icon>mdi-menu</v-icon>
-                </v-btn>
-                <div class="header-title">
-                    <h1>Messages</h1>
-                    <p v-if="totalUnreadCount > 0">{{ totalUnreadCount }} unread message{{ totalUnreadCount !== 1 ? 's' : '' }}</p>
-                </div>
-                <v-btn 
-                    icon 
-                    variant="text" 
-                    class="refresh-btn"
-                    :loading="refreshing"
-                    @click="refreshChats"
-                >
+        <!-- App Bar -->
+        <UserAppBar 
+            title="Messages" 
+            :subtitle="totalUnreadCount > 0 ? totalUnreadCount + ' unread message' + (totalUnreadCount !== 1 ? 's' : '') : ''"
+            :notification-count="0"
+            @toggle-drawer="drawer = true"
+        >
+            <template #actions>
+                <v-btn icon variant="text" class="bar-btn" style="color: white;" :loading="refreshing" @click="refreshChats">
                     <v-icon>mdi-refresh</v-icon>
                 </v-btn>
-            </div>
-        </div>
+            </template>
+        </UserAppBar>
 
         <!-- Navigation Drawer - Desktop only -->
         <UserMenu v-model="drawer" />
@@ -92,19 +84,8 @@
                                 </p>
                             </div>
                             
-                            <div class="chat-footer" v-if="chat.rescue_status || chat.unread_count > 0">
+                            <div class="chat-footer" v-if="chat.unread_count > 0">
                                 <v-chip
-                                    v-if="chat.rescue_status"
-                                    size="small"
-                                    :color="getStatusColor(chat.rescue_status)"
-                                    variant="tonal"
-                                    class="status-chip"
-                                >
-                                    <v-icon start size="12">mdi-circle</v-icon>
-                                    {{ formatStatus(chat.rescue_status) }}
-                                </v-chip>
-                                <v-chip
-                                    v-else-if="chat.unread_count > 0"
                                     size="small"
                                     color="primary"
                                     variant="flat"
@@ -160,9 +141,14 @@
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue';
 import { router } from '@inertiajs/vue3';
 import { getConversations, getProfilePictureUrl } from '@/Composables/useApi';
+import { useNotificationAlert } from '@/Composables/useNotificationAlert';
 import UserMenu from '@/Components/Pages/User/Menu/UserMenu.vue';
+import UserAppBar from '@/Components/Pages/User/Menu/UserAppBar.vue';
 import UserBottomNav from '@/Components/Pages/User/Menu/UserBottomNav.vue';
 import NotificationPopup from '@/Components/NotificationPopup.vue';
+
+// Notification Alert System
+const { playNotificationSound, vibrate, notify } = useNotificationAlert();
 
 // Scroll position storage key
 const SCROLL_POSITION_KEY = 'user_inbox_scroll_position';
@@ -186,6 +172,7 @@ const popupAlert = ref({
     type: 'info',
     icon: 'mdi-information',
 });
+const pendingConversationClick = ref(null);
 
 // Toast
 const showToast = ref(false);
@@ -217,9 +204,13 @@ const filteredChats = computed(() => {
     });
 });
 
-// Handle notification click
+// Handle notification click - navigate to conversation
 const handleNotificationClick = () => {
     popupAlert.value.show = false;
+    if (pendingConversationClick.value) {
+        openChat(pendingConversationClick.value);
+        pendingConversationClick.value = null;
+    }
 };
 
 // Save scroll position before leaving
@@ -253,13 +244,25 @@ onMounted(async () => {
     
     // Save scroll position before page unload
     window.addEventListener('beforeunload', saveScrollPosition);
+    
+    // Refresh chats when page becomes visible (user returns from chat)
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 });
+
+// Handle visibility change - refresh chats when user returns to inbox
+const handleVisibilityChange = () => {
+    if (!document.hidden) {
+        // Refresh chats when page becomes visible again
+        fetchChats(false);
+    }
+};
 
 onUnmounted(() => {
     if (pollingInterval.value) {
         clearInterval(pollingInterval.value);
     }
     window.removeEventListener('beforeunload', saveScrollPosition);
+    document.removeEventListener('visibilitychange', handleVisibilityChange);
 });
 
 const fetchChats = async (showErrorToast = false) => {
@@ -317,8 +320,38 @@ const fetchChats = async (showErrorToast = false) => {
             };
         });
         
-        // Note: Chat notifications are handled within the Chat module itself
-        // We only update the list here, no popup notifications needed
+        // Detect new messages and trigger notification (matching rescuer behavior)
+        if (!isInitialLoad && newChats.length > 0) {
+            for (const chat of newChats) {
+                const prevCount = previousUnreadCounts[chat.id] || 0;
+                const newCount = chat.unread_count || 0;
+                
+                if (newCount > prevCount) {
+                    // Trigger notification with sound + popup
+                    playNotificationSound('message');
+                    vibrate('message');
+                    
+                    pendingConversationClick.value = chat;
+                    
+                    popupAlert.value = {
+                        show: true,
+                        title: '💬 New Message',
+                        message: `${chat.other_user_name}: ${chat.last_message || 'New message'}`,
+                        type: 'info',
+                        icon: 'mdi-message-text',
+                    };
+                    
+                    notify({
+                        title: `New message from ${chat.other_user_name}`,
+                        body: chat.last_message || 'New message',
+                        icon: '/icons/icon-192x192.png'
+                    });
+                    
+                    setTimeout(() => { popupAlert.value.show = false; }, 5000);
+                    break; // Only show one notification at a time
+                }
+            }
+        }
         
         chats.value = newChats;
     } catch (err) {

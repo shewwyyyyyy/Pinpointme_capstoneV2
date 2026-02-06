@@ -23,6 +23,19 @@
         <div class="bottom-nav">
             <!-- Left Side Navigation -->
             <button 
+                data-wizard="dashboard"
+                :class="['nav-item', isActive('/user/scanner') && !isActive('/user/scanner?scan=true') ? 'active' : '']"
+                @click="navigateTo('/user/scanner')"
+            >
+                <div class="nav-icon-wrapper">
+                    <v-icon size="22">{{ isActive('/user/scanner') ? 'mdi-view-dashboard' : 'mdi-view-dashboard-outline' }}</v-icon>
+                </div>
+                <span class="nav-label">Dashboard</span>
+                <div v-if="isActive('/user/scanner')" class="active-indicator"></div>
+            </button>
+
+            <button 
+                data-wizard="messages"
                 :class="['nav-item', isActive('/user/inbox') ? 'active' : '', messageCount > 0 ? 'has-messages' : '']"
                 @click="navigateTo('/user/inbox')"
             >
@@ -38,26 +51,9 @@
                 <span class="nav-label">Messages</span>
                 <div v-if="isActive('/user/inbox')" class="active-indicator"></div>
             </button>
-            
-            <button 
-                :class="['nav-item', isActive('/user/notifications') ? 'active' : '', notificationCount > 0 ? 'has-alerts' : '']"
-                @click="navigateTo('/user/notifications')"
-            >
-                <div class="nav-icon-wrapper alerts-wrapper">
-                    <v-icon size="22">{{ isActive('/user/notifications') ? 'mdi-bell' : 'mdi-bell-outline' }}</v-icon>
-                    <transition name="bounce">
-                        <span v-if="notificationCount > 0" class="notification-badge">
-                            {{ notificationCount > 99 ? '99+' : notificationCount }}
-                        </span>
-                    </transition>
-                    <span v-if="notificationCount > 0 && !isActive('/user/notifications')" class="pulse-ring"></span>
-                </div>
-                <span class="nav-label">Alerts</span>
-                <div v-if="isActive('/user/notifications')" class="active-indicator"></div>
-            </button>
 
             <!-- Center Scan Button -->
-            <div class="scan-button-container">
+            <div class="scan-button-container" data-wizard="scan">
                 <button 
                     class="scan-button"
                     :class="{ 'active': isActive('/user/scanner') }"
@@ -76,6 +72,7 @@
 
             <!-- Right Side Navigation -->
             <button 
+                data-wizard="safety"
                 :class="['nav-item', isActive('/user/preventive-measures') ? 'active' : '']" 
                 @click="navigateTo('/user/preventive-measures')"
             >
@@ -87,14 +84,15 @@
             </button>
             
             <button 
-                :class="['nav-item', isActive('/user/profile') ? 'active' : '']" 
-                @click="navigateTo('/user/profile')"
+                data-wizard="history"
+                :class="['nav-item', isActive('/user/history') ? 'active' : '']" 
+                @click="navigateTo('/user/history')"
             >
                 <div class="nav-icon-wrapper">
-                    <v-icon size="22">{{ isActive('/user/profile') ? 'mdi-account' : 'mdi-account-outline' }}</v-icon>
+                    <v-icon size="22">{{ isActive('/user/history') ? 'mdi-history' : 'mdi-history' }}</v-icon>
                 </div>
-                <span class="nav-label">Profile</span>
-                <div v-if="isActive('/user/profile')" class="active-indicator"></div>
+                <span class="nav-label">History</span>
+                <div v-if="isActive('/user/history')" class="active-indicator"></div>
             </button>
         </div>
     </div>

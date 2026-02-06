@@ -1,27 +1,18 @@
 <template>
     <v-app class="bg-user-gradient-light">
-        <!-- Header -->
-        <div class="notifications-header">
-            <div class="header-content">
-                <v-btn icon variant="text" @click="drawer = !drawer" class="menu-btn desktop-only">
-                    <v-icon>mdi-menu</v-icon>
-                </v-btn>
-                <div class="header-title">
-                    <h1>Alerts</h1>
-                    <p v-if="activeRescueCount > 0">{{ activeRescueCount }} active rescue{{ activeRescueCount !== 1 ? 's' : '' }}</p>
-                    <p v-else>Stay informed about your rescue status</p>
-                </div>
-                <v-btn 
-                    icon 
-                    variant="text" 
-                    class="refresh-btn"
-                    :loading="refreshing"
-                    @click="refreshNotifications"
-                >
+        <!-- App Bar -->
+        <UserAppBar 
+            title="Alerts" 
+            :subtitle="activeRescueCount > 0 ? activeRescueCount + ' active rescue' + (activeRescueCount !== 1 ? 's' : '') : 'Stay informed about your rescue status'"
+            :notification-count="activeRescueCount"
+            @toggle-drawer="drawer = !drawer"
+        >
+            <template #actions>
+                <v-btn icon variant="text" class="bar-btn" style="color: white;" :loading="refreshing" @click="refreshNotifications">
                     <v-icon>mdi-refresh</v-icon>
                 </v-btn>
-            </div>
-        </div>
+            </template>
+        </UserAppBar>
 
         <!-- Navigation Drawer -->
         <UserMenu v-model="drawer" />
@@ -191,6 +182,7 @@ import { apiFetch, getProfilePictureUrl } from '@/Composables/useApi';
 import { useNotificationAlert } from '@/Composables/useNotificationAlert';
 import { useUnreadMessages } from '@/Composables/useUnreadMessages';
 import UserMenu from '@/Components/Pages/User/Menu/UserMenu.vue';
+import UserAppBar from '@/Components/Pages/User/Menu/UserAppBar.vue';
 import UserBottomNav from '@/Components/Pages/User/Menu/UserBottomNav.vue';
 import NotificationPopup from '@/Components/NotificationPopup.vue';
 

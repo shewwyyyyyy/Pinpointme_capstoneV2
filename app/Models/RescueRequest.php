@@ -26,13 +26,17 @@ class RescueRequest extends Model
         'additional_info',
         'media_attachments',
         'firstName',
-        'lastName'
+        'lastName',
+        'force_alert',
+        'force_alert_at'
     ];
 
     protected $casts = [
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
-        'media_attachments' => 'array'
+        'media_attachments' => 'array',
+        'force_alert' => 'boolean',
+        'force_alert_at' => 'datetime',
     ];
 
     /**

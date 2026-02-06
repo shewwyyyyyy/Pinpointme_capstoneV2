@@ -144,8 +144,9 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { router, usePage } from '@inertiajs/vue3';
-import { apiFetch, getUnreadMessageCount } from '@/Composables/useApi';
+import { apiFetch } from '@/Composables/useApi';
 import { useNotificationAlert } from '@/Composables/useNotificationAlert';
+import { useUnreadMessages } from '@/Composables/useUnreadMessages';
 import RescuerMenu from '@/Components/Pages/Rescuer/Menu/RescuerMenu.vue';
 import RescuerBottomNav from '@/Components/Pages/Rescuer/Menu/RescuerBottomNav.vue';
 
@@ -162,7 +163,7 @@ const loading = ref(true);
 const refreshing = ref(false);
 const rescueRequests = ref([]);
 const processingId = ref(null);
-const unreadMessageCount = ref(0);
+const { unreadCount: unreadMessageCount, onNewMessages } = useUnreadMessages();
 
 // Toast
 const showToast = ref(false);
@@ -224,8 +225,8 @@ const fetchNotifications = async () => {
             // Check for new notifications
             const newPendingCount = pendingRequests.value.length;
             if (newPendingCount > previousPendingCount.value && previousPendingCount.value > 0) {
-                playNotificationSound();
-                vibrate([200, 100, 200]);
+                playNotificationSound('emergency');
+                vibrate([300, 100, 300, 100, 300]);
             }
             previousPendingCount.value = newPendingCount;
         }
@@ -374,26 +375,19 @@ const formatStatus = (status) => {
     return labels[status] || status;
 };
 
-// Fetch unread message count
-const fetchUnreadMessageCount = async () => {
-    const rescuerId = authUser.value?.id;
-    if (!rescuerId) return;
-    try {
-        unreadMessageCount.value = await getUnreadMessageCount(rescuerId);
-    } catch (error) {
-        console.error('Failed to fetch unread message count:', error);
-    }
-};
-
 // Lifecycle
 onMounted(async () => {
     await fetchNotifications();
-    await fetchUnreadMessageCount();
     
-    // Start polling
+    // Register new message notification callback
+    onNewMessages((newCount) => {
+        playNotificationSound('message');
+        vibrate([100, 50, 100]);
+    });
+    
+    // Start polling for rescue notifications
     pollingInterval = setInterval(async () => {
         await fetchNotifications();
-        await fetchUnreadMessageCount();
     }, POLLING_INTERVAL);
 });
 

@@ -96,6 +96,11 @@ Route::get('/rescue-requests/rescuer/{rescuer}', [RescueRequestController::class
 Route::get('/users/{user}/rescue-history', [RescueRequestController::class, 'userHistory']);
 Route::get('/location-details/{buildingId}/{floorId}/{roomId}', [RescueRequestController::class, 'getLocationDetails']);
 
+// Admin force-alert: marks a rescue request so rescuers get unstoppable ringtone
+Route::post('/rescue-requests/{rescueRequest}/force-alert', [RescueRequestController::class, 'forceAlert']);
+// Admin: get pending requests that have been waiting too long (>5 min)
+Route::get('/rescue-requests/pending-too-long', [RescueRequestController::class, 'pendingTooLong']);
+
 // User profile routes - accessible with session or token auth
 Route::get('/users/{user}', [AuthController::class, 'showUser']);
 Route::put('/users/{user}', [AuthController::class, 'updateUser']);
@@ -103,6 +108,7 @@ Route::post('/users/{user}/profile-picture', [AuthController::class, 'uploadProf
 Route::delete('/users/{user}/profile-picture', [AuthController::class, 'deleteProfilePicture']);
 
 // Conversations & Messaging API - accessible for web app (session auth)
+Route::get('/conversations/admin', [ConversationController::class, 'adminIndex']); // Admin: all conversations
 Route::get('/conversations', [ConversationController::class, 'index']);
 Route::post('/conversations', [ConversationController::class, 'store']);
 Route::get('/conversations/rescue/{rescueRequest}', [ConversationController::class, 'getOrCreateForRescue']);

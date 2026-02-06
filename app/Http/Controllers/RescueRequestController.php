@@ -527,4 +527,65 @@ class RescueRequestController extends Controller
 
         return false;
     }
+
+    /**
+     * Admin: Mark a pending rescue request for force-alert.
+     * This sets force_alert = true so that the rescuer dashboard plays an unstoppable ringtone.
+     *
+     * @param  \App\Models\RescueRequest  $rescueRequest
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function forceAlert(RescueRequest $rescueRequest)
+    {
+        // Only allow force-alert on pending requests
+        if (!in_array($rescueRequest->status, ['pending'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Force alert can only be triggered for pending requests.'
+            ], 422);
+        }
+
+        $rescueRequest->update([
+            'force_alert' => true,
+            'force_alert_at' => now(),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Force alert activated. Available rescuers will receive an unstoppable notification.',
+            'data' => $rescueRequest->fresh(['building', 'floor', 'room'])
+        ]);
+    }
+
+    /**
+     * Admin: Get pending rescue requests that have been waiting longer than
+     * their urgency-based threshold with no rescuer accepting.
+     *
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function pendingTooLong()
+    {
+        $requests = RescueRequest::with(['building', 'floor', 'room', 'requester'])
+            ->where('status', 'pending')
+            ->orderByDesc('created_at')
+            ->get()
+            ->filter(function ($request) {
+                $urgency = strtolower($request->urgency_level ?? 'medium');
+                $thresholds = [
+                    'critical' => 10,
+                    'high'     => 30,
+                    'medium'   => 120,
+                    'low'      => 300,
+                ];
+                $requiredSeconds = $thresholds[$urgency] ?? 120;
+                return now()->diffInSeconds($request->created_at) >= $requiredSeconds;
+            })
+            ->values();
+
+        return response()->json([
+            'success' => true,
+            'data' => $requests,
+            'count' => $requests->count()
+        ]);
+    }
 }

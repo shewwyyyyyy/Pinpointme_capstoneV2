@@ -138,6 +138,30 @@ export async function getUserRescueHistory(userId) {
     return apiFetch(`/api/users/${userId}/rescue-history`, { method: 'GET' });
 }
 
+// ── Admin force-alert & pending-too-long APIs ──────────────────
+export async function triggerForceAlert(rescueRequestId) {
+    return apiFetch(`/api/rescue-requests/${rescueRequestId}/force-alert`, { method: 'POST' });
+}
+
+export async function getPendingTooLong() {
+    return apiFetch('/api/rescue-requests/pending-too-long', { method: 'GET' });
+}
+
+// ── Get all rescue requests (for admin polling) ────────────────
+export async function getAllRescueRequests() {
+    return apiFetch('/api/rescue-requests', { method: 'GET' });
+}
+
+// ── Get rescuer feed ───────────────────────────────────────────
+export async function getRescuerFeed(rescuerId) {
+    return apiFetch(`/api/rescue-requests/rescuer/${rescuerId}`, { method: 'GET' });
+}
+
+// ── Admin: get ALL conversations (read-only overview) ──────────
+export async function getAdminConversations() {
+    return apiFetch('/api/conversations/admin', { method: 'GET' });
+}
+
 export async function getLocationDetails(buildingId, floorId, roomId) {
     // Make this request without auth token since it's a public endpoint
     const url = `${API_BASE}/api/location-details/${buildingId}/${floorId}/${roomId}`;

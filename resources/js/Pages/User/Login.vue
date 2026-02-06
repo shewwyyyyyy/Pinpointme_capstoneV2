@@ -61,12 +61,16 @@
                                 <v-alert
                                     v-if="error"
                                     type="error"
-                                    variant="tonal"
-                                    class="mb-4"
+                                    variant="elevated"
+                                    class="mb-4 text-body-1 font-weight-bold login-error-alert"
+                                    color="error"
+                                    border="start"
+                                    prominent
                                     closable
                                     @click:close="error = ''"
                                 >
-                                    {{ error }}
+                                    <v-icon left color="error" class="mr-2">mdi-alert-circle</v-icon>
+                                    <span>{{ error }}</span>
                                 </v-alert>
 
                                 <!-- Google OAuth Error -->
@@ -117,7 +121,7 @@
                                     prepend-inner-icon="mdi-email"
                                     :rules="[rules.required, rules.email]"
                                     :disabled="isLoading"
-                                    class="mb-4"
+                                    class="mb-3"
                                 />
 
                                 <v-text-field
@@ -131,8 +135,12 @@
                                     @click:append-inner="showPassword = !showPassword"
                                     :rules="[rules.required]"
                                     :disabled="isLoading"
-                                    class="mb-6"
                                 />
+                                <div class="d-flex justify-end mb-2">
+                                    <v-btn variant="text" color="primary" size="small" @click="showForgotPassword = true" class="pa-0">
+                                        Forgot Password?
+                                    </v-btn>
+                                </div>
 
                                 <v-btn
                                     type="submit"
@@ -146,13 +154,10 @@
                                 </v-btn>
                             </v-form>
 
-                            <div class="text-center">
-                                <v-btn variant="text" color="primary" size="small" @click="showForgotPassword = true">
-                                    Forgot Password?
-                                </v-btn>
-                                <br>
-                                <v-btn variant="text" color="primary" size="small" @click="showRegister = true" class="mt-2">
-                                    Register Now
+                            <div class="text-center mt-2">
+                                <span class="text-grey-darken-1">Don't have an account?</span>
+                                <v-btn variant="text" color="primary" size="small" @click="showRegister = true" class="ml-1">
+                                    Register here
                                 </v-btn>
                             </div>
                         </v-card>
@@ -1286,6 +1291,17 @@ const closeRegister = () => {
 </script>
 
 <style scoped>
+/* Enhanced login error alert */
+.login-error-alert {
+    border-left: 6px solid #b71c1c !important;
+    background: #fff5f5 !important;
+    color: #b71c1c !important;
+    box-shadow: 0 2px 12px 0 rgba(183,28,28,0.08);
+    border-radius: 10px;
+    padding: 14px 18px !important;
+    align-items: center;
+    display: flex;
+}
 /* Left Panel Styles */
 .left-panel {
     background: linear-gradient(135deg, #3674B5 0%, #2D5F96 50%, #1E4A7A 100%);

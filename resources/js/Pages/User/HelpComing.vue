@@ -1,20 +1,19 @@
 <template>
     <v-app class="bg-user-gradient-light">
-        <!-- Clean Header -->
-        <div class="help-page-header">
-            <div class="header-content">
-                <v-btn icon variant="text" class="back-btn" @click="handleGoBack">
-                    <v-icon color="white">mdi-arrow-left</v-icon>
+        <!-- App Bar -->
+        <UserAppBar 
+            title="Help Status" 
+            :subtitle="rescue ? rescue.rescue_code : ''"
+            :show-back="true"
+            :notification-count="0"
+            @go-back="handleGoBack"
+        >
+            <template #actions>
+                <v-btn icon variant="text" class="bar-btn" style="color: white;" @click="fetchRescueData">
+                    <v-icon>mdi-refresh</v-icon>
                 </v-btn>
-                <div class="header-title">
-                    <h1>Help Status</h1>
-                    <p v-if="rescue">{{ rescue.rescue_code }}</p>
-                </div>
-                <v-btn icon variant="text" @click="fetchRescueData" class="refresh-btn">
-                    <v-icon color="white">mdi-refresh</v-icon>
-                </v-btn>
-            </div>
-        </div>
+            </template>
+        </UserAppBar>
 
         <!-- Navigation Drawer - handles its own visibility -->
         <UserMenu v-model="drawer" />
@@ -423,6 +422,7 @@ import {
 import { useNotificationAlert } from '@/Composables/useNotificationAlert';
 import { useUnreadMessages } from '@/Composables/useUnreadMessages';
 import UserMenu from '@/Components/Pages/User/Menu/UserMenu.vue';
+import UserAppBar from '@/Components/Pages/User/Menu/UserAppBar.vue';
 import UserBottomNav from '@/Components/Pages/User/Menu/UserBottomNav.vue';
 import NotificationPopup from '@/Components/NotificationPopup.vue';
 

@@ -790,7 +790,7 @@ class AuthController extends Controller
             // Valid mobile formats: 09XXXXXXXXX (11 digits total)
             if (!preg_match('/^09[0-9]{9}$/', $cleanedPhone)) {
                 return response()->json([
-                    'message' => 'Please enter a valid mobile number (e.g., 09171234567)',
+                    'message' => 'Please enter a valid number',
                     'errors' => ['phone_number' => ['Invalid mobile number format. Use 09XXXXXXXXX (11 digits)']]
                 ], 422);
             }
@@ -804,7 +804,7 @@ class AuthController extends Controller
             // Valid mobile formats: 09XXXXXXXXX (11 digits total)
             if (!preg_match('/^09[0-9]{9}$/', $cleanedPhone)) {
                 return response()->json([
-                    'message' => 'Please enter a valid mobile number (e.g., 09171234567)',
+                    'message' => 'Please enter a valid number',
                     'errors' => ['phone_number' => ['Invalid mobile number format. Use 09XXXXXXXXX (11 digits)']]
                 ], 422);
             }
@@ -1698,7 +1698,7 @@ class AuthController extends Controller
                     
                     $prefix = substr($normalized, 0, 4);
                     if (!in_array($prefix, $validPrefixes)) {
-                        $fail('Please enter a valid Philippine mobile number with a recognized network prefix.');
+                        $fail('Please enter a valid   with a recognized network prefix.');
                     }
                 },
             ],
@@ -1714,7 +1714,7 @@ class AuthController extends Controller
             'id_number.digits' => 'ID number must be exactly 9 digits.',
             'id_number.regex' => 'ID number must contain only numbers.',
             'phone_number.required' => 'Phone number is required.',
-            'phone_number.regex' => 'Please enter a valid Philippine mobile number (e.g., 09171234567).',
+            'phone_number.regex' => 'Please enter a valid   (e.g., 09171234567).',
         ]);
         
         if ($validator->fails()) {

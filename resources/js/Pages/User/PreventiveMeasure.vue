@@ -1,172 +1,167 @@
 <template>
     <v-app class="bg-user-gradient-light">
-        <!-- Header - matches Dashboard style -->
-        <div class="page-header">
-            <div class="header-content">
-                <v-btn icon variant="text" @click="drawer = !drawer" class="menu-btn desktop-only">
-                    <v-icon>mdi-menu</v-icon>
-                </v-btn>
-                <div class="header-title">
-                    <h1>Preventive Measures</h1>
-                    <p>Stay Safe</p>
-                </div>
-                <v-btn icon variant="text" @click="fetchMeasures" class="refresh-btn">
+        <!-- App Bar -->
+        <UserAppBar 
+            title="Preventive Measures" 
+            subtitle="Stay Safe"
+            :notification-count="0"
+            @toggle-drawer="drawer = !drawer"
+        >
+            <template #actions>
+                <v-btn icon variant="text" class="bar-btn" style="color: white;" @click="fetchMeasures">
                     <v-icon>mdi-refresh</v-icon>
                 </v-btn>
-            </div>
-        </div>
+            </template>
+        </UserAppBar>
 
         <!-- Navigation Drawer -->
         <UserMenu v-model="drawer" />
 
         <v-main class="main-content">
             <v-container fluid class="pa-4">
-                <!-- Header -->
-                <div class="mb-6">
-                    <h1 class="text-h5 font-weight-bold text-primary mb-2">
-                        How to Stay Safe During Emergencies
-                    </h1>
-                    <p class="text-body-2 text-grey">
-                        Learn essential safety tips and preventive measures
-                    </p>
-                </div>
+                
 
                 <!-- Category Filter -->
-                <v-chip-group
-                    v-model="selectedCategory"
-                    selected-class="bg-primary text-white"
-                    class="mb-4"
-                >
-                    <v-chip
-                        value=""
-                        variant="outlined"
-                        filter
+                <div class="category-scroll mb-5">
+                    <button
+                        :class="['category-pill', !selectedCategory ? 'active' : '']"
+                        @click="selectedCategory = ''"
                     >
-                        All
-                    </v-chip>
-                    <v-chip
+                        <v-icon size="16">mdi-view-grid</v-icon>
+                        <span>All</span>
+                    </button>
+                    <button
                         v-for="cat in categories"
                         :key="cat.value"
-                        :value="cat.value"
-                        variant="outlined"
-                        filter
+                        :class="['category-pill', selectedCategory === cat.value ? 'active' : '']"
+                        @click="selectedCategory = cat.value"
                     >
-                        <v-icon start size="small">{{ cat.icon }}</v-icon>
-                        {{ cat.label }}
-                    </v-chip>
-                </v-chip-group>
+                        <v-icon size="16">{{ cat.icon }}</v-icon>
+                        <span>{{ cat.label }}</span>
+                    </button>
+                </div>
+
+                <!-- Results Count -->
+                <div class="d-flex align-center justify-space-between mb-3">
+                    <span class="text-body-2 text-grey-darken-1 font-weight-medium">
+                        {{ filteredMeasures.length }} {{ filteredMeasures.length === 1 ? 'video' : 'videos' }} found
+                    </span>
+                    <v-btn 
+                        variant="text" 
+                        density="compact" 
+                        color="primary"
+                        prepend-icon="mdi-refresh"
+                        @click="fetchMeasures"
+                        size="small"
+                    >
+                        Refresh
+                    </v-btn>
+                </div>
 
                 <!-- Loading State -->
-                <div v-if="loading" class="d-flex justify-center align-center py-10">
-                    <v-progress-circular indeterminate color="primary" size="50" />
-                    <span class="ml-3 text-grey">Loading preventive measures...</span>
+                <div v-if="loading" class="loading-state">
+                    <v-progress-circular indeterminate color="primary" size="44" width="3" />
+                    <span class="loading-text">Loading safety guides...</span>
                 </div>
 
                 <!-- Error State -->
-                <v-alert
-                    v-else-if="error"
-                    type="error"
-                    variant="tonal"
-                    class="mb-4"
-                >
-                    {{ error }}
-                    <template v-slot:append>
-                        <v-btn variant="text" @click="fetchMeasures">Retry</v-btn>
-                    </template>
-                </v-alert>
+                <v-card v-else-if="error" class="error-card rounded-xl pa-6 text-center" elevation="0">
+                    <v-icon size="48" color="error" class="mb-3">mdi-alert-circle-outline</v-icon>
+                    <h3 class="text-body-1 font-weight-bold mb-2">Something went wrong</h3>
+                    <p class="text-body-2 text-grey mb-4">{{ error }}</p>
+                    <v-btn color="primary" variant="flat" rounded="pill" @click="fetchMeasures" prepend-icon="mdi-refresh">
+                        Try Again
+                    </v-btn>
+                </v-card>
 
-                <!-- Measures Grid -->
-                <v-row v-else-if="filteredMeasures.length > 0">
-                    <v-col
+                <!-- Measures Grid - Enhanced Cards -->
+                <div v-else-if="filteredMeasures.length > 0" class="measures-grid">
+                    <div 
                         v-for="measure in filteredMeasures"
                         :key="measure.id"
-                        cols="12"
-                        sm="6"
-                        md="4"
+                        class="measure-card-wrap"
                     >
-                        <v-card
-                            class="h-100 cursor-pointer"
-                            elevation="3"
-                            rounded="lg"
-                            @click="openVideo(measure)"
-                        >
-                            <!-- Video Thumbnail -->
-                            <div class="position-relative">
+                        <div class="measure-card" @click="openVideo(measure)">
+                            <!-- Thumbnail -->
+                            <div class="measure-thumbnail">
                                 <v-img
                                     :src="getThumbnailUrl(measure)"
-                                    height="180"
+                                    :aspect-ratio="16/9"
                                     cover
-                                    class="bg-grey-lighten-3"
+                                    class="thumbnail-img"
                                 >
                                     <template v-slot:placeholder>
-                                        <div class="d-flex align-center justify-center fill-height">
-                                            <v-progress-circular indeterminate color="primary" />
+                                        <div class="d-flex align-center justify-center fill-height bg-grey-lighten-3">
+                                            <v-progress-circular indeterminate color="primary" size="28" width="2" />
                                         </div>
                                     </template>
                                     <template v-slot:error>
-                                        <div class="d-flex align-center justify-center fill-height bg-grey-lighten-2">
-                                            <v-icon size="64" color="grey">mdi-video-off</v-icon>
+                                        <div class="d-flex flex-column align-center justify-center fill-height bg-grey-lighten-2">
+                                            <v-icon size="40" color="grey-lighten-1">mdi-video-off</v-icon>
                                         </div>
                                     </template>
                                 </v-img>
                                 
                                 <!-- Play Button Overlay -->
-                                <div class="position-absolute d-flex align-center justify-center" style="top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.2);">
-                                    <v-btn
-                                        icon
-                                        size="large"
-                                        color="white"
-                                        variant="flat"
-                                        class="play-btn"
-                                    >
-                                        <v-icon size="32">mdi-play</v-icon>
-                                    </v-btn>
+                                <div class="play-overlay">
+                                    <div class="play-circle">
+                                        <v-icon size="24" color="white">mdi-play</v-icon>
+                                    </div>
                                 </div>
 
                                 <!-- Category Badge -->
-                                <v-chip
-                                    v-if="measure.category"
-                                    :color="getCategoryColor(measure.category)"
-                                    size="small"
-                                    class="position-absolute ma-2"
-                                    style="top: 0; left: 0;"
-                                >
-                                    {{ formatCategory(measure.category) }}
-                                </v-chip>
+                                <div v-if="measure.category" class="category-badge" :style="{ background: getCategoryGradient(measure.category) }">
+                                    <v-icon size="12" color="white" class="mr-1">{{ getCategoryIcon(measure.category) }}</v-icon>
+                                    <span>{{ formatCategory(measure.category) }}</span>
+                                </div>
+
+                                <!-- Duration Badge (if available) -->
+                                <div v-if="isYouTubeVideo(measure)" class="source-badge">
+                                    <v-icon size="10" color="white" class="mr-1">mdi-youtube</v-icon>
+                                    <span>YouTube</span>
+                                </div>
                             </div>
 
-                            <v-card-title class="text-subtitle-1 font-weight-bold pb-1">
-                                {{ measure.title }}
-                            </v-card-title>
-
-                            <v-card-text class="pt-0">
-                                <p class="text-body-2 text-grey-darken-1 mb-2 description-text">
-                                    {{ measure.description }}
-                                </p>
-                                <div class="d-flex align-center text-caption text-grey">
-                                    <v-icon size="14" class="mr-1">mdi-account</v-icon>
-                                    {{ measure.author || 'Unknown' }}
-                                    <span class="mx-2">•</span>
-                                    <v-icon size="14" class="mr-1">mdi-calendar</v-icon>
-                                    {{ formatDate(measure.created_at) }}
+                            <!-- Card Body -->
+                            <div class="measure-body">
+                                <h3 class="measure-title">{{ measure.title }}</h3>
+                                <p class="measure-description">{{ measure.description }}</p>
+                                <div class="measure-meta">
+                                    <div class="meta-item">
+                                        <v-icon size="12">mdi-account-outline</v-icon>
+                                        <span>{{ measure.author || 'Unknown' }}</span>
+                                    </div>
+                                    <div class="meta-divider">•</div>
+                                    <div class="meta-item">
+                                        <v-icon size="12">mdi-calendar-outline</v-icon>
+                                        <span>{{ formatDate(measure.created_at) }}</span>
+                                    </div>
                                 </div>
-                            </v-card-text>
-                        </v-card>
-                    </v-col>
-                </v-row>
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
                 <!-- Empty State -->
-                <v-alert
-                    v-else
-                    type="info"
-                    variant="tonal"
-                    class="mb-4"
-                >
-                    <v-alert-title>No preventive measures found</v-alert-title>
-                    <p class="mt-2">
+                <div v-else class="empty-state">
+                    <div class="empty-icon-wrap">
+                        <v-icon size="48" color="grey-lighten-1">mdi-shield-off-outline</v-icon>
+                    </div>
+                    <h3 class="text-body-1 font-weight-bold text-grey-darken-1 mb-1">No guides found</h3>
+                    <p class="text-body-2 text-grey mb-4">
                         {{ selectedCategory ? 'No measures available for this category.' : 'No preventive measures have been added yet.' }}
                     </p>
-                </v-alert>
+                    <v-btn 
+                        v-if="selectedCategory" 
+                        variant="tonal" 
+                        color="primary" 
+                        rounded="pill"
+                        size="small"
+                        @click="selectedCategory = ''"
+                    >
+                        View All Categories
+                    </v-btn>
+                </div>
             </v-container>
 
             <!-- Video Modal -->
@@ -265,6 +260,7 @@ import { ref, computed, onMounted } from 'vue';
 import { useDisplay } from 'vuetify';
 import { useUnreadMessages } from '@/Composables/useUnreadMessages';
 import UserMenu from '@/Components/Pages/User/Menu/UserMenu.vue';
+import UserAppBar from '@/Components/Pages/User/Menu/UserAppBar.vue';
 import UserBottomNav from '@/Components/Pages/User/Menu/UserBottomNav.vue';
 
 // Props from Inertia
@@ -474,6 +470,24 @@ const getCategoryColor = (category) => {
     return categoryConfig[category]?.color || 'grey';
 };
 
+const getCategoryIcon = (category) => {
+    return categoryConfig[category]?.icon || 'mdi-tag';
+};
+
+const getCategoryGradient = (category) => {
+    const gradients = {
+        fire: 'linear-gradient(135deg, #FF6B35, #D32F2F)',
+        earthquake: 'linear-gradient(135deg, #8D6E63, #5D4037)',
+        flood: 'linear-gradient(135deg, #42A5F5, #1565C0)',
+        medical: 'linear-gradient(135deg, #EF5350, #C62828)',
+        general: 'linear-gradient(135deg, #26A69A, #00695C)',
+        safety: 'linear-gradient(135deg, #66BB6A, #2E7D32)',
+        evacuation: 'linear-gradient(135deg, #FFA726, #E65100)',
+        first_aid: 'linear-gradient(135deg, #EC407A, #AD1457)',
+    };
+    return gradients[category] || 'linear-gradient(135deg, #78909C, #546E7A)';
+};
+
 const formatCategory = (category) => {
     if (!category) return '';
     return category.charAt(0).toUpperCase() + category.slice(1);
@@ -508,24 +522,303 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.description-text {
+/* Hero Section */
+.hero-section {
+    text-align: center;
+    padding: 24px 16px 20px;
+    background: linear-gradient(135deg, rgba(54, 116, 181, 0.08), rgba(54, 116, 181, 0.03));
+    border-radius: 20px;
+    border: 1px solid rgba(54, 116, 181, 0.1);
+}
+
+.hero-icon-wrap {
+    width: 64px;
+    height: 64px;
+    border-radius: 18px;
+    background: linear-gradient(135deg, #3674B5, #2196F3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 14px;
+    box-shadow: 0 8px 24px rgba(54, 116, 181, 0.3);
+}
+
+.hero-title {
+    font-size: 1.4rem;
+    font-weight: 800;
+    color: #1a1a2e;
+    margin-bottom: 6px;
+}
+
+.hero-subtitle {
+    font-size: 0.82rem;
+    color: #666;
+    margin: 0;
+    max-width: 300px;
+    margin: 0 auto;
+    line-height: 1.5;
+}
+
+/* Category Filter */
+.category-scroll {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding: 4px 0;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+}
+
+.category-scroll::-webkit-scrollbar {
+    display: none;
+}
+
+.category-pill {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    border-radius: 50px;
+    border: 1.5px solid #e0e0e0;
+    background: white;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #555;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+}
+
+.category-pill:hover {
+    border-color: #3674B5;
+    color: #3674B5;
+    background: rgba(54, 116, 181, 0.04);
+}
+
+.category-pill.active {
+    background: #3674B5;
+    color: white;
+    border-color: #3674B5;
+    box-shadow: 0 4px 12px rgba(54, 116, 181, 0.3);
+}
+
+.category-pill.active .v-icon {
+    color: white !important;
+}
+
+/* Loading */
+.loading-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 20px;
+    gap: 16px;
+}
+
+.loading-text {
+    font-size: 0.85rem;
+    color: #999;
+    font-weight: 500;
+}
+
+/* Error Card */
+.error-card {
+    background: #FFF5F5 !important;
+    border: 1px solid #FFCDD2;
+}
+
+/* Measures Grid */
+.measures-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 16px;
+}
+
+.measure-card {
+    background: white;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+    border: 1px solid rgba(0, 0, 0, 0.04);
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.measure-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+}
+
+.measure-card:active {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+
+/* Thumbnail */
+.measure-thumbnail {
+    position: relative;
+    overflow: hidden;
+}
+
+.thumbnail-img {
+    transition: transform 0.4s ease;
+}
+
+.measure-card:hover .thumbnail-img {
+    transform: scale(1.03);
+}
+
+/* Play Overlay */
+.play-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(180deg, transparent 40%, rgba(0, 0, 0, 0.4) 100%);
+    transition: background 0.3s ease;
+}
+
+.measure-card:hover .play-overlay {
+    background: linear-gradient(180deg, rgba(0, 0, 0, 0.1) 0%, rgba(0, 0, 0, 0.5) 100%);
+}
+
+.play-circle {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: rgba(54, 116, 181, 0.9);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(8px);
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+}
+
+.measure-card:hover .play-circle {
+    transform: scale(1.12);
+    background: rgba(54, 116, 181, 1);
+    box-shadow: 0 6px 24px rgba(54, 116, 181, 0.4);
+}
+
+.play-circle .v-icon {
+    margin-left: 2px; /* optical centering */
+}
+
+/* Category Badge */
+.category-badge {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    display: flex;
+    align-items: center;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: white;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+    backdrop-filter: blur(4px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* Source Badge */
+.source-badge {
+    position: absolute;
+    bottom: 10px;
+    right: 10px;
+    display: flex;
+    align-items: center;
+    padding: 3px 8px;
+    border-radius: 12px;
+    font-size: 0.6rem;
+    font-weight: 600;
+    color: white;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+}
+
+/* Card Body */
+.measure-body {
+    padding: 14px 16px 16px;
+}
+
+.measure-title {
+    font-size: 0.92rem;
+    font-weight: 700;
+    color: #1a1a2e;
+    margin-bottom: 6px;
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
-    text-overflow: ellipsis;
+    line-height: 1.35;
 }
 
-.play-btn {
-    opacity: 0.9;
-    transition: transform 0.2s, opacity 0.2s;
+.measure-description {
+    font-size: 0.78rem;
+    color: #777;
+    margin-bottom: 10px;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    line-height: 1.5;
 }
 
-.v-card:hover .play-btn {
-    transform: scale(1.1);
-    opacity: 1;
+.measure-meta {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
 }
 
+.meta-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.7rem;
+    color: #999;
+}
+
+.meta-item .v-icon {
+    color: #bbb;
+}
+
+.meta-divider {
+    color: #ccc;
+    font-size: 0.6rem;
+}
+
+/* Empty State */
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 48px 20px;
+    text-align: center;
+}
+
+.empty-icon-wrap {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background: #f5f5f5;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 16px;
+}
+
+/* Video Modal */
 .video-container {
     position: relative;
     width: 100%;
@@ -546,65 +839,6 @@ onMounted(() => {
     background: #000;
 }
 
-.cursor-pointer {
-    cursor: pointer;
-}
-
-/* App Container */
-.app-container {
-    position: fixed !important;
-    top: 0 !important;
-    left: 0 !important;
-    right: 0 !important;
-    bottom: 0 !important;
-    width: 100vw !important;
-    height: 100vh !important;
-    overflow: hidden !important;
-}
-
-/* Header - matches Dashboard style */
-.page-header {
-    position: sticky;
-    top: 0;
-    z-index: 100;
-    background: #3674B5;
-    padding: env(safe-area-inset-top, 0) 0 0 0;
-    flex-shrink: 0;
-}
-
-.header-content {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 12px 16px;
-    gap: 12px;
-}
-
-.menu-btn, .refresh-btn {
-    color: white;
-}
-
-.header-title {
-    flex: 1;
-    text-align: center;
-}
-
-.header-title h1 {
-    font-size: 1.25rem;
-    font-weight: 700;
-    font-style: italic;
-    color: white;
-    margin: 0;
-}
-
-.header-title p {
-    font-size: 0.65rem;
-    letter-spacing: 2px;
-    color: rgba(255, 255, 255, 0.8);
-    margin: 0;
-    text-transform: uppercase;
-}
-
 /* Main Content */
 .main-content {
     height: 100%;
@@ -613,12 +847,41 @@ onMounted(() => {
     padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 120px) !important;
 }
 
-/* Desktop-only elements */
-.desktop-only {
-    display: flex;
+/* Tablet: 2-column grid */
+@media (min-width: 600px) {
+    .measures-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .hero-subtitle {
+        max-width: 400px;
+    }
 }
 
-/* Responsive visibility */
+/* Desktop: 3-column grid */
+@media (min-width: 1024px) {
+    .measures-grid {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 20px;
+    }
+    
+    .hero-section {
+        padding: 32px 24px;
+    }
+    
+    .hero-title {
+        font-size: 1.6rem;
+    }
+    
+    .desktop-only {
+        display: flex;
+    }
+    
+    .main-content {
+        padding-bottom: 40px !important;
+    }
+}
+
 @media (max-width: 1023px) {
     .desktop-only {
         display: none !important;
@@ -631,10 +894,6 @@ onMounted(() => {
     .main-content :deep(.v-container) {
         padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 120px) !important;
     }
-    
-    .main-content :deep(.v-row) {
-        margin-bottom: 40px !important;
-    }
 }
 
 @media (max-width: 600px) {
@@ -646,18 +905,46 @@ onMounted(() => {
         padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 140px) !important;
     }
     
-    .main-content :deep(.v-row) {
-        margin-bottom: 50px !important;
+    .hero-section {
+        padding: 20px 12px 16px;
+    }
+    
+    .hero-icon-wrap {
+        width: 52px;
+        height: 52px;
+        border-radius: 14px;
+    }
+    
+    .hero-icon-wrap .v-icon {
+        font-size: 28px !important;
+    }
+    
+    .hero-title {
+        font-size: 1.2rem;
+    }
+    
+    .category-pill {
+        padding: 6px 12px;
+        font-size: 0.72rem;
+    }
+    
+    .play-circle {
+        width: 42px;
+        height: 42px;
+    }
+    
+    .play-circle .v-icon {
+        font-size: 20px !important;
     }
 }
 
-@media (min-width: 1024px) {
-    .desktop-only {
-        display: flex;
+@media (max-width: 359px) {
+    .hero-title {
+        font-size: 1.1rem;
     }
     
-    .main-content {
-        padding-bottom: 40px !important;
+    .hero-subtitle {
+        font-size: 0.75rem;
     }
 }
 </style>

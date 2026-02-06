@@ -1,90 +1,160 @@
 import { ref, onUnmounted } from 'vue';
 
 /**
- * Composable for handling push-style notifications with sound and vibration
+ * Composable for handling push-style notifications with real audio sounds and vibration.
+ *
+ * Sound mapping:
+ *  - emergency / rescue request  →  /sounds/send-request-alarm.m4a
+ *  - message / chat              →  /sounds/message-notification.m4a
+ *  - force-alert (unstoppable)   →  /sounds/infinity-ringtone.m4a  (loops until stopped)
+ *  - success / default           →  Web Audio API beep fallback
  */
 export function useNotificationAlert() {
     const showAlert = ref(false);
     const alertMessage = ref('');
     const alertTitle = ref('');
-    const alertType = ref('info'); // info, success, warning, error
+    const alertType = ref('info');
     const alertIcon = ref('mdi-bell');
     const alertCallback = ref(null);
-    
-    // Sound URLs - using data URIs for notification sounds
-    const sounds = {
-        notification: null,
-        emergency: null,
-        message: null,
-    };
-    
-    // Create audio context and sounds
-    const initSounds = () => {
-        // Create a simple beep sound using Web Audio API
-        try {
-            const AudioContext = window.AudioContext || window.webkitAudioContext;
-            if (AudioContext) {
-                sounds.audioContext = new AudioContext();
-            }
-        } catch (e) {
-            console.warn('Web Audio API not supported');
+    const isForceAlertPlaying = ref(false);
+
+    // ── Audio instances (lazy-loaded) ──────────────────────────
+    let emergencyAudio = null;
+    let messageAudio = null;
+    let forceAlertAudio = null;
+
+    const getEmergencyAudio = () => {
+        if (!emergencyAudio) {
+            emergencyAudio = new Audio('/sounds/send-request-alarm.m4a');
+            emergencyAudio.preload = 'auto';
         }
+        return emergencyAudio;
     };
-    
-    // Play a beep sound using Web Audio API
+
+    const getMessageAudio = () => {
+        if (!messageAudio) {
+            messageAudio = new Audio('/sounds/message-notification.m4a');
+            messageAudio.preload = 'auto';
+        }
+        return messageAudio;
+    };
+
+    const getForceAlertAudio = () => {
+        if (!forceAlertAudio) {
+            forceAlertAudio = new Audio('/sounds/infinity-ringtone.m4a');
+            forceAlertAudio.preload = 'auto';
+            forceAlertAudio.loop = true; // loops infinitely until stopped
+        }
+        return forceAlertAudio;
+    };
+
+    // ── Web Audio API fallback beep ────────────────────────────
     const playBeep = (frequency = 800, duration = 200, volume = 0.5, type = 'sine') => {
         try {
             const AudioContext = window.AudioContext || window.webkitAudioContext;
-            const audioContext = new AudioContext();
-            
-            const oscillator = audioContext.createOscillator();
-            const gainNode = audioContext.createGain();
-            
-            oscillator.connect(gainNode);
-            gainNode.connect(audioContext.destination);
-            
-            oscillator.frequency.value = frequency;
-            oscillator.type = type;
-            gainNode.gain.value = volume;
-            
-            oscillator.start();
-            
-            // Fade out
-            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration / 1000);
-            
-            oscillator.stop(audioContext.currentTime + duration / 1000);
+            const ctx = new AudioContext();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.frequency.value = frequency;
+            osc.type = type;
+            gain.gain.value = volume;
+            osc.start();
+            gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + duration / 1000);
+            osc.stop(ctx.currentTime + duration / 1000);
         } catch (e) {
-            console.warn('Could not play sound:', e);
+            console.warn('Could not play beep:', e);
         }
     };
-    
-    // Play notification sound pattern
+
+    // ── Play notification sound ────────────────────────────────
     const playNotificationSound = (type = 'notification') => {
-        switch (type) {
-            case 'emergency':
-                // Urgent alert - three ascending beeps
-                playBeep(600, 150, 0.6, 'square');
-                setTimeout(() => playBeep(800, 150, 0.6, 'square'), 200);
-                setTimeout(() => playBeep(1000, 200, 0.7, 'square'), 400);
-                break;
-            case 'message':
-                // Chat message - soft double beep
-                playBeep(800, 100, 0.3, 'sine');
-                setTimeout(() => playBeep(1000, 100, 0.3, 'sine'), 150);
-                break;
-            case 'success':
-                // Success - pleasant ascending
-                playBeep(523, 100, 0.3, 'sine');
-                setTimeout(() => playBeep(659, 100, 0.3, 'sine'), 120);
-                setTimeout(() => playBeep(784, 150, 0.4, 'sine'), 240);
-                break;
-            default:
-                // Standard notification - single beep
-                playBeep(800, 200, 0.4, 'sine');
+        try {
+            switch (type) {
+                case 'emergency':
+                case 'rescue': {
+                    const audio = getEmergencyAudio();
+                    audio.currentTime = 0;
+                    audio.volume = 1.0;
+                    audio.play().catch(e => {
+                        console.warn('Emergency audio blocked, using beep fallback:', e);
+                        playBeep(600, 150, 0.6, 'square');
+                        setTimeout(() => playBeep(800, 150, 0.6, 'square'), 200);
+                        setTimeout(() => playBeep(1000, 200, 0.7, 'square'), 400);
+                    });
+                    break;
+                }
+                case 'message': {
+                    const audio = getMessageAudio();
+                    audio.currentTime = 0;
+                    audio.volume = 0.8;
+                    audio.play().catch(e => {
+                        console.warn('Message audio blocked, using beep fallback:', e);
+                        playBeep(800, 100, 0.3, 'sine');
+                        setTimeout(() => playBeep(1000, 100, 0.3, 'sine'), 150);
+                    });
+                    break;
+                }
+                case 'force-alert': {
+                    const audio = getForceAlertAudio();
+                    audio.currentTime = 0;
+                    audio.volume = 1.0;
+                    audio.loop = true;
+                    isForceAlertPlaying.value = true;
+                    audio.play().catch(e => {
+                        console.warn('Force-alert audio blocked:', e);
+                        startFallbackForceAlert();
+                    });
+                    break;
+                }
+                case 'success':
+                    playBeep(523, 100, 0.3, 'sine');
+                    setTimeout(() => playBeep(659, 100, 0.3, 'sine'), 120);
+                    setTimeout(() => playBeep(784, 150, 0.4, 'sine'), 240);
+                    break;
+                default: {
+                    const audio = getMessageAudio();
+                    audio.currentTime = 0;
+                    audio.volume = 0.5;
+                    audio.play().catch(() => playBeep(800, 200, 0.4, 'sine'));
+                }
+            }
+        } catch (e) {
+            console.warn('playNotificationSound error:', e);
         }
     };
-    
-    // Vibrate device
+
+    // ── Force alert fallback (repeating beeps if audio blocked) ──
+    let fallbackForceAlertTimer = null;
+    const startFallbackForceAlert = () => {
+        isForceAlertPlaying.value = true;
+        const beepLoop = () => {
+            if (!isForceAlertPlaying.value) return;
+            playBeep(900, 300, 0.8, 'square');
+            setTimeout(() => playBeep(700, 300, 0.8, 'square'), 400);
+            fallbackForceAlertTimer = setTimeout(beepLoop, 1000);
+        };
+        beepLoop();
+    };
+
+    // ── Stop the force-alert ringtone ──────────────────────────
+    const stopForceAlert = () => {
+        isForceAlertPlaying.value = false;
+        if (forceAlertAudio) {
+            forceAlertAudio.pause();
+            forceAlertAudio.currentTime = 0;
+        }
+        if (fallbackForceAlertTimer) {
+            clearTimeout(fallbackForceAlertTimer);
+            fallbackForceAlertTimer = null;
+        }
+        if ('vibrate' in navigator) {
+            navigator.vibrate(0);
+        }
+    };
+
+    // ── Vibration ──────────────────────────────────────────────
     const vibrate = (pattern = [200, 100, 200]) => {
         if ('vibrate' in navigator) {
             try {
@@ -94,25 +164,28 @@ export function useNotificationAlert() {
             }
         }
     };
-    
-    // Vibration patterns for different types
+
     const vibrateForType = (type) => {
         switch (type) {
             case 'emergency':
-                vibrate([300, 100, 300, 100, 300]); // Long urgent pattern
+            case 'rescue':
+                vibrate([300, 100, 300, 100, 300, 100, 300]);
+                break;
+            case 'force-alert':
+                vibrate([500, 200, 500, 200, 500, 200, 500, 200, 500]);
                 break;
             case 'message':
-                vibrate([100, 50, 100]); // Short double vibration
+                vibrate([100, 50, 100]);
                 break;
             case 'success':
-                vibrate([100]); // Single short vibration
+                vibrate([100]);
                 break;
             default:
-                vibrate([200, 100, 200]); // Standard pattern
+                vibrate([200, 100, 200]);
         }
     };
-    
-    // Show notification alert
+
+    // ── Main notify function ───────────────────────────────────
     const notify = ({
         title = 'Notification',
         message = '',
@@ -130,60 +203,47 @@ export function useNotificationAlert() {
         alertIcon.value = icon;
         alertCallback.value = onClick;
         showAlert.value = true;
-        
-        // Play sound
+
         if (sound) {
             playNotificationSound(soundType);
         }
-        
-        // Vibrate
+
         if (vibration) {
             vibrateForType(soundType);
         }
-        
-        // Auto hide after duration
-        if (duration > 0) {
-            setTimeout(() => {
-                hideAlert();
-            }, duration);
+
+        // Auto-hide (force-alert never auto-hides)
+        if (duration > 0 && soundType !== 'force-alert') {
+            setTimeout(() => hideAlert(), duration);
         }
-        
-        // Request browser notification permission if not granted
+
         requestNotificationPermission();
-        
-        // Also show browser notification if page is not visible
+
         if (document.hidden) {
             showBrowserNotification(title, message, icon);
         }
     };
-    
-    // Hide alert
+
     const hideAlert = () => {
         showAlert.value = false;
         alertCallback.value = null;
     };
-    
-    // Handle alert click
+
     const handleAlertClick = () => {
         if (alertCallback.value) {
             alertCallback.value();
         }
         hideAlert();
     };
-    
-    // Request browser notification permission
+
+    // ── Browser notification API ───────────────────────────────
     const requestNotificationPermission = async () => {
         if ('Notification' in window && Notification.permission === 'default') {
-            try {
-                await Notification.requestPermission();
-            } catch (e) {
-                console.warn('Notification permission request failed:', e);
-            }
+            try { await Notification.requestPermission(); } catch (e) { /* ignore */ }
         }
     };
-    
-    // Show browser notification
-    const showBrowserNotification = (title, body, icon) => {
+
+    const showBrowserNotification = (title, body) => {
         if ('Notification' in window && Notification.permission === 'granted') {
             try {
                 new Notification(title, {
@@ -199,8 +259,8 @@ export function useNotificationAlert() {
             }
         }
     };
-    
-    // Convenience methods for different notification types
+
+    // ── Convenience methods ────────────────────────────────────
     const notifyEmergency = (title, message, onClick = null) => {
         notify({
             title,
@@ -212,7 +272,7 @@ export function useNotificationAlert() {
             onClick,
         });
     };
-    
+
     const notifyMessage = (title, message, onClick = null) => {
         notify({
             title,
@@ -224,7 +284,7 @@ export function useNotificationAlert() {
             onClick,
         });
     };
-    
+
     const notifySuccess = (title, message, onClick = null) => {
         notify({
             title,
@@ -236,7 +296,7 @@ export function useNotificationAlert() {
             onClick,
         });
     };
-    
+
     const notifyWarning = (title, message, onClick = null) => {
         notify({
             title,
@@ -248,10 +308,19 @@ export function useNotificationAlert() {
             onClick,
         });
     };
-    
-    // Initialize sounds on mount
-    initSounds();
-    
+
+    const notifyForceAlert = (title, message, onClick = null) => {
+        notify({
+            title,
+            message,
+            type: 'error',
+            icon: 'mdi-alarm-light',
+            soundType: 'force-alert',
+            duration: 0,
+            onClick,
+        });
+    };
+
     return {
         // State
         showAlert,
@@ -259,16 +328,19 @@ export function useNotificationAlert() {
         alertMessage,
         alertType,
         alertIcon,
-        
+        isForceAlertPlaying,
+
         // Methods
         notify,
         notifyEmergency,
         notifyMessage,
         notifySuccess,
         notifyWarning,
+        notifyForceAlert,
         hideAlert,
         handleAlertClick,
         playNotificationSound,
+        stopForceAlert,
         vibrate,
         requestNotificationPermission,
     };

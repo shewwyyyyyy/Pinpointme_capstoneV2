@@ -1053,7 +1053,7 @@ const rules = {
         
         // Must start with 09 and have exactly 11 digits
         if (!/^09[0-9]{9}$/.test(cleaned)) {
-            return 'Please enter a valid mobile number (e.g., 09171234567)';
+            return 'Please enter a valid number';
         }
         
         return true;

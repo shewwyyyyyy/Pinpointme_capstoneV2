@@ -1,20 +1,13 @@
 <template>
     <v-app class="bg-user-gradient-light">
-        <!-- Header -->
-        <div class="profile-page-header">
-            <div class="header-content">
-                <v-btn icon variant="text" @click="goBack" class="menu-btn">
-                    <v-icon>mdi-arrow-left</v-icon>
-                </v-btn>
-                <div class="header-title">
-                    <h1>Profile</h1>
-                    <p>Manage your account</p>
-                </div>
-                <v-btn icon variant="text" class="placeholder-btn" style="visibility: hidden;">
-                    <v-icon>mdi-menu</v-icon>
-                </v-btn>
-            </div>
-        </div>
+        <!-- App Bar -->
+        <UserAppBar 
+            title="Profile" 
+            subtitle="Manage your account"
+            :show-back="true"
+            :notification-count="0"
+            @go-back="goBack"
+        />
 
         <v-main class="pb-20">
             <!-- Loading State -->
@@ -347,89 +340,6 @@
                                         size="large"
                                     >
                                         Save Changes
-                                    </v-btn>
-                                </div>
-                            </v-expansion-panel-text>
-                        </v-expansion-panel>
-                    </v-expansion-panels>
-                </v-card>
-
-                <!-- Location History -->
-                <v-card class="mb-3 mb-sm-4 rounded-xl section-card" elevation="0" color="white">
-                    <v-expansion-panels flat v-model="historyPanel">
-                        <v-expansion-panel>
-                            <v-expansion-panel-title class="panel-title-mobile">
-                                <div class="d-flex align-center">
-                                    <v-avatar color="primary" size="32" class="mr-3">
-                                        <v-icon color="white" size="18">mdi-history</v-icon>
-                                    </v-avatar>
-                                    <span class="text-body-1 text-sm-subtitle-1 font-weight-bold">Location History</span>
-                                    <v-chip size="x-small" color="primary" variant="tonal" class="ml-2">
-                                        {{ locationHistory.length }}
-                                    </v-chip>
-                                </div>
-                            </v-expansion-panel-title>
-                            <v-expansion-panel-text class="panel-content-mobile">
-                                <!-- Loading History -->
-                                <div v-if="loadingHistory" class="d-flex justify-center py-4">
-                                    <v-progress-circular indeterminate color="primary" size="32"></v-progress-circular>
-                                </div>
-                                
-                                <!-- Empty History -->
-                                <div v-else-if="locationHistory.length === 0" class="text-center py-6">
-                                    <v-icon size="56" color="grey-lighten-1">mdi-map-marker-off</v-icon>
-                                    <p class="text-body-2 text-grey mt-3">No rescue history found</p>
-                                </div>
-                                
-                                <!-- History List -->
-                                <div v-else>
-                                    <v-list density="compact" class="bg-transparent pa-0">
-                                        <v-list-item
-                                            v-for="(item, index) in displayedHistory"
-                                            :key="item.id"
-                                            class="px-2 mb-2 history-item rounded-lg"
-                                            @click="viewHistoryItem(item)"
-                                        >
-                                            <template v-slot:prepend>
-                                                <v-avatar
-                                                    :color="getStatusColor(item.status)"
-                                                    size="36"
-                                                    class="mr-3"
-                                                >
-                                                    <v-icon color="white" size="18">
-                                                        {{ item.isRescued ? 'mdi-check' : 'mdi-clock-outline' }}
-                                                    </v-icon>
-                                                </v-avatar>
-                                            </template>
-                                            <v-list-item-title class="font-weight-medium text-body-2">
-                                                {{ item.location || 'Unknown Location' }}
-                                            </v-list-item-title>
-                                            <v-list-item-subtitle class="text-caption">
-                                                {{ formatHistoryDate(item.timestamp) }}
-                                            </v-list-item-subtitle>
-                                            <template v-slot:append>
-                                                <v-chip
-                                                    :color="getStatusColor(item.status)"
-                                                    variant="tonal"
-                                                    size="x-small"
-                                                >
-                                                    {{ formatStatus(item.status) }}
-                                                </v-chip>
-                                            </template>
-                                        </v-list-item>
-                                    </v-list>
-                                    
-                                    <!-- View All Button -->
-                                    <v-btn
-                                        block
-                                        variant="tonal"
-                                        color="primary"
-                                        size="large"
-                                        class="mt-3 rounded-lg mobile-btn"
-                                        @click="goToLocationHistory"
-                                    >
-                                        View All History ({{ locationHistory.length }})
-                                        <v-icon end size="18">mdi-arrow-right</v-icon>
                                     </v-btn>
                                 </div>
                             </v-expansion-panel-text>
@@ -980,6 +890,7 @@ import { ref, reactive, computed, onMounted, watch } from 'vue';
 import { router, usePage } from '@inertiajs/vue3';
 import { getCurrentUser, updateUser, uploadProfilePicture, deleteProfilePicture, getProfilePictureUrl, getUserRescueHistory } from '@/Composables/useApi';
 import { useUnreadMessages } from '@/Composables/useUnreadMessages';
+import UserAppBar from '@/Components/Pages/User/Menu/UserAppBar.vue';
 import UserBottomNav from '@/Components/Pages/User/Menu/UserBottomNav.vue';
 
 // Get Inertia page for auth
@@ -1121,7 +1032,7 @@ const rules = {
         
         // Must start with 09 and have exactly 11 digits
         if (!/^09[0-9]{9}$/.test(cleaned)) {
-            return 'Please enter a valid mobile number (e.g., 09171234567)';
+            return 'Please enter a valid number';
         }
         
         return true;
@@ -1316,7 +1227,7 @@ const formatIdNumber = () => {
     }
 };
 
-// Format phone number for Philippine mobile numbers (used for all phone fields)
+// Format phone number for  s (used for all phone fields)
 const formatPhoneNumber = (field) => {
     let value = editData[field] || '';
     

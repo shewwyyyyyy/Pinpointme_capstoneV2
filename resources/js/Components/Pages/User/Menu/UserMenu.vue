@@ -97,12 +97,6 @@ const userId = computed(() => {
 // Menu items with profile included
 const menuItems = computed(() => [
     {
-        id: 'profile',
-        name: 'My Profile',
-        icon: 'mdi-account-circle',
-        path: '/user/profile',
-    },
-    {
         id: 'dashboard',
         name: 'Dashboard',
         icon: 'mdi-view-dashboard',
@@ -115,16 +109,28 @@ const menuItems = computed(() => [
         path: '/user/inbox',
     },
     {
-        id: 'preventive',
-        name: 'Preventive Measures',
-        icon: 'mdi-file-document',
-        path: '/user/preventive-measures',
+        id: 'notifications',
+        name: 'Notifications',
+        icon: 'mdi-bell',
+        path: '/user/notifications',
     },
     {
         id: 'history',
         name: 'Location History',
         icon: 'mdi-history',
         path: '/user/history',
+    },
+    {
+        id: 'preventive',
+        name: 'Preventive Measures',
+        icon: 'mdi-file-document',
+        path: '/user/preventive-measures',
+    },
+    {
+        id: 'profile',
+        name: 'My Profile',
+        icon: 'mdi-account-circle',
+        path: '/user/profile',
     },
 ]);
 

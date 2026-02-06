@@ -1,20 +1,19 @@
 <template>
     <v-app class="bg-user-gradient-light">
-        <!-- Modern Header -->
-        <div class="map-header">
-            <div class="header-content">
-                <v-btn icon variant="text" class="back-btn" @click="goBack">
-                    <v-icon color="white">mdi-arrow-left</v-icon>
+        <!-- App Bar -->
+        <UserAppBar 
+            title="Your Location Map" 
+            :subtitle="rescueRequest?.building?.name || ''"
+            :show-back="true"
+            :notification-count="0"
+            @go-back="goBack"
+        >
+            <template #actions>
+                <v-btn icon variant="text" class="bar-btn" style="color: white;" @click="resetZoom">
+                    <v-icon>mdi-crosshairs-gps</v-icon>
                 </v-btn>
-                <div class="header-info">
-                    <h1>Your Location Map</h1>
-                    <p v-if="rescueRequest?.building?.name">{{ rescueRequest.building.name }}</p>
-                </div>
-                <v-btn icon variant="text" @click="resetZoom" class="header-action-btn">
-                    <v-icon color="white">mdi-crosshairs-gps</v-icon>
-                </v-btn>
-            </div>
-        </div>
+            </template>
+        </UserAppBar>
 
         <!-- Navigation Drawer -->
         <UserMenu v-model="drawer" />
@@ -265,6 +264,7 @@ import { router } from '@inertiajs/vue3';
 import { getRescueRequestByCode, getRescueRequestById } from '@/Composables/useApi';
 import { useUnreadMessages } from '@/Composables/useUnreadMessages';
 import UserMenu from '@/Components/Pages/User/Menu/UserMenu.vue';
+import UserAppBar from '@/Components/Pages/User/Menu/UserAppBar.vue';
 import UserBottomNav from '@/Components/Pages/User/Menu/UserBottomNav.vue';
 
 const props = defineProps({

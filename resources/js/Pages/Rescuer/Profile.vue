@@ -19,7 +19,7 @@
         <!-- Navigation Drawer -->
         <RescuerMenu v-model="drawer" />
 
-        <v-main class="pb-20">
+        <v-main class="profile-main">
             <!-- Loading State -->
             <div v-if="loading" class="d-flex justify-center align-center" style="min-height: 60vh;">
                 <v-progress-circular indeterminate color="primary" size="48"></v-progress-circular>
@@ -97,123 +97,124 @@
 
                 <!-- Personal Information -->
                 <v-card class="mb-4 rounded-xl" elevation="0" color="white">
-                    <v-expansion-panels flat v-model="personalInfoPanel">
-                        <v-expansion-panel>
-                            <v-expansion-panel-title class="py-3 px-4">
-                                <div class="d-flex align-center">
-                                    <v-icon color="primary" class="mr-2" size="20">mdi-account</v-icon>
-                                    <span class="text-subtitle-1 font-weight-bold">Personal Information</span>
-                                </div>
-                            </v-expansion-panel-title>
-                            <v-expansion-panel-text>
-                                <v-form ref="formRef" v-model="formValid">
-                                    <v-row dense>
-                                        <v-col cols="6">
-                                            <v-text-field
-                                                v-model="profile.first_name"
-                                                label="First Name"
-                                                :readonly="!isEditing"
-                                                :rules="[rules.required]"
-                                                variant="outlined"
-                                                density="compact"
-                                                hide-details="auto"
-                                                class="mb-3"
-                                            ></v-text-field>
-                                        </v-col>
-                                        <v-col cols="6">
-                                            <v-text-field
-                                                v-model="profile.last_name"
-                                                label="Last Name"
-                                                :readonly="!isEditing"
-                                                :rules="[rules.required]"
-                                                variant="outlined"
-                                                density="compact"
-                                                hide-details="auto"
-                                                class="mb-3"
-                                            ></v-text-field>
-                                        </v-col>
-                                        <v-col cols="12">
-                                            <v-text-field
-                                                v-model="profile.email"
-                                                label="Email"
-                                                readonly
-                                                disabled
-                                                variant="outlined"
-                                                density="compact"
-                                                hide-details="auto"
-                                                class="mb-3 non-editable-field"
-                                                prepend-inner-icon="mdi-email-outline"
-                                                bg-color="grey-lighten-3"
-                                            ></v-text-field>
-                                        </v-col>
-                                        <v-col cols="12">
-                                            <v-text-field
-                                                v-model="profile.contact_number"
-                                                label="Contact Number"
-                                                :readonly="!isEditing"
-                                                variant="outlined"
-                                                density="compact"
-                                                :rules="isEditing ? [rules.phoneNumber] : []"
-                                                hint="Mobile number (e.g., 09171234567)"
-                                                :persistent-hint="isEditing"
-                                                placeholder="09171234567"
-                                                class="mb-3"
-                                                prepend-inner-icon="mdi-phone-outline"
-                                            ></v-text-field>
-                                        </v-col>
-                                        <v-col cols="12">
-                                            <v-text-field
-                                                v-model="profile.employee_id"
-                                                label="Rescuer ID"
-                                                readonly
-                                                disabled
-                                                variant="outlined"
-                                                density="compact"
-                                                hide-details="auto"
-                                                class="non-editable-field"
-                                                prepend-inner-icon="mdi-badge-account-outline"
-                                                bg-color="grey-lighten-3"
-                                            ></v-text-field>
-                                        </v-col>
-                                    </v-row>
-                                </v-form>
-                                
-                                <div class="d-flex gap-2 mt-3">
+                    <div class="d-flex align-center py-3 px-4">
+                        <v-icon color="primary" class="mr-2" size="20">mdi-account</v-icon>
+                        <span class="text-subtitle-1 font-weight-bold">Personal Information</span>
+                    </div>
+                    <v-divider></v-divider>
+                    <div class="pa-4">
+                        <v-form ref="formRef" v-model="formValid">
+                            <v-row dense>
+                                <v-col cols="12" sm="6">
+                                    <v-text-field
+                                        v-model="profile.first_name"
+                                        label="First Name"
+                                        :readonly="!isEditing"
+                                        :rules="[rules.required]"
+                                        variant="outlined"
+                                        density="compact"
+                                        hide-details="auto"
+                                        class="mb-3"
+                                    ></v-text-field>
+                                </v-col>
+                                <v-col cols="12" sm="6">
+                                    <v-text-field
+                                        v-model="profile.last_name"
+                                        label="Last Name"
+                                        :readonly="!isEditing"
+                                        :rules="[rules.required]"
+                                        variant="outlined"
+                                        density="compact"
+                                        hide-details="auto"
+                                        class="mb-3"
+                                    ></v-text-field>
+                                </v-col>
+                                <v-col cols="12">
+                                    <v-text-field
+                                        v-model="profile.email"
+                                        label="Email"
+                                        readonly
+                                        disabled
+                                        variant="outlined"
+                                        density="compact"
+                                        hide-details="auto"
+                                        class="mb-3 non-editable-field"
+                                        prepend-inner-icon="mdi-email-outline"
+                                        bg-color="grey-lighten-3"
+                                    ></v-text-field>
+                                </v-col>
+                                <v-col cols="12">
+                                    <v-text-field
+                                        v-model="profile.contact_number"
+                                        label="Contact Number"
+                                        :readonly="!isEditing"
+                                        variant="outlined"
+                                        density="compact"
+                                        :rules="isEditing ? [rules.phoneNumber] : []"
+                                        hint="Mobile number (e.g., 09171234567)"
+                                        :persistent-hint="isEditing"
+                                        placeholder="09171234567"
+                                        class="mb-3"
+                                        prepend-inner-icon="mdi-phone-outline"
+                                    ></v-text-field>
+                                </v-col>
+                                <v-col cols="12">
+                                    <v-text-field
+                                        v-model="profile.employee_id"
+                                        label="Rescuer ID"
+                                        readonly
+                                        disabled
+                                        variant="outlined"
+                                        density="compact"
+                                        hide-details="auto"
+                                        class="non-editable-field"
+                                        prepend-inner-icon="mdi-badge-account-outline"
+                                        bg-color="grey-lighten-3"
+                                    ></v-text-field>
+                                </v-col>
+                            </v-row>
+                        </v-form>
+                        
+                        <div class="profile-action-buttons mt-3">
+                            <v-btn
+                                v-if="!isEditing"
+                                block
+                                color="primary"
+                                variant="tonal"
+                                @click="isEditing = true"
+                                class="rounded-lg"
+                            >
+                                <v-icon start>mdi-pencil</v-icon>
+                                Edit Information
+                            </v-btn>
+                            <v-row v-else dense>
+                                <v-col cols="6">
                                     <v-btn
-                                        v-if="!isEditing"
                                         block
-                                        color="primary"
-                                        variant="tonal"
-                                        @click="isEditing = true"
+                                        color="grey"
+                                        variant="outlined"
+                                        @click="cancelEdit"
                                         class="rounded-lg"
                                     >
-                                        <v-icon start>mdi-pencil</v-icon>
-                                        Edit Information
+                                        Cancel
                                     </v-btn>
-                                    <template v-else>
-                                        <v-btn
-                                            color="grey"
-                                            variant="outlined"
-                                            @click="cancelEdit"
-                                            class="rounded-lg flex-grow-1"
-                                        >
-                                            Cancel
-                                        </v-btn>
-                                        <v-btn
-                                            color="primary"
-                                            variant="flat"
-                                            :loading="saving"
-                                            :disabled="!formValid"
-                                            @click="saveProfile"
-                                            class="rounded-lg flex-grow-1"
-                                        >
-                                            Save Changes
-                                        </v-btn>
-                                    </template>
-                                </div>
-                            </v-expansion-panel-text>
-                        </v-expansion-panel>
-                    </v-expansion-panels>
+                                </v-col>
+                                <v-col cols="6">
+                                    <v-btn
+                                        block
+                                        color="primary"
+                                        variant="flat"
+                                        :loading="saving"
+                                        :disabled="!formValid"
+                                        @click="saveProfile"
+                                        class="rounded-lg"
+                                    >
+                                        Save Changes
+                                    </v-btn>
+                                </v-col>
+                            </v-row>
+                        </div>
+                    </div>
                 </v-card>
 
                 <!-- Security Section -->
@@ -787,7 +788,6 @@ const loggingOut = ref(false);
 const unreadMessageCount = ref(0);
 
 // Panel states
-const personalInfoPanel = ref(null);
 const securityPanel = ref(null);
 const settingsPanel = ref(null);
 
@@ -864,7 +864,7 @@ const rules = {
         
         // Must start with 09 and have exactly 11 digits
         if (!/^09[0-9]{9}$/.test(cleaned)) {
-            return 'Please enter a valid mobile number (e.g., 09171234567)';
+            return 'Please enter a valid number';
         }
         
         return true;
@@ -1499,6 +1499,13 @@ onUnmounted(() => {
     display: inline-block;
 }
 
+/* Profile main layout */
+.profile-main {
+    padding-bottom: calc(89px + env(safe-area-inset-bottom, 0px));
+    min-height: 100vh;
+    min-height: 100dvh;
+}
+
 /* Desktop only visibility */
 .desktop-only {
     display: flex;
@@ -1510,10 +1517,58 @@ onUnmounted(() => {
     }
 }
 
-/* Adjust padding for mobile */
+/* Mobile responsive adjustments */
 @media (max-width: 600px) {
-    .pb-20 {
-        padding-bottom: 80px !important;
+    .profile-main {
+        padding-bottom: calc(130px + env(safe-area-inset-bottom, 0px)) !important;
+    }
+    
+    .header-content {
+        padding: 8px 12px;
+    }
+    
+    .header-title h1 {
+        font-size: 1.1rem;
+    }
+    
+    .header-title p {
+        font-size: 0.7rem;
+    }
+    
+    /* Ensure container has proper spacing */
+    .v-container {
+        padding-left: 12px !important;
+        padding-right: 12px !important;
+    }
+    
+    /* Make cards more compact on mobile */
+    .v-card {
+        margin-bottom: 12px !important;
+    }
+    
+    /* Adjust button sizing */
+    .profile-action-buttons .v-btn {
+        min-height: 44px;
+    }
+}
+
+@media (max-width: 400px) {
+    .profile-main {
+        padding-bottom: calc(110px + env(safe-area-inset-bottom, 0px)) !important;
+    }
+    
+    .header-content {
+        padding: 6px 10px;
+    }
+    
+    .v-container {
+        padding-left: 8px !important;
+        padding-right: 8px !important;
+    }
+    
+    /* Make profile header more compact */
+    .profile-header-bg {
+        padding: 16px !important;
     }
 }
 
