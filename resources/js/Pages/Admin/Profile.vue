@@ -255,6 +255,7 @@ import { ref, computed, onMounted, reactive } from 'vue';
 import { usePage } from '@inertiajs/vue3';
 import { useDisplay } from 'vuetify';
 import { getProfilePictureUrl, updateUser, uploadProfilePicture, deleteProfilePicture } from '@/Composables/useApi';
+import { setUserActiveStatus } from '@/Utilities/firebase';
 
 const { mobile } = useDisplay();
 const isMobile = computed(() => mobile.value);
@@ -598,6 +599,17 @@ const removePhoto = async () => {
 };
 
 const logout = async () => {
+    // Set user as inactive in Firebase (keep FCM token for offline notifications)
+    try {
+        const userData = JSON.parse(localStorage.getItem('userData') || '{}');
+        if (userData.id) {
+            await setUserActiveStatus(userData.id, false);
+            console.log('[Logout] User marked as inactive in Firebase');
+        }
+    } catch (e) {
+        console.error('[Logout] Error setting user inactive:', e);
+    }
+
     localStorage.removeItem('userData');
     localStorage.removeItem('authToken');
     localStorage.removeItem('token');

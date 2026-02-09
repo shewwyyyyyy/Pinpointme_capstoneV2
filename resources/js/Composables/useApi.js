@@ -157,6 +157,12 @@ export async function getRescuerFeed(rescuerId) {
     return apiFetch(`/api/rescue-requests/rescuer/${rescuerId}`, { method: 'GET' });
 }
 
+// ── Get rescuer user IDs for FCM notifications ─────────────────
+export async function getRescuerIds() {
+    const data = await apiFetch('/api/rescuers/ids', { method: 'GET' });
+    return data.rescuer_ids || [];
+}
+
 // ── Admin: get ALL conversations (read-only overview) ──────────
 export async function getAdminConversations() {
     return apiFetch('/api/conversations/admin', { method: 'GET' });

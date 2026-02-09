@@ -15,6 +15,7 @@ use App\Http\Controllers\ConversationController;
 use App\Http\Controllers\MessageController;
 use App\Http\Controllers\AuditTrailController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\PushNotificationController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -98,6 +99,13 @@ Route::get('/location-details/{buildingId}/{floorId}/{roomId}', [RescueRequestCo
 
 // Admin force-alert: marks a rescue request so rescuers get unstoppable ringtone
 Route::post('/rescue-requests/{rescueRequest}/force-alert', [RescueRequestController::class, 'forceAlert']);
+
+// Push Notification Routes
+Route::get('/push/vapid-public-key', [PushNotificationController::class, 'vapidPublicKey']);
+Route::post('/push/subscribe', [PushNotificationController::class, 'subscribe'])->middleware('web');
+Route::post('/push/unsubscribe', [PushNotificationController::class, 'unsubscribe'])->middleware('web');
+Route::get('/push/test', [PushNotificationController::class, 'testNotification'])->middleware('web');
+Route::get('/push/status', [PushNotificationController::class, 'status'])->middleware('web');
 // Admin: get pending requests that have been waiting too long (>5 min)
 Route::get('/rescue-requests/pending-too-long', [RescueRequestController::class, 'pendingTooLong']);
 
@@ -123,6 +131,9 @@ Route::post('/conversations/{conversation}/messages', [MessageController::class,
 Route::get('/messages/{message}', [MessageController::class, 'show']);
 Route::put('/messages/{message}', [MessageController::class, 'update']);
 Route::delete('/messages/{message}', [MessageController::class, 'destroy']);
+
+// Get rescuer user IDs for FCM notifications
+Route::get('/rescuers/ids', [RescueRequestController::class, 'getRescuerIds']);
 
 // Protected API Routes (requires Sanctum token authentication - for mobile apps)
 Route::middleware('auth:sanctum')->group(function () {

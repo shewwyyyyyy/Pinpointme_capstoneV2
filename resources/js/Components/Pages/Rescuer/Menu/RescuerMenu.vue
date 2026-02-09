@@ -46,6 +46,7 @@
 import { ref, computed, onMounted } from 'vue';
 import { router, usePage } from '@inertiajs/vue3';
 import { getProfilePictureUrl } from '@/Composables/useApi';
+import { setUserActiveStatus } from '@/Utilities/firebase';
 
 const props = defineProps({
     modelValue: {
@@ -132,6 +133,17 @@ onMounted(() => {
 });
 
 const handleLogout = async () => {
+    // Set user as inactive in Firebase (keep FCM token for offline notifications)
+    try {
+        const storedData = JSON.parse(localStorage.getItem('userData') || '{}');
+        if (storedData.id) {
+            await setUserActiveStatus(storedData.id, false);
+            console.log('[Logout] User marked as inactive in Firebase');
+        }
+    } catch (e) {
+        console.error('[Logout] Error setting user inactive:', e);
+    }
+
     // Clear all localStorage data
     localStorage.removeItem('userData');
     localStorage.removeItem('authToken');

@@ -451,6 +451,7 @@ import {
     getProfilePictureUrl,
 } from '@/Composables/useApi';
 import { useNotificationAlert } from '@/Composables/useNotificationAlert';
+import { notifyIfUserInactive } from '@/Utilities/firebase';
 
 const props = defineProps({
     // Can pass either conversationId directly or rescueRequestId
@@ -701,6 +702,58 @@ const fetchMessages = async (convId = null) => {
     }
 };
 
+/**
+ * Notify the recipient via FCM if they are inactive (not currently using the app)
+ * @param {string} messageContent - The content/preview of the message
+ * @param {string} messageType - Type of message: 'text', 'audio', 'image', 'file'
+ */
+const notifyRecipientIfNeeded = async (messageContent, messageType = 'text') => {
+    try {
+        // Get the other participant's user ID
+        const recipient = otherParticipant.value;
+        if (!recipient?.user_id) {
+            console.log('[Chat] No recipient found for notification');
+            return;
+        }
+
+        // Get current user's name for the notification title
+        const userData = JSON.parse(localStorage.getItem('userData') || '{}');
+        const senderName = userData.firstName && userData.lastName 
+            ? `${userData.firstName} ${userData.lastName}`.trim()
+            : userData.email || 'Someone';
+
+        // Create notification title and body
+        const title = `New message from ${senderName}`;
+        const body = messageContent.length > 100 
+            ? messageContent.substring(0, 100) + '...' 
+            : messageContent;
+
+        // Additional data for the notification
+        const data = {
+            type: 'chat_message',
+            conversation_id: String(conversation.value?.id || ''),
+            rescue_request_id: String(rescueRequest.value?.id || props.rescueRequestId || ''),
+            sender_id: String(currentUserId.value),
+            click_action: props.rescueRequestId 
+                ? `/chat/${props.rescueRequestId}`
+                : `/conversation/${conversation.value?.id}`,
+            tag: `chat-${conversation.value?.id}`
+        };
+
+        // Send notification only if recipient is inactive
+        const result = await notifyIfUserInactive(recipient.user_id, title, body, data);
+        
+        if (result.notified) {
+            console.log('[Chat] Notification sent to inactive recipient');
+        } else {
+            console.log('[Chat] Notification not sent:', result.reason);
+        }
+    } catch (error) {
+        console.error('[Chat] Error notifying recipient:', error);
+        // Don't throw - notification failure shouldn't affect message sending
+    }
+};
+
 const sendTextMessage = async () => {
     const content = messageInput.value.trim();
     if (!content || isSending.value) return;
@@ -735,6 +788,9 @@ const sendTextMessage = async () => {
         if (index !== -1) {
             messages.value[index] = data;
         }
+
+        // Notify the recipient if they're inactive
+        await notifyRecipientIfNeeded(tempContent, 'text');
     } catch (error) {
         console.error('Error sending message:', error);
         // Remove temp message on error
@@ -831,6 +887,9 @@ const sendAudioMessage = async (audioBlob) => {
         messages.value.push(data);
         await nextTick();
         scrollToBottom();
+
+        // Notify the recipient if they're inactive
+        await notifyRecipientIfNeeded('🎤 Voice message', 'audio');
     } catch (error) {
         console.error('Error sending audio:', error);
         showSnackbar('Failed to send voice message', 'error');
@@ -960,6 +1019,11 @@ const uploadFile = async (file) => {
         messages.value.push(data);
         await nextTick();
         scrollToBottom();
+
+        // Notify the recipient if they're inactive
+        const fileType = file.type?.startsWith('image/') ? 'image' : 'file';
+        const notifyContent = fileType === 'image' ? '📷 Image' : `📎 ${file.name || 'File'}`;
+        await notifyRecipientIfNeeded(notifyContent, fileType);
     } catch (error) {
         console.error('Error uploading file:', error);
         showSnackbar('Failed to send file', 'error');

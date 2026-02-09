@@ -127,7 +127,14 @@ export default defineConfig({
             "@": path.resolve(__dirname, "./resources/js"),
         },
     },
+    optimizeDeps: {
+        include: ['jspdf', 'jspdf-autotable', 'qrcode', 'html5-qrcode'],
+    },
     build: {
+        commonjsOptions: {
+            include: [/jspdf/, /jspdf-autotable/, /node_modules/],
+            transformMixedEsModules: true,
+        },
         chunkSizeWarningLimit: 1000,
         rollupOptions: {
             output: {

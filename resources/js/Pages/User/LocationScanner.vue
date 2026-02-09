@@ -847,7 +847,9 @@ import {
     getProfilePictureUrl,
     getUserActiveRescueRequest,
     getConversations,
+    getRescuerIds,
 } from '@/Composables/useApi';
+import { sendRescueNotifications } from '@/Utilities/firebase';
 import { useAudioRecording } from '@/Composables/useAudioRecording';
 import { useNotificationAlert } from '@/Composables/useNotificationAlert';
 import UserMenu from '@/Components/Pages/User/Menu/UserMenu.vue';
@@ -2789,6 +2791,31 @@ const submitRescueRequest = async () => {
             
             // Clear media files after successful submission
             clearMediaFiles();
+
+            // Send FCM notifications to all rescuers via Firebase Cloud Function
+            try {
+                const rescuerIds = await getRescuerIds();
+                if (rescuerIds && rescuerIds.length > 0) {
+                    const locationParts = [];
+                    if (selectedBuilding.value?.name) locationParts.push(selectedBuilding.value.name);
+                    if (selectedFloor.value?.name) locationParts.push(selectedFloor.value.name);
+                    if (selectedRoom.value?.room_name || selectedRoom.value?.name) {
+                        locationParts.push(selectedRoom.value.room_name || selectedRoom.value.name);
+                    }
+                    const locationStr = locationParts.join(' - ') || 'Unknown Location';
+                    
+                    await sendRescueNotifications({
+                        rescueCode: result.rescueCode,
+                        location: locationStr,
+                        urgencyLevel: emergencyForm.value.urgencyLevel || 'medium'
+                    }, rescuerIds);
+                    
+                    console.log('[Rescue] FCM notifications sent to', rescuerIds.length, 'rescuers');
+                }
+            } catch (fcmError) {
+                // Don't fail the rescue request if FCM notification fails
+                console.error('[Rescue] Failed to send FCM notifications:', fcmError);
+            }
 
             // Navigate to help coming page
             setTimeout(() => {

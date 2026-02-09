@@ -708,6 +708,8 @@
 <script setup>
 import { ref, onMounted, computed, watch } from 'vue';
 import { router, useForm, usePage } from '@inertiajs/vue3';
+import { initializePushNotifications, isPushSupported, getNotificationPermission } from '@/Utilities/pushNotifications';
+import { initializeFCMForUser } from '@/Utilities/firebase';
 
 const page = usePage();
 
@@ -923,6 +925,24 @@ const handleLogin = async () => {
                 };
 
                 localStorage.setItem('userData', JSON.stringify(userData));
+
+                // Initialize push notifications after successful login
+                initializePushNotifications().then(result => {
+                    if (result.success) {
+                        console.log('[Login] Push notifications enabled');
+                    } else {
+                        console.log('[Login] Push notifications not enabled:', result.reason);
+                    }
+                });
+
+                // Initialize Firebase FCM and set user as active
+                initializeFCMForUser(user.id).then(result => {
+                    if (result.success) {
+                        console.log('[Login] Firebase FCM initialized, user marked as active');
+                    } else {
+                        console.log('[Login] Firebase FCM not initialized:', result.error);
+                    }
+                });
 
                 toastMessage.value = 'Login successful!';
                 toastColor.value = 'success';

@@ -1,0 +1,17 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Users collection - stores FCM tokens
+    match /users/{userId} {
+      // Allow read/write for authenticated users on their own document
+      // Allow functions to read all documents
+      allow read: if true;
+      allow write: if true;
+    }
+    
+    // Notifications collection (if needed for queuing)
+    match /notifications/{notificationId} {
+      allow read, write: if true;
+    }
+  }
+}

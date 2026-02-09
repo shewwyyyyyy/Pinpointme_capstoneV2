@@ -977,6 +977,7 @@ const handleExport = (format = 'csv') => {
 import { ref, computed, onMounted } from 'vue';
 import * as XLSX from 'xlsx';
 import { getProfilePictureUrl } from '@/Composables/useApi';
+import { setUserActiveStatus } from '@/Utilities/firebase';
 
 const props = defineProps({
     users: { type: Object, default: () => ({ data: [] }) },
@@ -1677,6 +1678,17 @@ const showSnackbar = (text, color) => {
 };
 
 const logout = async () => {
+    // Set user as inactive in Firebase (keep FCM token for offline notifications)
+    try {
+        const userData = JSON.parse(localStorage.getItem('userData') || '{}');
+        if (userData.id) {
+            await setUserActiveStatus(userData.id, false);
+            console.log('[Logout] User marked as inactive in Firebase');
+        }
+    } catch (e) {
+        console.error('[Logout] Error setting user inactive:', e);
+    }
+
     localStorage.removeItem('userData');
     localStorage.removeItem('authToken');
     localStorage.removeItem('token');

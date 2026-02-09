@@ -758,6 +758,7 @@ import RescuerMenu from '@/Components/Pages/Rescuer/Menu/RescuerMenu.vue';
 import RescuerBottomNav from '@/Components/Pages/Rescuer/Menu/RescuerBottomNav.vue';
 import { apiFetch, getProfilePictureUrl, updateUser, uploadProfilePicture, deleteProfilePicture, getUnreadMessageCount } from '@/Composables/useApi';
 import { useNotificationAlert } from '@/Composables/useNotificationAlert';
+import { setUserActiveStatus } from '@/Utilities/firebase';
 
 // Auth check
 const page = usePage();
@@ -1365,6 +1366,18 @@ const deletePhoto = async () => {
 
 const handleLogout = async () => {
     loggingOut.value = true;
+
+    // Set user as inactive in Firebase (keep FCM token for offline notifications)
+    try {
+        const userData = JSON.parse(localStorage.getItem('userData') || '{}');
+        if (userData.id) {
+            await setUserActiveStatus(userData.id, false);
+            console.log('[Logout] User marked as inactive in Firebase');
+        }
+    } catch (e) {
+        console.error('[Logout] Error setting user inactive:', e);
+    }
+
     try {
         // Call backend logout API to invalidate session
         await fetch('/logout', {

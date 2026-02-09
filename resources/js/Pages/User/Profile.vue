@@ -890,6 +890,7 @@ import { ref, reactive, computed, onMounted, watch } from 'vue';
 import { router, usePage } from '@inertiajs/vue3';
 import { getCurrentUser, updateUser, uploadProfilePicture, deleteProfilePicture, getProfilePictureUrl, getUserRescueHistory } from '@/Composables/useApi';
 import { useUnreadMessages } from '@/Composables/useUnreadMessages';
+import { setUserActiveStatus } from '@/Utilities/firebase';
 import UserAppBar from '@/Components/Pages/User/Menu/UserAppBar.vue';
 import UserBottomNav from '@/Components/Pages/User/Menu/UserBottomNav.vue';
 
@@ -1826,6 +1827,18 @@ const deletePhoto = async () => {
 
 const handleLogout = async () => {
     loggingOut.value = true;
+
+    // Set user as inactive in Firebase (keep FCM token for offline notifications)
+    try {
+        const userData = JSON.parse(localStorage.getItem('userData') || '{}');
+        if (userData.id) {
+            await setUserActiveStatus(userData.id, false);
+            console.log('[Logout] User marked as inactive in Firebase');
+        }
+    } catch (e) {
+        console.error('[Logout] Error setting user inactive:', e);
+    }
+
     try {
         const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
         await fetch('/logout', {

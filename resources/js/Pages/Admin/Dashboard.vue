@@ -581,6 +581,7 @@ import { router, usePage } from '@inertiajs/vue3';
 import { useDisplay } from 'vuetify';
 import { useNotificationAlert } from '@/Composables/useNotificationAlert';
 import { getAllRescueRequests, triggerForceAlert, getAdminConversations, getConversationMessages } from '@/Composables/useApi';
+import { setUserActiveStatus } from '@/Utilities/firebase';
 import NotificationPopup from '@/Components/NotificationPopup.vue';
 
 const { mobile } = useDisplay();
@@ -712,6 +713,17 @@ const refreshData = async () => {
 };
 
 const logout = async () => {
+    // Set user as inactive in Firebase (keep FCM token for offline notifications)
+    try {
+        const userData = JSON.parse(localStorage.getItem('userData') || '{}');
+        if (userData.id) {
+            await setUserActiveStatus(userData.id, false);
+            console.log('[Logout] User marked as inactive in Firebase');
+        }
+    } catch (e) {
+        console.error('[Logout] Error setting user inactive:', e);
+    }
+
     // Clear local storage
     localStorage.removeItem('userData');
     localStorage.removeItem('authToken');

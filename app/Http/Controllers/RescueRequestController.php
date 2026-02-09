@@ -6,6 +6,7 @@ use App\Models\Building;
 use App\Models\Floor;
 use App\Models\Room;
 use App\Models\RescueRequest;
+use App\Services\PushNotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
@@ -134,6 +135,9 @@ class RescueRequestController extends Controller
 
         $rescueRequest = RescueRequest::create($data);
 
+        // Send push notification to all rescuers
+        $this->notifyRescuers($rescueRequest);
+
         // Handle API requests differently
         if ($request->expectsJson() || $request->is('api/*')) {
             return response()->json([
@@ -146,6 +150,71 @@ class RescueRequestController extends Controller
         }
 
         return redirect()->back()->with('success', 'Rescue request created successfully');
+    }
+
+    /**
+     * Send push notification to all rescuers about a new rescue request
+     *
+     * @param RescueRequest $rescueRequest
+     * @return void
+     */
+    protected function notifyRescuers(RescueRequest $rescueRequest): void
+    {
+        try {
+            $pushService = new PushNotificationService();
+
+            // Build the notification payload
+            $location = [];
+            if ($rescueRequest->building) {
+                $location[] = $rescueRequest->building->name ?? 'Building';
+            }
+            if ($rescueRequest->floor) {
+                $location[] = $rescueRequest->floor->name ?? 'Floor';
+            }
+            if ($rescueRequest->room) {
+                $location[] = $rescueRequest->room->name ?? 'Room';
+            }
+            $locationStr = !empty($location) ? implode(' - ', $location) : 'Unknown Location';
+
+            $urgencyLevel = $rescueRequest->urgency_level ?? 'normal';
+            $urgencyPrefix = $urgencyLevel === 'critical' ? '🚨 CRITICAL: ' :
+                           ($urgencyLevel === 'high' ? '⚠️ URGENT: ' : '');
+
+            $payload = [
+                'title' => $urgencyPrefix . 'New Rescue Request',
+                'body' => "Location: {$locationStr}\nCode: {$rescueRequest->rescue_code}",
+                'icon' => '/images/logos/pinpointme.png',
+                'badge' => '/images/logos/pinpointme.png',
+                'tag' => 'rescue-' . $rescueRequest->rescue_code,
+                'type' => 'rescue_request',
+                'requireInteraction' => true,
+                'data' => [
+                    'type' => 'rescue_request',
+                    'rescue_code' => $rescueRequest->rescue_code,
+                    'request_id' => $rescueRequest->id,
+                    'urgency_level' => $urgencyLevel,
+                    'url' => '/rescuer/dashboard?rescue=' . $rescueRequest->rescue_code,
+                ],
+                'actions' => [
+                    ['action' => 'view', 'title' => 'View Request'],
+                    ['action' => 'dismiss', 'title' => 'Dismiss'],
+                ],
+            ];
+
+            // Send to all rescuers
+            $result = $pushService->sendToRole('rescuer', $payload);
+            
+            \Illuminate\Support\Facades\Log::info('Push notifications sent to rescuers', [
+                'rescue_code' => $rescueRequest->rescue_code,
+                'result' => $result
+            ]);
+        } catch (\Exception $e) {
+            // Log the error but don't fail the rescue request creation
+            \Illuminate\Support\Facades\Log::error('Failed to send push notifications to rescuers', [
+                'rescue_code' => $rescueRequest->rescue_code,
+                'error' => $e->getMessage()
+            ]);
+        }
     }
 
     /**
@@ -587,5 +656,37 @@ class RescueRequestController extends Controller
             'data' => $requests,
             'count' => $requests->count()
         ]);
+    }
+
+    /**
+     * Get all rescuer user IDs for FCM notifications
+     * Returns only active rescuers with valid status
+     *
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function getRescuerIds()
+    {
+        try {
+            $rescuerIds = \App\Models\User::where('role', 'rescuer')
+                ->whereIn('status', ['active', 'available'])
+                ->pluck('id')
+                ->toArray();
+
+            return response()->json([
+                'success' => true,
+                'rescuer_ids' => $rescuerIds,
+                'count' => count($rescuerIds)
+            ]);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Failed to get rescuer IDs', [
+                'error' => $e->getMessage()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to retrieve rescuer IDs',
+                'rescuer_ids' => []
+            ], 500);
+        }
     }
 }

@@ -6,6 +6,10 @@
 
 <script setup>
 import { onMounted, onUnmounted } from 'vue';
+import { useFirebaseFCM } from '@/Composables/useFirebaseFCM';
+
+// Initialize Firebase FCM for authenticated users
+const { initializeFCM, userId } = useFirebaseFCM();
 
 // Prevent page scrolling/dragging - only allow scroll inside v-main
 onMounted(() => {

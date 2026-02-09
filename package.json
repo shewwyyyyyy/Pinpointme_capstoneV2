@@ -23,11 +23,13 @@
         "@mdi/font": "^7.4.47",
         "@mdi/js": "^7.4.47",
         "@vitejs/plugin-vue": "^6.0.1",
+        "firebase": "^12.9.0",
         "html5-qrcode": "^2.3.8",
         "jspdf": "^4.1.0",
         "jspdf-autotable": "^5.0.7",
         "qrcode": "^1.5.4",
         "vue": "^3.5.25",
-        "vue-qrcode-reader": "^5.7.3"
+        "vue-qrcode-reader": "^5.7.3",
+        "xlsx": "^0.18.5"
     }
 }

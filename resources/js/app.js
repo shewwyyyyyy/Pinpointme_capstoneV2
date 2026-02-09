@@ -2,19 +2,31 @@ import { createApp, h } from "vue";
 import { createInertiaApp } from "@inertiajs/vue3";
 import Layout from "@/App.vue";
 import vuetify from "./vuetify";
+import { registerServiceWorker } from "./Utilities/pushNotifications";
 
-// PWA Service Worker - disabled for local development
-// import { registerSW } from 'virtual:pwa-register';
-// const updateSW = registerSW({
-//     onNeedRefresh() {
-//         if (confirm('New content available. Reload?')) {
-//             updateSW(true);
-//         }
-//     },
-//     onOfflineReady() {
-//         console.log('App ready to work offline');
-//     },
-// });
+// Register service workers immediately for push notifications
+// This needs to happen early so push notifications work even when app is closed
+if ('serviceWorker' in navigator) {
+    // Register the main push notification service worker
+    registerServiceWorker()
+        .then(registration => {
+            if (registration) {
+                console.log('[App] Main service worker registered for push notifications');
+            }
+        })
+        .catch(error => {
+            console.error('[App] Main service worker registration failed:', error);
+        });
+    
+    // Register Firebase messaging service worker
+    navigator.serviceWorker.register('/firebase-messaging-sw.js')
+        .then(registration => {
+            console.log('[App] Firebase messaging service worker registered');
+        })
+        .catch(error => {
+            console.error('[App] Firebase messaging service worker registration failed:', error);
+        });
+}
 
 createInertiaApp({
     resolve: (name) => {
