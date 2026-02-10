@@ -1550,6 +1550,7 @@ class AuthController extends Controller
     public function redirectToGoogle()
     {
         return \Laravel\Socialite\Facades\Socialite::driver('google')
+            ->redirectUrl(config('services.google.redirect'))
             ->with(['hd' => 'sdca.edu.ph']) // Restrict to SDCA domain at OAuth level
             ->redirect();
     }
@@ -1560,7 +1561,9 @@ class AuthController extends Controller
     public function handleGoogleCallback(Request $request)
     {
         try {
-            $googleUser = \Laravel\Socialite\Facades\Socialite::driver('google')->user();
+            $googleUser = \Laravel\Socialite\Facades\Socialite::driver('google')
+                ->redirectUrl(config('services.google.redirect'))
+                ->user();
             
             // Verify SDCA domain
             $email = strtolower($googleUser->getEmail());
