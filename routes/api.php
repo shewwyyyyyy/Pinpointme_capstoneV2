@@ -93,6 +93,7 @@ Route::put('/rescue-requests/{rescueRequest}', [RescueRequestController::class, 
 Route::get('/rescue-requests/code/{code}', [RescueRequestController::class, 'showByCode']);
 Route::patch('/rescue-requests/code/{code}/status', [RescueRequestController::class, 'updateStatus']);
 Route::post('/rescue-requests/{rescueRequest}/mark-safe', [RescueRequestController::class, 'markSafe']);
+Route::post('/rescue-requests/{rescueRequest}/translate', [RescueRequestController::class, 'translateRequest']);
 Route::get('/rescue-requests/rescuer/{rescuer}', [RescueRequestController::class, 'rescuerFeed']);
 Route::get('/users/{user}/rescue-history', [RescueRequestController::class, 'userHistory']);
 Route::get('/location-details/{buildingId}/{floorId}/{roomId}', [RescueRequestController::class, 'getLocationDetails']);

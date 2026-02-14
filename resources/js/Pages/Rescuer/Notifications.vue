@@ -27,14 +27,42 @@
 
         <!-- Main Content -->
         <v-main class="notifications-main">
+            <!-- Restriction Warning -->
+            <v-alert
+                v-if="isRescuerRestricted"
+                type="warning"
+                variant="tonal"
+                prominent
+                border="start"
+                class="ma-4"
+            >
+                <template v-slot:prepend>
+                    <v-icon size="28">mdi-lock</v-icon>
+                </template>
+                <div class="text-subtitle-2 font-weight-bold mb-1">Access Restricted</div>
+                <div class="text-caption">
+                    Your status is set to <strong>{{ rescuerStatus }}</strong> by an administrator. 
+                    You cannot access notifications until your status is changed.
+                </div>
+            </v-alert>
+
             <!-- Loading State -->
-            <div v-if="loading" class="loading-container">
+            <div v-if="loading && !isRescuerRestricted" class="loading-container">
                 <v-progress-circular indeterminate color="primary" size="48" />
                 <p>Loading notifications...</p>
             </div>
 
+            <!-- Restriction Empty State -->
+            <div v-else-if="isRescuerRestricted && !loading" class="empty-state restriction-state">
+                <div class="empty-icon-wrapper">
+                    <v-icon size="80" color="grey-lighten-2">mdi-bell-lock</v-icon>
+                </div>
+                <h3>Notifications Unavailable</h3>
+                <p>Contact an administrator to change your status to access notifications.</p>
+            </div>
+
             <!-- Empty State -->
-            <div v-else-if="filteredNotifications.length === 0" class="empty-state">
+            <div v-else-if="filteredNotifications.length === 0 && !isRescuerRestricted" class="empty-state">
                 <div class="empty-icon-wrapper">
                     <v-icon size="64" color="grey-lighten-1">mdi-bell-off-outline</v-icon>
                 </div>
@@ -51,8 +79,8 @@
                 </v-btn>
             </div>
 
-            <!-- Notifications List -->
-            <div v-else class="notifications-list">
+            <!-- Notifications List (only if not restricted) -->
+            <div v-else-if="!isRescuerRestricted" class="notifications-list">
                 <TransitionGroup name="notification">
                     <div 
                         v-for="notification in filteredNotifications" 
@@ -164,6 +192,13 @@ const refreshing = ref(false);
 const rescueRequests = ref([]);
 const processingId = ref(null);
 const { unreadCount: unreadMessageCount, onNewMessages } = useUnreadMessages();
+const rescuerStatus = ref('available');
+
+// Check if rescuer is restricted
+const isRescuerRestricted = computed(() => {
+    const status = rescuerStatus.value?.toLowerCase();
+    return status === 'off_duty' || status === 'unavailable';
+});
 
 // Toast
 const showToast = ref(false);
@@ -216,6 +251,19 @@ const fetchNotifications = async () => {
         const rescuerId = authUser.value?.id;
         if (!rescuerId) return;
         
+        // Update rescuer status from localStorage
+        const userData = JSON.parse(localStorage.getItem('userData') || '{}');
+        rescuerStatus.value = userData.status || 'available';
+        
+        // Don't fetch notifications if rescuer is restricted
+        if (isRescuerRestricted.value) {
+            console.log('[Notifications] Rescuer is restricted, skipping notification fetch');
+            rescueRequests.value = [];
+            loading.value = false;
+            refreshing.value = false;
+            return;
+        }
+        
         const response = await apiFetch(`/api/rescue-requests/rescuer/${rescuerId}`);
         // Handle wrapped response { success: true, data: [...] }
         const data = response?.data || response;
@@ -245,6 +293,12 @@ const refreshNotifications = async () => {
 };
 
 const handleNotificationClick = (notification) => {
+    // Prevent viewing notification if rescuer is restricted
+    if (isRescuerRestricted.value) {
+        showToastMessage('You cannot access rescue requests while your status is restricted', 'warning');
+        return;
+    }
+    
     viewRescue(notification);
 };
 
@@ -308,12 +362,20 @@ const formatTimeAgo = (dateString) => {
     if (!dateString) return 'Unknown';
     const date = new Date(dateString);
     const now = new Date();
-    const seconds = Math.floor((now - date) / 1000);
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
     
-    if (seconds < 60) return 'Just now';
-    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
-    if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
-    return `${Math.floor(seconds / 86400)}d ago`;
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) {
+        return `0:${String(diffMins).padStart(2, '0')}`;
+    }
+    if (diffHours < 24) {
+        const mins = diffMins % 60;
+        return `${diffHours}:${String(mins).padStart(2, '0')}`;
+    }
+    return `${diffDays}d ago`;
 };
 
 const truncateText = (text, maxLength) => {
@@ -377,13 +439,19 @@ const formatStatus = (status) => {
 
 // Lifecycle
 onMounted(async () => {
+    // Initialize rescuer status from localStorage
+    const userData = JSON.parse(localStorage.getItem('userData') || '{}');
+    rescuerStatus.value = userData.status || 'available';
+    
     await fetchNotifications();
     
-    // Register new message notification callback
-    onNewMessages((newCount) => {
-        playNotificationSound('message');
-        vibrate([100, 50, 100]);
-    });
+    // Register new message notification callback (only if not restricted)
+    if (!isRescuerRestricted.value) {
+        onNewMessages((newCount) => {
+            playNotificationSound('message');
+            vibrate([100, 50, 100]);
+        });
+    }
     
     // Start polling for rescue notifications
     pollingInterval = setInterval(async () => {
@@ -451,6 +519,7 @@ onUnmounted(() => {
 
 /* Main Content */
 .notifications-main {
+    padding-top: 16px;
     padding-bottom: calc(140px + env(safe-area-inset-bottom, 0px));
     min-height: 100vh;
 }

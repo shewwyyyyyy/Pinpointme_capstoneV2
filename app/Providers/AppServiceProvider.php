@@ -70,6 +70,9 @@ use App\Services\Fetches\MessageFetchService;
 use App\Services\AuditTrailService;
 use App\Services\Fetches\AuditTrailFetchService;
 
+// Translation Service
+use App\Services\TranslationService;
+
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\ServiceProvider;
 
@@ -116,6 +119,9 @@ class AppServiceProvider extends ServiceProvider
         // Audit Trail
         $this->app->bind(AuditTrailInterface::class, AuditTrailService::class);
         $this->app->bind(AuditTrailFetchInterface::class, AuditTrailFetchService::class);
+        
+        // Translation Service (singleton)
+        $this->app->singleton(TranslationService::class);
     }
 
     /**

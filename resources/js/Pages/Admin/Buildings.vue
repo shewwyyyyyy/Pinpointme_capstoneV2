@@ -1,53 +1,8 @@
 <template>
     <v-app class="bg-grey-lighten-4">
 
-        <!-- App Bar (Unified) -->
-        <v-app-bar color="primary" elevation="2">
-            <v-app-bar-nav-icon @click="drawer = !drawer"></v-app-bar-nav-icon>
-            <v-app-bar-title>
-                <v-icon class="mr-2" color="white">mdi-shield-check</v-icon>
-                <span class="text-white font-weight-bold">PinPointMe Admin</span>
-            </v-app-bar-title>
-            <v-spacer />
-            <!-- Profile Avatar Menu -->
-            <v-menu offset-y>
-                <template v-slot:activator="{ props }">
-                    <v-btn icon v-bind="props">
-                        <v-avatar color="white" size="36">
-                            <span class="text-primary font-weight-bold">{{ adminInitials }}</span>
-                        </v-avatar>
-                    </v-btn>
-                </template>
-                <v-list>
-                    <v-list-item @click="goToProfile" prepend-icon="mdi-account">
-                        <v-list-item-title>Profile</v-list-item-title>
-                    </v-list-item>
-                    <v-list-item @click="toggleDarkMode" prepend-icon="mdi-theme-light-dark">
-                        <v-list-item-title>{{ isDark ? 'Light Mode' : 'Dark Mode' }}</v-list-item-title>
-                    </v-list-item>
-                    <v-list-item @click="logout" prepend-icon="mdi-logout">
-                        <v-list-item-title>Logout</v-list-item-title>
-                    </v-list-item>
-                </v-list>
-            </v-menu>
-        </v-app-bar>
-
-        <!-- Navigation Drawer (Unified) -->
-        <v-navigation-drawer
-            v-model="drawer"
-            :permanent="!isMobile"
-            :temporary="isMobile"
-            app
-        >
-            <v-list>
-                <v-list-item prepend-icon="mdi-view-dashboard" title="Dashboard" href="/admin/dashboard" @click="closeDrawerOnMobile"></v-list-item>
-                <v-list-item prepend-icon="mdi-account-group" title="Users" href="/admin/users" @click="closeDrawerOnMobile"></v-list-item>
-                <v-list-item prepend-icon="mdi-lifebuoy" title="Rescuers" href="/admin/rescuers" @click="closeDrawerOnMobile"></v-list-item>
-                <v-list-item prepend-icon="mdi-office-building" title="Buildings" href="/admin/buildings" active @click="closeDrawerOnMobile"></v-list-item>
-                <v-list-item prepend-icon="mdi-file-chart" title="Reports" href="/admin/reports" @click="closeDrawerOnMobile"></v-list-item>
-                <v-list-item prepend-icon="mdi-shield-alert" title="Preventive Measures" href="/admin/preventive-measures" @click="closeDrawerOnMobile"></v-list-item>
-            </v-list>
-        </v-navigation-drawer>
+        <!-- Admin App Bar -->
+        <AdminAppBar activePage="buildings" />
 
         <!-- Main Content -->
         <v-main>
@@ -435,7 +390,8 @@
                     <div id="bulk-qr-container" class="d-flex flex-wrap justify-center gap-4">
                         <div v-for="qrItem in bulkQrItems" :key="qrItem.id" class="text-center pa-2 border rounded">
                             <canvas :id="'bulk-qr-' + qrItem.id" width="150" height="150"></canvas>
-                            <p class="text-caption mt-1">{{ qrItem.floor }}</p>
+                            <p class="text-caption mt-1 text-grey">{{ qrItem.building }}</p>
+                            <p class="text-caption">{{ qrItem.floor }}</p>
                             <p class="text-caption font-weight-bold">{{ qrItem.room }}</p>
                         </div>
                     </div>
@@ -565,39 +521,15 @@ import { ref, computed, onMounted, nextTick } from 'vue';
 import { router } from '@inertiajs/vue3';
 import QRCode from 'qrcode';
 import { useDisplay } from 'vuetify';
-import { setUserActiveStatus } from '@/Utilities/firebase';
+import AdminAppBar from '@/Components/AdminAppBar.vue';
 
 const { mobile } = useDisplay();
 const isMobile = computed(() => mobile.value);
-
-const isDark = ref(false);
-const toggleDarkMode = () => {
-    isDark.value = !isDark.value;
-    document.documentElement.classList.toggle('v-theme--dark', isDark.value);
-};
-const goToProfile = () => {
-    window.location.href = '/admin/profile';
-};
-const closeDrawerOnMobile = () => {
-    if (isMobile.value) {
-        drawer.value = false;
-    }
-};
-
-// Admin initials for profile
-const adminInitials = computed(() => {
-    const userData = JSON.parse(localStorage.getItem('userData') || '{}');
-    if (userData.first_name && userData.last_name) {
-        return `${userData.first_name[0]}${userData.last_name[0]}`.toUpperCase();
-    }
-    return 'AD';
-});
 
 const props = defineProps({
     buildings: { type: Array, default: () => [] }
 });
 
-const drawer = ref(!mobile.value);
 const saving = ref(false);
 const deleting = ref(false);
 const snackbar = ref(false);
@@ -1129,13 +1061,57 @@ const generateQrCode = async () => {
     }
 };
 
+const createLabeledQrCanvas = (qrCanvas, building, floor, room) => {
+    // Create a new canvas with extra space for labels
+    const labeledCanvas = document.createElement('canvas');
+    const ctx = labeledCanvas.getContext('2d');
+    
+    const padding = 40;
+    const qrSize = qrCanvas.width;
+    labeledCanvas.width = qrSize + (padding * 2);
+    labeledCanvas.height = qrSize + (padding * 4) + 80; // Extra space for text
+    
+    // White background
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, labeledCanvas.width, labeledCanvas.height);
+    
+    // Building name (top)
+    ctx.fillStyle = '#000000';
+    ctx.font = 'bold 24px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText(building, labeledCanvas.width / 2, padding + 20);
+    
+    // Floor and Room info
+    ctx.fillStyle = '#666666';
+    ctx.font = '16px Arial';
+    ctx.fillText(`${floor} → ${room}`, labeledCanvas.width / 2, padding + 45);
+    
+    // Draw QR code
+    ctx.drawImage(qrCanvas, padding, padding + 60);
+    
+    // Footer text
+    ctx.fillStyle = '#999999';
+    ctx.font = '12px Arial';
+    ctx.fillText('Scan this QR code in emergency', labeledCanvas.width / 2, labeledCanvas.height - 20);
+    
+    return labeledCanvas;
+};
+
 const downloadQrCode = () => {
     const canvas = document.getElementById('qr-canvas');
     if (!canvas) return;
     
+    // Create labeled canvas
+    const labeledCanvas = createLabeledQrCanvas(
+        canvas,
+        qrRoomInfo.value.building,
+        qrRoomInfo.value.floor,
+        qrRoomInfo.value.room
+    );
+    
     const link = document.createElement('a');
     link.download = `QR-${qrRoomInfo.value.building}-${qrRoomInfo.value.floor}-${qrRoomInfo.value.room}.png`;
-    link.href = canvas.toDataURL('image/png');
+    link.href = labeledCanvas.toDataURL('image/png');
     link.click();
     
     showSnackbar('QR code downloaded', 'success');
@@ -1310,9 +1286,17 @@ const downloadAllQrCodes = async () => {
     for (const item of bulkQrItems.value) {
         const canvas = document.getElementById(`bulk-qr-${item.id}`);
         if (canvas) {
+            // Create labeled canvas
+            const labeledCanvas = createLabeledQrCanvas(
+                canvas,
+                item.building,
+                item.floor,
+                item.room
+            );
+            
             const link = document.createElement('a');
             link.download = `QR-${item.building}-${item.floor}-${item.room}.png`;
-            link.href = canvas.toDataURL('image/png');
+            link.href = labeledCanvas.toDataURL('image/png');
             link.click();
             // Small delay between downloads
             await new Promise(resolve => setTimeout(resolve, 100));
@@ -1330,9 +1314,11 @@ const printAllQrCodes = () => {
         if (canvas) {
             qrHtml += `
                 <div class="qr-item">
+                    <p class="building">${item.building}</p>
                     <img src="${canvas.toDataURL('image/png')}" alt="QR Code" />
                     <p class="floor">${item.floor}</p>
                     <p class="room">${item.room}</p>
+                    <p class="footer">Scan this QR code in emergency</p>
                 </div>
             `;
         }
@@ -1358,14 +1344,17 @@ const printAllQrCodes = () => {
                 }
                 .qr-item { 
                     text-align: center; 
-                    padding: 10px;
-                    border: 1px solid #ddd;
+                    padding: 15px;
+                    border: 2px solid #333;
                     border-radius: 8px;
                     page-break-inside: avoid;
+                    background: white;
                 }
-                .qr-item img { width: 150px; height: 150px; }
-                .qr-item .floor { margin: 5px 0 0 0; font-size: 12px; color: #666; }
-                .qr-item .room { margin: 2px 0 0 0; font-weight: bold; }
+                .qr-item img { width: 150px; height: 150px; margin: 10px 0; }
+                .qr-item .building { margin: 0 0 10px 0; font-weight: bold; font-size: 16px; color: #000; }
+                .qr-item .floor { margin: 5px 0 2px 0; font-size: 12px; color: #666; }
+                .qr-item .room { margin: 2px 0 10px 0; font-weight: bold; font-size: 14px; }
+                .qr-item .footer { margin: 10px 0 0 0; font-size: 10px; color: #999; }
                 @media print {
                     .qr-item { border: 1px solid #333; }
                 }
@@ -1612,34 +1601,6 @@ const printEvacuationPlan = () => {
         printWindow.print();
         printWindow.close();
     }, 250);
-};
-
-const logout = async () => {
-    // Set user as inactive in Firebase (keep FCM token for offline notifications)
-    try {
-        const userData = JSON.parse(localStorage.getItem('userData') || '{}');
-        if (userData.id) {
-            await setUserActiveStatus(userData.id, false);
-            console.log('[Logout] User marked as inactive in Firebase');
-        }
-    } catch (e) {
-        console.error('[Logout] Error setting user inactive:', e);
-    }
-
-    localStorage.removeItem('userData');
-    localStorage.removeItem('authToken');
-    localStorage.removeItem('token');
-    
-    try {
-        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
-        await fetch('/logout', {
-            method: 'POST',
-            headers: { 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' },
-            credentials: 'include'
-        });
-    } catch (e) { console.error('Logout error:', e); }
-    
-    window.location.href = '/login';
 };
 
 onMounted(() => {

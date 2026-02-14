@@ -20,10 +20,14 @@ class RescueRequest extends Model
         'room_id',
         'conversation_id',
         'description',
+        'original_description',
         'mobility_status',
         'injuries',
+        'original_injuries',
         'urgency_level',
         'additional_info',
+        'original_additional_info',
+        'is_translated',
         'media_attachments',
         'firstName',
         'lastName',
@@ -37,6 +41,7 @@ class RescueRequest extends Model
         'media_attachments' => 'array',
         'force_alert' => 'boolean',
         'force_alert_at' => 'datetime',
+        'is_translated' => 'boolean',
     ];
 
     /**

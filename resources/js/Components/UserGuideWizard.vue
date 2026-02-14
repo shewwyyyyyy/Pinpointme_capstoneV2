@@ -351,8 +351,16 @@ const updateSpotlight = async () => {
     
     const el = document.querySelector(target);
     if (el) {
-        // Scroll element into view if it's not visible
+        // Check if element is actually visible (not hidden by CSS like display:none on desktop)
         const rect = el.getBoundingClientRect();
+        if (rect.width === 0 && rect.height === 0) {
+            // Element exists but is hidden (e.g., bottom nav on web view)
+            spotlightRect.value = null;
+            cardPlacement.value = 'center';
+            return;
+        }
+
+        // Scroll element into view if it's not visible
         const viewH = window.innerHeight;
         if (rect.top < 0 || rect.bottom > viewH) {
             el.scrollIntoView({ behavior: 'smooth', block: 'center' });

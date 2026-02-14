@@ -194,7 +194,7 @@
                     <!-- Hero Section -->
                     <div class="scanner-hero">
                         <div class="hero-content">
-                            <v-icon size="56" color="white" class="mb-3">mdi-map-marker-radius</v-icon>
+                            <img src="/images/Icons/ppm_logo.png" alt="PinPointMe Logo" style="width: 80px; height: 80px; object-fit: contain; margin-bottom: 12px;" />
                             <h1>Emergency Scanner</h1>
                             <p>Scan your location or describe your emergency</p>
                         </div>
@@ -252,36 +252,6 @@
                             </div>
                         </v-alert>
 
-                        <!-- Location Status Card -->
-                        <v-card v-if="selectedBuilding || selectedFloor || selectedRoom" class="mb-4 rounded-xl location-status-card" :class="{ scanned: locationScanned }" elevation="0" ref="locationCard">
-                            <div class="location-status-header" :class="{ success: locationScanned }">
-                                <v-icon :color="locationScanned ? 'white' : 'primary'" size="24">
-                                    {{ locationScanned ? 'mdi-check-circle' : 'mdi-map-marker' }}
-                                </v-icon>
-                                <span>{{ locationScanned ? 'Location Scanned!' : 'Current Location' }}</span>
-                                <v-chip v-if="locationScanned" size="x-small" color="white" variant="flat" class="ml-auto">
-                                    <v-icon start size="12">mdi-qrcode-scan</v-icon>
-                                    QR
-                                </v-chip>
-                            </div>
-                            <v-card-text>
-                                <div class="location-chips">
-                                    <v-chip v-if="selectedBuilding" color="primary" variant="tonal" size="small">
-                                        <v-icon start size="14">mdi-office-building</v-icon>
-                                        {{ selectedBuilding.name }}
-                                    </v-chip>
-                                    <v-chip v-if="selectedFloor" color="secondary" variant="tonal" size="small">
-                                        <v-icon start size="14">mdi-stairs</v-icon>
-                                        {{ selectedFloor.floor_name }}
-                                    </v-chip>
-                                    <v-chip v-if="selectedRoom" color="success" variant="tonal" size="small">
-                                        <v-icon start size="14">mdi-door</v-icon>
-                                        {{ selectedRoom.room_name }}
-                                    </v-chip>
-                                </div>
-                            </v-card-text>
-                        </v-card>
-
                         <!-- Manual Location Selection -->
                         <v-card class="mb-4 rounded-xl manual-location-card" elevation="0">
                             <div class="manual-location-header">
@@ -294,6 +264,37 @@
                                 </div>
                             </div>
                             <v-card-text class="pt-3">
+                                <!-- Quick Search -->
+                                <v-row dense class="mb-3">
+                                    <v-col cols="12">
+                                        <v-autocomplete
+                                            v-model="searchSelectedRoom"
+                                            :items="allRoomsForSearch"
+                                            :item-title="item => `${item.room_name} (${item.building_name} - ${item.floor_name})`"
+                                            label="Quick Search Room"
+                                            variant="outlined"
+                                            density="comfortable"
+                                            return-object
+                                            clearable
+                                            @update:model-value="onSearchRoomSelect"
+                                            hide-details
+                                            prepend-inner-icon="mdi-magnify"
+                                            placeholder="Search by room name..."
+                                        >
+                                            <template v-slot:item="{ props, item }">
+                                                <v-list-item v-bind="props">
+                                                    <template v-slot:prepend>
+                                                        <v-icon>mdi-door</v-icon>
+                                                    </template>
+                                                    <v-list-item-title>{{ item.raw.room_name }}</v-list-item-title>
+                                                    <v-list-item-subtitle>{{ item.raw.building_name }} - {{ item.raw.floor_name }}</v-list-item-subtitle>
+                                                </v-list-item>
+                                            </template>
+                                        </v-autocomplete>
+                                    </v-col>
+                                </v-row>
+                                
+                                <!-- Manual Dropdowns -->
                                 <v-row dense>
                                     <v-col cols="12" sm="4">
                                         <v-select
@@ -382,13 +383,14 @@
                         <v-card id="emergency-form-section" class="mb-4 rounded-xl emergency-form-card" elevation="0">
                             <div class="emergency-form-header">
                                 <v-icon color="white" size="24" class="mr-2">mdi-alert-circle</v-icon>
-                                <span>Emergency Details</span>
-                                <v-chip v-if="canSubmit" size="x-small" color="white" variant="flat" class="ml-auto">
+                                <span>Emergency Details (Optional)</span>
+                                <v-chip v-if="hasLocation" size="x-small" color="white" variant="flat" class="ml-auto">
                                     <v-icon start size="12">mdi-check</v-icon>
                                     Ready
                                 </v-chip>
                             </div>
                             <v-card-text class="pt-4">
+                                
                                 <v-form ref="emergencyFormRef">
                                     <v-row dense>
                                         <v-col cols="12" class="pb-0">
@@ -400,65 +402,72 @@
                                         <v-col cols="6">
                                             <v-text-field
                                                 v-model="emergencyForm.firstName"
-                                                label="First Name"
+                                                label="First Name (Optional)"
                                                 variant="outlined"
                                                 density="comfortable"
                                                 prepend-inner-icon="mdi-account"
                                                 hide-details
-                                                placeholder="Person in need"
+                                                placeholder="Your first name"
                                             />
                                         </v-col>
                                         <v-col cols="6">
                                             <v-text-field
                                                 v-model="emergencyForm.lastName"
-                                                label="Last Name"
+                                                label="Last Name (Optional)"
                                                 variant="outlined"
                                                 density="comfortable"
                                                 prepend-inner-icon="mdi-account"
                                                 hide-details
-                                                placeholder="Person in need"
+                                                placeholder="Your last name"
                                             />
                                         </v-col>
                                         <v-col cols="12">
                                             <v-textarea
                                                 v-model="emergencyForm.description"
-                                                label="Describe your emergency"
+                                                label="Describe your emergency (Optional)"
                                                 variant="outlined"
                                                 rows="2"
                                                 prepend-inner-icon="mdi-text"
                                                 hide-details
                                                 class="mt-3"
+                                                placeholder="Briefly describe the situation if you can"
                                             />
+                                            <div class="text-caption text-grey mt-1 d-flex align-center">
+                                                <v-icon size="12" class="mr-1">mdi-translate</v-icon>
+                                                <span>Descriptions in other languages are automatically translated to English for rescuers</span>
+                                            </div>
                                         </v-col>
                                         <v-col cols="6">
                                             <v-select
                                                 v-model="emergencyForm.mobilityStatus"
                                                 :items="mobilityOptions"
-                                                label="Mobility"
+                                                label="Mobility (Optional)"
                                                 variant="outlined"
                                                 density="comfortable"
                                                 prepend-inner-icon="mdi-walk"
                                                 hide-details
                                                 class="mt-3"
+                                                clearable
                                             />
                                         </v-col>
                                         <v-col cols="6">
                                             <v-select
                                                 v-model="emergencyForm.urgencyLevel"
                                                 :items="urgencyOptions"
-                                                label="Urgency"
+                                                label="Urgency (Optional)"
                                                 variant="outlined"
                                                 density="comfortable"
                                                 prepend-inner-icon="mdi-speedometer"
                                                 hide-details
                                                 class="mt-3"
+                                                clearable
                                             />
                                         </v-col>
                                         <v-col cols="12">
                                             <v-select
                                                 v-model="emergencyForm.injuries"
                                                 :items="injuryOptions"
-                                                label="Injuries"
+                                                label="Injuries (Optional)"
                                                 variant="outlined"
                                                 density="comfortable"
                                                 prepend-inner-icon="mdi-medical-bag"
@@ -616,7 +625,6 @@
                                     variant="flat"
                                     block
                                     :loading="isSubmitting"
-                                    :disabled="!canSubmit"
                                     @click="submitRescueRequest"
                                     class="rounded-xl submit-btn"
                                     elevation="2"
@@ -1064,6 +1072,27 @@ const availableRooms = computed(() => {
     return selectedFloor.value?.rooms || [];
 });
 
+// All rooms for search autocomplete
+const allRoomsForSearch = computed(() => {
+    const rooms = [];
+    buildings.value.forEach(building => {
+        building.floors?.forEach(floor => {
+            floor.rooms?.forEach(room => {
+                rooms.push({
+                    ...room,
+                    building_id: building.id,
+                    building_name: building.name,
+                    floor_id: floor.id,
+                    floor_name: floor.floor_name,
+                    building_obj: building,
+                    floor_obj: floor
+                });
+            });
+        });
+    });
+    return rooms;
+});
+
 const hasFloorPlan = computed(() => {
     return selectedFloor.value?.floor_plan_url && selectedFloor.value?.floor_plan_data;
 });
@@ -1114,6 +1143,159 @@ const emergencyForm = ref({
     additionalInfo: '',
 });
 
+// Form Persistence Functions
+const FORM_STORAGE_KEY = 'emergency_form_data';
+const LOCATION_STORAGE_KEY = 'location_selection_data';
+const isRestoringData = ref(false); // Flag to prevent watchers from overwriting restored data
+
+const saveFormData = () => {
+    if (isRestoringData.value) return; // Skip saving during restoration
+    try {
+        const formData = {
+            emergencyForm: { ...emergencyForm.value },
+            mediaFiles: mediaFiles.value.map(file => ({
+                name: file.name,
+                size: file.size,
+                type: file.type
+            })),
+            timestamp: Date.now()
+        };
+        localStorage.setItem(FORM_STORAGE_KEY, JSON.stringify(formData));
+    } catch (error) {
+        console.warn('Failed to save form data:', error);
+    }
+};
+
+const saveLocationData = () => {
+    if (isRestoringData.value) return; // Skip saving during restoration
+    try {
+        const locationData = {
+            selectedBuilding: selectedBuilding.value ? { id: selectedBuilding.value.id, name: selectedBuilding.value.name } : null,
+            selectedFloor: selectedFloor.value ? { id: selectedFloor.value.id, name: selectedFloor.value.name } : null,
+            selectedRoom: selectedRoom.value ? { id: selectedRoom.value.id, room_name: selectedRoom.value.room_name, name: selectedRoom.value.name } : null,
+            locationScanned: locationScanned.value,
+            timestamp: Date.now()
+        };
+        localStorage.setItem(LOCATION_STORAGE_KEY, JSON.stringify(locationData));
+    } catch (error) {
+        console.warn('Failed to save location data:', error);
+    }
+};
+
+const restoreFormData = () => {
+    try {
+        const saved = localStorage.getItem(FORM_STORAGE_KEY);
+        if (!saved) return false;
+
+        const formData = JSON.parse(saved);
+        if (Date.now() - formData.timestamp > 24 * 60 * 60 * 1000) {
+            localStorage.removeItem(FORM_STORAGE_KEY);
+            return false;
+        }
+
+        const sf = formData.emergencyForm || {};
+        const hasContent = sf.description || sf.mobilityStatus || sf.urgencyLevel || sf.additionalInfo || (sf.injuries && sf.injuries.length > 0);
+        if (!hasContent) return false;
+
+        // Preserve authenticated user names
+        const authFirst = emergencyForm.value.firstName;
+        const authLast = emergencyForm.value.lastName;
+
+        emergencyForm.value = {
+            firstName: authFirst || sf.firstName || '',
+            lastName: authLast || sf.lastName || '',
+            description: sf.description || '',
+            mobilityStatus: sf.mobilityStatus || '',
+            urgencyLevel: sf.urgencyLevel || '',
+            injuries: Array.isArray(sf.injuries) ? [...sf.injuries] : [],
+            otherInjury: sf.otherInjury || '',
+            additionalInfo: sf.additionalInfo || '',
+        };
+
+       
+        return true;
+    } catch (error) {
+        console.warn('Failed to restore form data:', error);
+        localStorage.removeItem(FORM_STORAGE_KEY);
+        return false;
+    }
+};
+
+const restoreLocationData = async () => {
+    try {
+        const saved = localStorage.getItem(LOCATION_STORAGE_KEY);
+        if (saved) {
+            const locationData = JSON.parse(saved);
+            // Only restore if saved within last 24 hours
+            if (Date.now() - locationData.timestamp < 24 * 60 * 60 * 1000) {
+                // Wait for buildings to load first
+                await loadBuildings();
+                
+                if (locationData.selectedBuilding) {
+                    // Find building by ID in current buildings list
+                    const building = buildings.value.find(b => b.id === locationData.selectedBuilding.id);
+                    if (building) {
+                        selectedBuilding.value = building;
+                        
+                        if (locationData.selectedFloor) {
+                            const floor = building.floors?.find(f => f.id === locationData.selectedFloor.id);
+                            if (floor) {
+                                selectedFloor.value = floor;
+                                
+                                if (locationData.selectedRoom) {
+                                    const room = floor.rooms?.find(r => r.id === locationData.selectedRoom.id);
+                                    if (room) {
+                                        selectedRoom.value = room;
+                                        locationScanned.value = locationData.locationScanned || false;
+                                        
+                                        console.log(`Location restored: ${room.room_name || room.name}`);
+                                        return true;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            } else {
+                // Clear old data
+                localStorage.removeItem(LOCATION_STORAGE_KEY);
+            }
+        }
+        return false;
+    } catch (error) {
+        console.warn('Failed to restore location data:', error);
+        localStorage.removeItem(LOCATION_STORAGE_KEY);
+        return false;
+    }
+};
+
+const clearSavedData = () => {
+    localStorage.removeItem(FORM_STORAGE_KEY);
+    localStorage.removeItem(LOCATION_STORAGE_KEY);
+};
+
+// Manual form reset with clear saved data
+const resetFormData = () => {
+    emergencyForm.value = {
+        firstName: userData.value?.first_name || userData.value?.firstName || '',
+        lastName: userData.value?.last_name || userData.value?.lastName || '',
+        description: '',
+        mobilityStatus: '',
+        urgencyLevel: '',
+        injuries: [],
+        otherInjury: '',
+        additionalInfo: '',
+    };
+    mediaFiles.value = [];
+    selectedBuilding.value = null;
+    selectedFloor.value = null;
+    selectedRoom.value = null;
+    locationScanned.value = false;
+    
+    // Clear saved data when form is manually reset
+    clearSavedData();
+};
+
 // Media Attachments
 const mediaFiles = ref([]);
 const mediaInputRef = ref(null);
@@ -1155,6 +1337,10 @@ const injuryOptions = [
 // Submission
 const isSubmitting = ref(false);
 const canSubmit = computed(() => {
+    return true; // Allow submitting even without location - details can be updated later
+});
+
+const hasLocation = computed(() => {
     return selectedBuilding.value && selectedFloor.value && selectedRoom.value;
 });
 
@@ -1199,15 +1385,36 @@ onMounted(async () => {
     // Also save to localStorage for components that need it
     localStorage.setItem('userData', JSON.stringify(userData.value));
     
+    // Load buildings FIRST before checking active request
+    await loadBuildings();
+    
+    // Check if user has active rescue request FIRST
+    await checkActiveRescueRequest();
+    
+    // Block watchers from saving while we restore
+    isRestoringData.value = true;
+    
+    // Only restore saved data if there is NO completed/safe rescue
+    // (i.e., data from a finished rescue should not be restored)
+    const lastRescueStatus = activeRequest.value?.status;
+    const isRescueDone = !hasActiveRequest.value;
+    
+    if (!isRescueDone) {
+        // Active rescue exists - restore location and form data
+        await restoreLocationData();
+        restoreFormData();
+    } else {
+        // No active rescue - clear any stale saved data from previous rescues
+        clearSavedData();
+    }
+    
     // Pre-fill name from user data
     emergencyForm.value.firstName = userData.value.first_name || userData.value.firstName || '';
     emergencyForm.value.lastName = userData.value.last_name || userData.value.lastName || '';
     
-    // Load buildings FIRST before checking active request
-    await loadBuildings();
-    
-    // Check if user has active rescue request
-    await checkActiveRescueRequest();
+    // Allow watchers to save again after next tick
+    await nextTick();
+    isRestoringData.value = false;
     
     // Fetch conversations for notification count
     await fetchConversations();
@@ -1321,6 +1528,12 @@ const triggerStatusChangeNotification = (oldStatus, newStatus, request) => {
         'completed': { title: '✅ Rescue Completed', message: 'Your rescue has been marked as complete.', type: 'success', icon: 'mdi-check-circle' },
     };
     
+    // Clear emergency details when rescue is completed or marked as safe
+    if (['rescued', 'completed', 'safe'].includes(newStatus)) {
+        clearSavedData();
+        resetFormData();
+    }
+    
     const notification = statusMessages[newStatus];
     if (notification) {
         showPopupNotification(
@@ -1351,9 +1564,9 @@ const triggerNewMessageNotification = (newCount) => {
         () => goToInbox()
     );
     
-    // Browser notification for consistency
+    // Browser notification only if app is in background
     try {
-        if (Notification.permission === 'granted') {
+        if (document.hidden && Notification.permission === 'granted') {
             new Notification(`New message from ${senderName}`, {
                 body: lastMsg,
                 icon: '/icons/icon-192x192.png'
@@ -1363,7 +1576,25 @@ const triggerNewMessageNotification = (newCount) => {
 };
 
 // Show popup notification with sound and vibration
+const lastNotificationTime = ref(0);
+const notificationCooldown = 2000; // 2 seconds cooldown between notifications
+
 const showPopupNotification = (title, message, type = 'info', icon = 'mdi-bell', callback = null) => {
+    // Prevent duplicate notifications within cooldown period
+    const now = Date.now();
+    if (now - lastNotificationTime.value < notificationCooldown) {
+        console.log('[Notification] Skipped due to cooldown:', title);
+        return;
+    }
+    
+    // If a notification is already showing, don't show another one
+    if (popupAlert.value.show) {
+        console.log('[Notification] Skipped - notification already visible:', title);
+        return;
+    }
+    
+    lastNotificationTime.value = now;
+    
     popupAlert.value = {
         show: true,
         title,
@@ -1514,6 +1745,43 @@ const onFloorChange = () => {
     selectedRoom.value = null;
     locationScanned.value = false; // Reset scanned state when manually changing
 };
+
+// Handler for search room selection - auto-populates building and floor
+const onSearchRoomSelect = (room) => {
+    if (!room) {
+        // If cleared, don't change anything
+        return;
+    }
+    
+    // Find and set the building
+    const building = buildings.value.find(b => b.id === room.building_id);
+    if (building) {
+        selectedBuilding.value = building;
+        
+        // Find and set the floor
+        const floor = building.floors?.find(f => f.id === room.floor_id);
+        if (floor) {
+            selectedFloor.value = floor;
+            
+            // Set the room
+            const foundRoom = floor.rooms?.find(r => r.id === room.id);
+            if (foundRoom) {
+                selectedRoom.value = foundRoom;
+                locationScanned.value = false;
+            }
+        }
+    }
+};
+
+// Watch for form changes and save to localStorage
+watch(emergencyForm, () => {
+    saveFormData();
+}, { deep: true });
+
+// Watch for location changes and save to localStorage
+watch([selectedBuilding, selectedFloor, selectedRoom], () => {
+    saveLocationData();
+}, { deep: true });
 
 // Watch for room selection changes to draw evacuation path
 watch([selectedRoom, selectedFloor], () => {
@@ -2056,6 +2324,8 @@ const selectLocationFromQr = async (data) => {
                         if (room) {
                             selectedRoom.value = room;
                             console.log(`✅ SUCCESS! Location selected: ${building.name} > ${floor.floor_name} > ${room.room_name}`);
+                            // Save location data after successful QR scan
+                            saveLocationData();
                             return true;
                         } else {
                             console.warn(`⚠️ Room "${roomName}" not found in floor "${floor.floor_name}"`);
@@ -2086,6 +2356,8 @@ const selectLocationFromQr = async (data) => {
                     await nextTick();
                     selectedRoom.value = room;
                     console.log(`✅ SUCCESS! Found room globally: ${building.name} > ${floor.floor_name} > ${room.room_name}`);
+                    // Save location data after successful global room search
+                    saveLocationData();
                     return true;
                 }
             }
@@ -2110,6 +2382,8 @@ const selectLocationFromQr = async (data) => {
                     await nextTick();
                     selectedRoom.value = room;
                     console.log(`✅ SUCCESS! Found room by ID: ${building.name} > ${floor.floor_name} > ${room.room_name}`);
+                    // Save location data after successful room ID search
+                    saveLocationData();
                     return true;
                 }
             }
@@ -2579,6 +2853,9 @@ const processAudioTranscription = async (audioBlob) => {
                             locationApplied = true;
                             locationScanned.value = false; // Mark as voice input, not QR
                             
+                            // Save location data after AI extraction
+                            saveLocationData();
+                            
                             showNotification(
                                 `✅ Location detected: ${locationResult.building.name} → ${locationResult.floor.floor_name} → ${locationResult.room.room_name}`,
                                 'success'
@@ -2609,6 +2886,9 @@ const processAudioTranscription = async (audioBlob) => {
             if (emergencyResult.injuries.length > 0) {
                 emergencyForm.value.injuries = emergencyResult.injuries;
             }
+            
+            // Save form data after AI extraction
+            saveFormData();
             
             // Step 5: If no location found locally, try API extraction as fallback
             if (!locationResult.hasLocation) {
@@ -2745,9 +3025,9 @@ const submitRescueRequest = async () => {
             // Create FormData for file upload
             const formData = new FormData();
             formData.append('user_id', userData.value?.id);
-            formData.append('building_id', selectedBuilding.value.id);
-            formData.append('floor_id', selectedFloor.value.id);
-            formData.append('room_id', selectedRoom.value.id);
+            if (selectedBuilding.value) formData.append('building_id', selectedBuilding.value.id);
+            if (selectedFloor.value) formData.append('floor_id', selectedFloor.value.id);
+            if (selectedRoom.value) formData.append('room_id', selectedRoom.value.id);
             formData.append('description', emergencyForm.value.description || '');
             formData.append('mobility_status', emergencyForm.value.mobilityStatus || '');
             formData.append('urgency_level', emergencyForm.value.urgencyLevel || '');
@@ -2767,9 +3047,9 @@ const submitRescueRequest = async () => {
             // Regular JSON payload without files
             const payload = {
                 user_id: userData.value?.id,
-                building_id: selectedBuilding.value.id,
-                floor_id: selectedFloor.value.id,
-                room_id: selectedRoom.value.id,
+                building_id: selectedBuilding.value?.id || null,
+                floor_id: selectedFloor.value?.id || null,
+                room_id: selectedRoom.value?.id || null,
                 description: emergencyForm.value.description,
                 mobility_status: emergencyForm.value.mobilityStatus,
                 urgency_level: emergencyForm.value.urgencyLevel,
@@ -2788,6 +3068,9 @@ const submitRescueRequest = async () => {
             localStorage.setItem('lastRescueRequestTime', new Date().toISOString());
 
             showNotification('Rescue request submitted successfully!', 'success');
+            
+            // Clear saved form and location data after successful submission
+            clearSavedData();
             
             // Clear media files after successful submission
             clearMediaFiles();
@@ -2880,13 +3163,17 @@ const drawEvacuationPaths = () => {
         ctx.lineWidth = isSelectedRoom ? 3 : 1;
         ctx.strokeRect(room.x, room.y, room.width, room.height);
         
-        // Label
+        // Label - show "You are here" for selected room, room name for others
         if (room.room_name) {
-            ctx.fillStyle = '#000';
-            ctx.font = 'bold 14px Arial';
+            ctx.fillStyle = isSelectedRoom ? '#D32F2F' : '#000';
+            ctx.font = isSelectedRoom ? 'bold 16px Arial' : 'bold 14px Arial';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillText(room.room_name, room.x + room.width / 2, room.y + room.height / 2);
+            ctx.fillText(
+                isSelectedRoom ? '📍 You are here' : room.room_name,
+                room.x + room.width / 2,
+                room.y + room.height / 2
+            );
         }
     });
     
@@ -3038,6 +3325,11 @@ const handleMediaSelect = async (event) => {
     // Reset the input
     event.target.value = '';
     
+    // Save form data after media files are added
+    if (filesToAdd.length > 0) {
+        saveFormData();
+    }
+    
     if (filesToAdd.length > 0) {
         showNotification(`${filesToAdd.length} file(s) added`, 'success');
     }
@@ -3050,6 +3342,8 @@ const removeMediaFile = (index) => {
         URL.revokeObjectURL(file.preview);
     }
     mediaFiles.value.splice(index, 1);
+    // Save form data after removing media file
+    saveFormData();
 };
 
 // Preview a media file
@@ -3087,6 +3381,8 @@ const clearMediaFiles = () => {
         }
     });
     mediaFiles.value = [];
+    // Update saved form data when media files are cleared
+    saveFormData();
 };
 
 // ==================== End Media Attachment Functions ====================
@@ -3488,6 +3784,10 @@ const showNotification = (message, color = 'info') => {
 .hero-content {
     position: relative;
     z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
     text-align: center;
 }
 

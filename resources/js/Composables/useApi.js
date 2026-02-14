@@ -130,6 +130,17 @@ export async function markRescueSafe(rescueRequestId) {
     return apiFetch(`/api/rescue-requests/${rescueRequestId}/mark-safe`, { method: 'POST' });
 }
 
+export async function updateRescueRequest(rescueRequestId, payload) {
+    return apiFetch(`/api/rescue-requests/${rescueRequestId}`, {
+        method: 'PUT',
+        body: JSON.stringify(payload),
+    });
+}
+
+export async function translateRescueRequest(rescueRequestId) {
+    return apiFetch(`/api/rescue-requests/${rescueRequestId}/translate`, { method: 'POST' });
+}
+
 export async function getUserActiveRescueRequest(userId) {
     return apiFetch(`/api/users/${userId}/active-rescue`, { method: 'GET' });
 }

@@ -1859,11 +1859,13 @@ const handleLogout = async () => {
     localStorage.removeItem('authToken');
     localStorage.removeItem('token');
     localStorage.removeItem('userSettings');
+    localStorage.removeItem('rescuerSettings');
     localStorage.removeItem('lastRescueCode');
     localStorage.removeItem('lastRescueRequestId');
     localStorage.removeItem('lastRescueRequestTime');
     localStorage.removeItem('conversationId');
     localStorage.removeItem('chatId');
+    localStorage.removeItem('activeRescue');
     
     // Clear session storage
     sessionStorage.clear();

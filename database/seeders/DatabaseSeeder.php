@@ -24,6 +24,8 @@ class DatabaseSeeder extends Seeder
             // PinPointMe seeders
             UserSeeder::class,
             BuildingStructureSeeder::class, // Now uses GD 1, GD 2, GD 3
+            FloorSeeder::class,              // Seed floors from CSV
+            RoomSeeder::class,               // Seed rooms from CSV
             RescueRequestSeeder::class,
             ConversationMessagingSeeder::class,
             AuditTrailSeeder::class,

@@ -46,16 +46,7 @@
                     <span class="text-body-2 text-grey-darken-1 font-weight-medium">
                         {{ filteredMeasures.length }} {{ filteredMeasures.length === 1 ? 'video' : 'videos' }} found
                     </span>
-                    <v-btn 
-                        variant="text" 
-                        density="compact" 
-                        color="primary"
-                        prepend-icon="mdi-refresh"
-                        @click="fetchMeasures"
-                        size="small"
-                    >
-                        Refresh
-                    </v-btn>
+                     
                 </div>
 
                 <!-- Loading State -->

@@ -1,53 +1,8 @@
 <template>
     <v-app class="bg-grey-lighten-4">
 
-        <!-- App Bar (Unified) -->
-        <v-app-bar color="primary" elevation="2">
-            <v-app-bar-nav-icon @click="drawer = !drawer"></v-app-bar-nav-icon>
-            <v-app-bar-title>
-                <v-icon class="mr-2" color="white">mdi-shield-check</v-icon>
-                <span class="text-white font-weight-bold">PinPointMe Admin</span>
-            </v-app-bar-title>
-            <v-spacer />
-            <!-- Profile Avatar Menu -->
-            <v-menu offset-y>
-                <template v-slot:activator="{ props }">
-                    <v-btn icon v-bind="props">
-                        <v-avatar color="white" size="36">
-                            <span class="text-primary font-weight-bold">{{ adminInitials }}</span>
-                        </v-avatar>
-                    </v-btn>
-                </template>
-                <v-list>
-                    <v-list-item @click="goToProfile" prepend-icon="mdi-account">
-                        <v-list-item-title>Profile</v-list-item-title>
-                    </v-list-item>
-                    <v-list-item @click="toggleDarkMode" prepend-icon="mdi-theme-light-dark">
-                        <v-list-item-title>{{ isDark ? 'Light Mode' : 'Dark Mode' }}</v-list-item-title>
-                    </v-list-item>
-                    <v-list-item @click="logout" prepend-icon="mdi-logout">
-                        <v-list-item-title>Logout</v-list-item-title>
-                    </v-list-item>
-                </v-list>
-            </v-menu>
-        </v-app-bar>
-
-        <!-- Navigation Drawer (Unified) -->
-        <v-navigation-drawer
-            v-model="drawer"
-            :permanent="!isMobile"
-            :temporary="isMobile"
-            app
-        >
-            <v-list>
-                <v-list-item prepend-icon="mdi-view-dashboard" title="Dashboard" href="/admin/dashboard" @click="closeDrawerOnMobile"></v-list-item>
-                <v-list-item prepend-icon="mdi-account-group" title="Users" href="/admin/users" @click="closeDrawerOnMobile"></v-list-item>
-                <v-list-item prepend-icon="mdi-lifebuoy" title="Rescuers" href="/admin/rescuers" @click="closeDrawerOnMobile"></v-list-item>
-                <v-list-item prepend-icon="mdi-office-building" title="Buildings" href="/admin/buildings" @click="closeDrawerOnMobile"></v-list-item>
-                <v-list-item prepend-icon="mdi-file-chart" title="Reports" href="/admin/reports" active @click="closeDrawerOnMobile"></v-list-item>
-                <v-list-item prepend-icon="mdi-shield-alert" title="Preventive Measures" href="/admin/preventive-measures" @click="closeDrawerOnMobile"></v-list-item>
-            </v-list>
-        </v-navigation-drawer>
+        <!-- Admin App Bar -->
+        <AdminAppBar activePage="reports" />
 
         <!-- Main Content -->
         <v-main>
@@ -64,7 +19,7 @@
                 <v-card rounded="lg" class="mb-6">
                     <v-card-text>
                         <v-row align="center">
-                            <v-col cols="12" md="3">
+                            <v-col cols="12" sm="6" md="3">
                                 <v-select
                                     v-model="timeFilter"
                                     :items="timeFilters"
@@ -77,7 +32,7 @@
                                     @update:model-value="fetchReports"
                                 />
                             </v-col>
-                            <v-col cols="12" md="3">
+                            <v-col cols="12" sm="6" md="3">
                                 <v-select
                                     v-model="statusFilter"
                                     :items="statusFilters"
@@ -90,7 +45,7 @@
                                     @update:model-value="fetchReports"
                                 />
                             </v-col>
-                            <v-col cols="12" md="3">
+                            <v-col cols="12" md="6">
                                 <v-text-field
                                     v-model="search"
                                     prepend-inner-icon="mdi-magnify"
@@ -101,12 +56,14 @@
                                     clearable
                                 />
                             </v-col>
-                            <v-col cols="12" md="3" class="d-flex gap-2">
-                                <v-btn variant="outlined" @click="resetFilters">
+                        </v-row>
+                        <v-row class="mt-2">
+                            <v-col cols="12" class="d-flex gap-2 justify-end">
+                                <v-btn variant="outlined" @click="resetFilters" size="default">
                                     <v-icon start>mdi-filter-off</v-icon>
                                     Reset
                                 </v-btn>
-                                <v-btn color="error" @click="exportToPDF" :loading="exporting">
+                                <v-btn color="error" @click="openExportDialog" :loading="exporting" size="default">
                                     <v-icon start>mdi-file-pdf-box</v-icon>
                                     Export PDF
                                 </v-btn>
@@ -115,89 +72,7 @@
                     </v-card-text>
                 </v-card>
 
-                <!-- Enhanced Stats Cards -->
-                <v-row class="mb-6">
-                    <v-col cols="12" sm="6" md="3">
-                        <v-card class="stat-card stat-card-primary" rounded="xl" elevation="4">
-                            <div class="stat-card-overlay"></div>
-                            <v-card-text class="position-relative pa-4">
-                                <div class="d-flex align-center justify-space-between">
-                                    <div>
-                                        <p class="text-white text-caption mb-1 opacity-80">Total Requests</p>
-                                        <h2 class="text-h3 font-weight-bold text-white">{{ counts.total }}</h2>
-                                        <v-chip color="rgba(255,255,255,0.2)" size="x-small" class="mt-2 text-white">
-                                            <v-icon start size="12">mdi-trending-up</v-icon>
-                                            {{ timeFilter === 'day' ? 'Today' : timeFilter === 'week' ? 'This Week' : timeFilter === 'month' ? 'This Month' : 'This Year' }}
-                                        </v-chip>
-                                    </div>
-                                    <v-avatar size="56" color="rgba(255,255,255,0.2)">
-                                        <v-icon size="32" color="white">mdi-alert-circle-outline</v-icon>
-                                    </v-avatar>
-                                </div>
-                            </v-card-text>
-                        </v-card>
-                    </v-col>
-                    <v-col cols="12" sm="6" md="3">
-                        <v-card class="stat-card stat-card-warning" rounded="xl" elevation="4">
-                            <div class="stat-card-overlay"></div>
-                            <v-card-text class="position-relative pa-4">
-                                <div class="d-flex align-center justify-space-between">
-                                    <div>
-                                        <p class="text-white text-caption mb-1 opacity-80">Pending</p>
-                                        <h2 class="text-h3 font-weight-bold text-white">{{ counts.pending }}</h2>
-                                        <v-chip color="rgba(255,255,255,0.2)" size="x-small" class="mt-2 text-white">
-                                            <v-icon start size="12">mdi-clock-outline</v-icon>
-                                            {{ getPercentage(counts.pending) }}% of total
-                                        </v-chip>
-                                    </div>
-                                    <v-avatar size="56" color="rgba(255,255,255,0.2)">
-                                        <v-icon size="32" color="white">mdi-clock-alert-outline</v-icon>
-                                    </v-avatar>
-                                </div>
-                            </v-card-text>
-                        </v-card>
-                    </v-col>
-                    <v-col cols="12" sm="6" md="3">
-                        <v-card class="stat-card stat-card-info" rounded="xl" elevation="4">
-                            <div class="stat-card-overlay"></div>
-                            <v-card-text class="position-relative pa-4">
-                                <div class="d-flex align-center justify-space-between">
-                                    <div>
-                                        <p class="text-white text-caption mb-1 opacity-80">In Progress</p>
-                                        <h2 class="text-h3 font-weight-bold text-white">{{ counts.in_progress }}</h2>
-                                        <v-chip color="rgba(255,255,255,0.2)" size="x-small" class="mt-2 text-white">
-                                            <v-icon start size="12">mdi-run-fast</v-icon>
-                                            {{ getPercentage(counts.in_progress) }}% of total
-                                        </v-chip>
-                                    </div>
-                                    <v-avatar size="56" color="rgba(255,255,255,0.2)">
-                                        <v-icon size="32" color="white">mdi-progress-clock</v-icon>
-                                    </v-avatar>
-                                </div>
-                            </v-card-text>
-                        </v-card>
-                    </v-col>
-                    <v-col cols="12" sm="6" md="3">
-                        <v-card class="stat-card stat-card-success" rounded="xl" elevation="4">
-                            <div class="stat-card-overlay"></div>
-                            <v-card-text class="position-relative pa-4">
-                                <div class="d-flex align-center justify-space-between">
-                                    <div>
-                                        <p class="text-white text-caption mb-1 opacity-80">Completed</p>
-                                        <h2 class="text-h3 font-weight-bold text-white">{{ counts.completed }}</h2>
-                                        <v-chip color="rgba(255,255,255,0.2)" size="x-small" class="mt-2 text-white">
-                                            <v-icon start size="12">mdi-check-all</v-icon>
-                                            {{ getPercentage(counts.completed) }}% success rate
-                                        </v-chip>
-                                    </div>
-                                    <v-avatar size="56" color="rgba(255,255,255,0.2)">
-                                        <v-icon size="32" color="white">mdi-check-circle-outline</v-icon>
-                                    </v-avatar>
-                                </div>
-                            </v-card-text>
-                        </v-card>
-                    </v-col>
-                </v-row>
+                 
 
                 <!-- Reports Table -->
                 <v-card rounded="lg">
@@ -367,6 +242,43 @@
             </v-card>
         </v-dialog>
 
+        <!-- Export Options Dialog -->
+        <v-dialog v-model="exportDialog" max-width="420" persistent>
+            <v-card rounded="xl">
+                <v-card-title class="d-flex align-center bg-error pa-4">
+                    <v-icon color="white" class="mr-2">mdi-file-pdf-box</v-icon>
+                    <span class="text-white font-weight-bold">Export to PDF</span>
+                </v-card-title>
+                <v-divider></v-divider>
+                <v-card-text class="pa-5">
+                    <p class="text-body-2 text-grey-darken-1 mb-4">Select the time period for the report export:</p>
+                    <v-select
+                        v-model="exportTimeFilter"
+                        :items="timeFilters"
+                        item-title="label"
+                        item-value="value"
+                        variant="outlined"
+                        density="comfortable"
+                        rounded="lg"
+                        label="Time Period"
+                        prepend-inner-icon="mdi-calendar-range"
+                    ></v-select>
+                     
+                </v-card-text>
+                <v-divider></v-divider>
+                <v-card-actions class="pa-4">
+                    <v-spacer></v-spacer>
+                    <v-btn variant="text" @click="exportDialog = false" :disabled="exporting">
+                        Cancel
+                    </v-btn>
+                    <v-btn color="error" variant="flat" @click="confirmExport" :loading="exporting" rounded="lg">
+                        <v-icon start>mdi-download</v-icon>
+                        Export
+                    </v-btn>
+                </v-card-actions>
+            </v-card>
+        </v-dialog>
+
         <!-- Snackbar -->
         <v-snackbar v-model="snackbar" :color="snackbarColor" timeout="3000">
             {{ snackbarText }}
@@ -375,36 +287,20 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
-import { router } from '@inertiajs/vue3';
+import { ref, computed } from 'vue';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { useDisplay } from 'vuetify';
-import { setUserActiveStatus } from '@/Utilities/firebase';
+import AdminAppBar from '@/Components/AdminAppBar.vue';
 
 const { mobile } = useDisplay();
 const isMobile = computed(() => mobile.value);
-
-const isDark = ref(false);
-const toggleDarkMode = () => {
-    isDark.value = !isDark.value;
-    document.documentElement.classList.toggle('v-theme--dark', isDark.value);
-};
-const goToProfile = () => {
-    window.location.href = '/admin/profile';
-};
-const closeDrawerOnMobile = () => {
-    if (isMobile.value) {
-        drawer.value = false;
-    }
-};
 
 const props = defineProps({
     reportData: { type: Array, default: () => [] },
     counts: { type: Object, default: () => ({ total: 0, pending: 0, in_progress: 0, completed: 0 }) }
 });
 
-const drawer = ref(!mobile.value);
 const loading = ref(false);
 const exporting = ref(false);
 const search = ref('');
@@ -415,18 +311,12 @@ const selectedReport = ref(null);
 const snackbar = ref(false);
 const snackbarText = ref('');
 const snackbarColor = ref('success');
+const exportDialog = ref(false);
+const exportTimeFilter = ref('day');
+const exportReportData = ref([]);
 
 const reportsList = ref(props.reportData || []);
 const counts = ref(props.counts);
-
-// Admin initials for profile
-const adminInitials = computed(() => {
-    const userData = JSON.parse(localStorage.getItem('userData') || '{}');
-    if (userData.first_name && userData.last_name) {
-        return `${userData.first_name[0]}${userData.last_name[0]}`.toUpperCase();
-    }
-    return 'AD';
-});
 
 // Calculate percentage helper
 const getPercentage = (value) => {
@@ -443,9 +333,8 @@ const timeFilters = [
 
 const statusFilters = [
     { label: 'All Status', value: 'all' },
-    { label: 'Pending', value: 'pending' },
+    { label: 'Need Help', value: 'need_help' },
     { label: 'In Progress', value: 'in_progress' },
-    { label: 'Completed', value: 'completed' },
     { label: 'Rescued', value: 'rescued' }
 ];
 
@@ -463,10 +352,12 @@ const headers = [
 const filteredData = computed(() => {
     let data = reportsList.value;
     if (statusFilter.value !== 'all') {
-        if (statusFilter.value === 'in_progress') {
+        if (statusFilter.value === 'need_help') {
+            data = data.filter(r => r.status === 'pending');
+        } else if (statusFilter.value === 'in_progress') {
             data = data.filter(r => ['accepted', 'in_progress', 'en_route'].includes(r.status));
-        } else {
-            data = data.filter(r => r.status === statusFilter.value);
+        } else if (statusFilter.value === 'rescued') {
+            data = data.filter(r => ['rescued', 'completed', 'safe'].includes(r.status));
         }
     }
     return data;
@@ -475,9 +366,9 @@ const filteredData = computed(() => {
 const statusDistribution = computed(() => {
     const total = reportsList.value.length || 1;
     return [
-        { name: 'Pending', count: counts.value.pending, percentage: Math.round((counts.value.pending / total) * 100), color: 'warning' },
+        { name: 'Need Help', count: counts.value.pending, percentage: Math.round((counts.value.pending / total) * 100), color: 'warning' },
         { name: 'In Progress', count: counts.value.in_progress, percentage: Math.round((counts.value.in_progress / total) * 100), color: 'info' },
-        { name: 'Completed', count: counts.value.completed, percentage: Math.round((counts.value.completed / total) * 100), color: 'success' }
+        { name: 'Rescued', count: counts.value.completed, percentage: Math.round((counts.value.completed / total) * 100), color: 'success' }
     ];
 });
 
@@ -527,7 +418,47 @@ const viewDetails = (item) => {
     detailsDialog.value = true;
 };
 
-const exportToPDF = async () => {
+const getExportRecordCount = computed(() => {
+    return exportReportData.value.length;
+});
+
+const openExportDialog = () => {
+    exportTimeFilter.value = timeFilter.value;
+    exportReportData.value = filteredData.value;
+    exportDialog.value = true;
+};
+
+const confirmExport = async () => {
+    // Fetch data for selected time period if different from current
+    if (exportTimeFilter.value !== timeFilter.value) {
+        try {
+            exporting.value = true;
+            const params = new URLSearchParams();
+            params.append('time_filter', exportTimeFilter.value);
+            if (statusFilter.value !== 'all') params.append('status_filter', statusFilter.value);
+            
+            const response = await fetch(`/admin/reports?${params}`, {
+                headers: { 'Accept': 'application/json' }
+            });
+            const data = await response.json();
+            if (data.success) {
+                exportReportData.value = data.data;
+                await exportToPDF(exportReportData.value, exportTimeFilter.value);
+            }
+        } catch (error) {
+            console.error('Error fetching export data:', error);
+            showSnackbar('Export failed', 'error');
+        } finally {
+            exporting.value = false;
+            exportDialog.value = false;
+        }
+    } else {
+        await exportToPDF(filteredData.value, exportTimeFilter.value);
+        exportDialog.value = false;
+    }
+};
+
+const exportToPDF = async (data, timePeriod) => {
     exporting.value = true;
     try {
         const doc = new jsPDF('p', 'mm', 'a4');
@@ -556,14 +487,14 @@ const exportToPDF = async () => {
         doc.text(`Generated: ${reportDate}`, 14, 28);
         
         // Time period filter
-        const periodText = timeFilter.value === 'day' ? 'Today' : 
-                          timeFilter.value === 'week' ? 'This Week' : 
-                          timeFilter.value === 'month' ? 'This Month' : 'This Year';
+        const periodText = timePeriod === 'day' ? 'Today' : 
+                          timePeriod === 'week' ? 'This Week' : 
+                          timePeriod === 'month' ? 'This Month' : 'This Year';
         doc.text(`Period: ${periodText}`, pageWidth - 60, 28);
         
         // Table headers and data
         const tableColumn = ['Code', 'Reported By', 'Location', 'Time', 'Date', 'Status', 'Urgency', 'Rescuer'];
-        const tableRows = filteredData.value.map(r => [
+        const tableRows = data.map(r => [
             r.rescue_code || '',
             r.name || '',
             r.location || '',
@@ -644,34 +575,6 @@ const showSnackbar = (text, color) => {
     snackbar.value = true;
 };
 
-const logout = async () => {
-    // Set user as inactive in Firebase (keep FCM token for offline notifications)
-    try {
-        const userData = JSON.parse(localStorage.getItem('userData') || '{}');
-        if (userData.id) {
-            await setUserActiveStatus(userData.id, false);
-            console.log('[Logout] User marked as inactive in Firebase');
-        }
-    } catch (e) {
-        console.error('[Logout] Error setting user inactive:', e);
-    }
-
-    localStorage.removeItem('userData');
-    localStorage.removeItem('authToken');
-    localStorage.removeItem('token');
-    
-    try {
-        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
-        await fetch('/logout', {
-            method: 'POST',
-            headers: { 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' },
-            credentials: 'include'
-        });
-    } catch (e) { console.error('Logout error:', e); }
-    
-    window.location.href = '/login';
-};
-
 const getInitials = (name) => {
     if (!name) return '?';
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
@@ -685,13 +588,24 @@ const getStatusColor = (status) => {
         en_route: 'info',
         rescued: 'success',
         completed: 'success',
+        safe: 'success',
         cancelled: 'error'
     };
     return colors[status] || 'grey';
 };
 
 const formatStatus = (status) => {
-    return status?.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) || 'Unknown';
+    const labels = {
+        pending: 'Need Help',
+        accepted: 'In Progress',
+        in_progress: 'In Progress',
+        en_route: 'In Progress',
+        rescued: 'Rescued',
+        completed: 'Rescued',
+        safe: 'Rescued',
+        cancelled: 'Cancelled'
+    };
+    return labels[status] || status?.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) || 'Unknown';
 };
 
 const getUrgencyColor = (urgency) => {
@@ -703,10 +617,6 @@ const getUrgencyColor = (urgency) => {
     };
     return colors[urgency] || 'grey';
 };
-
-onMounted(() => {
-    // Data comes from Inertia props
-});
 </script>
 
 <style scoped>

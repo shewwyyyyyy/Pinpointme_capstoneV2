@@ -9,10 +9,10 @@
             <template v-slot:prepend>
                 <v-avatar color="white" size="48">
                     <v-img v-if="profilePictureUrl" :src="profilePictureUrl" cover />
-                    <span v-else class="text-h6" style="color: #3674B5;">{{ getInitials(userName) }}</span>
+                    <span v-else class="text-h6" style="color: #3674B5;">{{ getInitials('PinPointMe') }}</span>
                 </v-avatar>
             </template>
-            <v-list-item-title class="font-weight-bold text-white">{{ userName }}</v-list-item-title>
+            <v-list-item-title class="font-weight-bold text-white">PinPointMe</v-list-item-title>
             <v-list-item-subtitle class="text-white-darken-1">{{ userEmail }}</v-list-item-subtitle>
         </v-list-item>
 

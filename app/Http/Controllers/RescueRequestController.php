@@ -7,8 +7,10 @@ use App\Models\Floor;
 use App\Models\Room;
 use App\Models\RescueRequest;
 use App\Services\PushNotificationService;
+use App\Services\TranslationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
@@ -132,6 +134,9 @@ class RescueRequestController extends Controller
             
             $data['media_attachments'] = $mediaAttachments;
         }
+
+        // Translate text fields to English for rescuers
+        $data = $this->translateTextFields($data);
 
         $rescueRequest = RescueRequest::create($data);
 
@@ -387,6 +392,9 @@ class RescueRequestController extends Controller
         $data = $request->only([
             'assigned_rescuer',
             'status',
+            'building_id',
+            'floor_id',
+            'room_id',
             'description',
             'mobility_status',
             'injuries',
@@ -397,6 +405,9 @@ class RescueRequestController extends Controller
         $validator = Validator::make($data, [
             'assigned_rescuer' => 'nullable|exists:users,id',
             'status' => 'nullable|string|in:pending,assigned,in_progress,rescued,safe,completed,cancelled',
+            'building_id' => 'nullable|exists:buildings,id',
+            'floor_id' => 'nullable|exists:floors,id',
+            'room_id' => 'nullable|exists:rooms,id',
             'description' => 'nullable|string',
             'mobility_status' => 'nullable|string',
             'injuries' => 'nullable|string',
@@ -419,12 +430,66 @@ class RescueRequestController extends Controller
         try {
             $rescueRequest = RescueRequest::findOrFail($id);
             
+            // Check if rescuer is available (not off_duty or unavailable)
+            if (isset($data['assigned_rescuer']) && $data['assigned_rescuer'] !== $rescueRequest->assigned_rescuer) {
+                $rescuer = \App\Models\User::find($data['assigned_rescuer']);
+                if ($rescuer && $rescuer->role === 'rescuer') {
+                    // Check if rescuer can accept new requests
+                    if (in_array($rescuer->status, ['off_duty', 'unavailable'])) {
+                        if ($request->expectsJson() || $request->is('api/*')) {
+                            return response()->json([
+                                'success' => false,
+                                'message' => 'Rescuer is currently ' . str_replace('_', ' ', $rescuer->status) . ' and cannot accept rescue requests.'
+                            ], 422);
+                        }
+                        return redirect()->back()->with('error', 'Rescuer is not available.');
+                    }
+                    
+                    // Check if rescuer already has an active rescue
+                    $hasActiveRescue = RescueRequest::where('assigned_rescuer', $rescuer->id)
+                        ->whereIn('status', ['assigned', 'in_progress', 'en_route'])
+                        ->where('id', '!=', $id)
+                        ->exists();
+                    
+                    if ($hasActiveRescue) {
+                        if ($request->expectsJson() || $request->is('api/*')) {
+                            return response()->json([
+                                'success' => false,
+                                'message' => 'Rescuer already has an active rescue assignment.'
+                            ], 422);
+                        }
+                        return redirect()->back()->with('error', 'Rescuer already has an active rescue.');
+                    }
+                }
+            }
+            
             // Update timestamp for status changes
             if (isset($data['status']) && $data['status'] !== $rescueRequest->status) {
                 $data['updated_at'] = now();
             }
             
             $rescueRequest->update($data);
+            
+            // Update rescuer's status when rescue request status changes
+            if (isset($data['assigned_rescuer'])) {
+                $rescuer = \App\Models\User::find($data['assigned_rescuer']);
+                if ($rescuer && $rescuer->role === 'rescuer') {
+                    // Set rescuer status to 'on_rescue' when assigned
+                    $rescuer->update(['status' => 'on_rescue']);
+                }
+            } elseif (isset($data['status']) && $rescueRequest->assigned_rescuer) {
+                $rescuer = \App\Models\User::find($rescueRequest->assigned_rescuer);
+                if ($rescuer && $rescuer->role === 'rescuer') {
+                    // If rescue is completed, rescued, safe, or cancelled, set rescuer back to available
+                    if (in_array($data['status'], ['completed', 'rescued', 'safe', 'cancelled'])) {
+                        $rescuer->update(['status' => 'available']);
+                    }
+                    // If rescue is assigned or in_progress, ensure rescuer is on_rescue
+                    elseif (in_array($data['status'], ['assigned', 'in_progress'])) {
+                        $rescuer->update(['status' => 'on_rescue']);
+                    }
+                }
+            }
             
             // Load relationships for API response
             $rescueRequest->load(['building', 'floor', 'room', 'requester', 'rescuer']);
@@ -595,6 +660,91 @@ class RescueRequestController extends Controller
         }
 
         return false;
+    }
+
+    /**
+     * Translate text fields to English for rescuers.
+     * Stores originals in original_* columns and overwrites main columns with English.
+     */
+    private function translateTextFields(array $data): array
+    {
+        try {
+            $translationService = app(TranslationService::class);
+            $fieldsToCheck = ['description', 'additional_info', 'injuries'];
+
+            $hasNonEnglish = false;
+
+            foreach ($fieldsToCheck as $field) {
+                if (!empty($data[$field]) && is_string($data[$field])) {
+                    if (!$translationService->isLikelyEnglish($data[$field])) {
+                        $hasNonEnglish = true;
+                        break;
+                    }
+                }
+            }
+
+            // Just flag whether the text is non-English; don't auto-translate
+            $data['is_translated'] = $hasNonEnglish;
+        } catch (\Exception $e) {
+            Log::error('Language detection failed during rescue request creation', [
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        return $data;
+    }
+
+    /**
+     * Translate a rescue request's text fields on-demand.
+     *
+     * @param  \App\Models\RescueRequest  $rescueRequest
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function translateRequest(RescueRequest $rescueRequest)
+    {
+        try {
+            $translationService = app(TranslationService::class);
+            $fieldsToTranslate = [
+                'description'     => 'original_description',
+                'additional_info' => 'original_additional_info',
+                'injuries'        => 'original_injuries',
+            ];
+
+            $translations = [];
+
+            foreach ($fieldsToTranslate as $field => $originalField) {
+                if (!empty($rescueRequest->$field) && is_string($rescueRequest->$field)) {
+                    if (!$translationService->isLikelyEnglish($rescueRequest->$field)) {
+                        // Preserve original and translate
+                        $original = $rescueRequest->$field;
+                        $translated = $translationService->translateToEnglish($original);
+                        
+                        $rescueRequest->$originalField = $original;
+                        $rescueRequest->$field = $translated;
+                        $translations[$field] = $translated;
+                    }
+                }
+            }
+
+            $rescueRequest->save();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Translation completed',
+                'translations' => $translations,
+                'data' => $rescueRequest->fresh(['building', 'floor', 'room', 'rescuer', 'requester']),
+            ]);
+        } catch (\Exception $e) {
+            Log::error('On-demand translation failed', [
+                'rescue_request_id' => $rescueRequest->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Translation failed: ' . $e->getMessage(),
+            ], 500);
+        }
     }
 
     /**

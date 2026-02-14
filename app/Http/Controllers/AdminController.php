@@ -31,7 +31,7 @@ class AdminController extends Controller
             'total' => $rescueRequests->count(),
             'pending' => $rescueRequests->where('status', 'pending')->count(),
             'in_progress' => $rescueRequests->whereIn('status', ['accepted', 'in_progress', 'en_route'])->count(),
-            'completed' => $rescueRequests->whereIn('status', ['completed', 'rescued'])->count(),
+            'completed' => $rescueRequests->whereIn('status', ['completed', 'rescued', 'safe'])->count(),
         ];
 
         // Rescues by building
@@ -45,13 +45,32 @@ class AdminController extends Controller
                 'count' => $item->count
             ]);
 
-        // Rescuer statistics
+        // Rescuer statistics - count based on actual assignments
         $rescuers = User::where('role', 'rescuer')->get();
+        
+        // Count rescuers with active assignments (assigned, in_progress, en_route)
+        $activeRescueCount = RescueRequest::whereIn('status', ['assigned', 'in_progress', 'en_route'])
+            ->whereNotNull('assigned_rescuer')
+            ->distinct('assigned_rescuer')
+            ->count('assigned_rescuer');
+        
+        // Available rescuers are those with 'available' status OR no active assignments
+        $availableCount = $rescuers->filter(function($rescuer) {
+            // Check if rescuer has any active rescue assignments
+            $hasActiveRescue = RescueRequest::where('assigned_rescuer', $rescuer->id)
+                ->whereIn('status', ['assigned', 'in_progress', 'en_route'])
+                ->exists();
+            
+            // Available if status is 'available' AND no active rescues
+            return $rescuer->status === 'available' && !$hasActiveRescue;
+        })->count();
+        
         $rescuerStats = [
             'total' => $rescuers->count(),
-            'available' => $rescuers->where('status', 'available')->count(),
-            'on_rescue' => $rescuers->where('status', 'on_rescue')->count(),
+            'available' => $availableCount,
+            'on_rescue' => $activeRescueCount,
             'off_duty' => $rescuers->where('status', 'off_duty')->count(),
+            'unavailable' => $rescuers->where('status', 'unavailable')->count(),
         ];
 
         // Recent alerts (recent rescue requests)
@@ -179,12 +198,28 @@ class AdminController extends Controller
 
         $rescuers = $query->orderBy('created_at', 'desc')->paginate($request->get('per_page', 50));
 
+        // Count rescuers with active rescue assignments
+        $activeRescueCount = RescueRequest::whereIn('status', ['assigned', 'in_progress', 'en_route'])
+            ->whereNotNull('assigned_rescuer')
+            ->distinct('assigned_rescuer')
+            ->count('assigned_rescuer');
+        
+        $allRescuers = User::where('role', 'rescuer')->get();
+        
+        // Available rescuers have 'available' status AND no active assignments
+        $availableCount = $allRescuers->filter(function($rescuer) {
+            $hasActiveRescue = RescueRequest::where('assigned_rescuer', $rescuer->id)
+                ->whereIn('status', ['assigned', 'in_progress', 'en_route'])
+                ->exists();
+            return $rescuer->status === 'available' && !$hasActiveRescue;
+        })->count();
+        
         $counts = [
-            'total' => User::where('role', 'rescuer')->count(),
-            'available' => User::where('role', 'rescuer')->where('status', 'available')->count(),
-            'on_rescue' => User::where('role', 'rescuer')->where('status', 'on_rescue')->count(),
-            'off_duty' => User::where('role', 'rescuer')->where('status', 'off_duty')->count(),
-            'unavailable' => User::where('role', 'rescuer')->where('status', 'unavailable')->count(),
+            'total' => $allRescuers->count(),
+            'available' => $availableCount,
+            'on_rescue' => $activeRescueCount,
+            'off_duty' => $allRescuers->where('status', 'off_duty')->count(),
+            'unavailable' => $allRescuers->where('status', 'unavailable')->count(),
         ];
 
         // Get recent audit trail for rescuers
@@ -235,7 +270,15 @@ class AdminController extends Controller
             ->where('created_at', '>=', $startDate);
 
         if ($statusFilter !== 'all') {
-            $query->where('status', $statusFilter);
+            if ($statusFilter === 'need_help') {
+                $query->where('status', 'pending');
+            } elseif ($statusFilter === 'in_progress') {
+                $query->whereIn('status', ['accepted', 'in_progress', 'en_route']);
+            } elseif ($statusFilter === 'rescued') {
+                $query->whereIn('status', ['rescued', 'completed', 'safe']);
+            } else {
+                $query->where('status', $statusFilter);
+            }
         }
 
         $rescueRequests = $query->orderBy('created_at', 'desc')->get();
@@ -258,7 +301,7 @@ class AdminController extends Controller
             'total' => $rescueRequests->count(),
             'pending' => $rescueRequests->where('status', 'pending')->count(),
             'in_progress' => $rescueRequests->whereIn('status', ['accepted', 'in_progress', 'en_route'])->count(),
-            'completed' => $rescueRequests->whereIn('status', ['completed', 'rescued'])->count(),
+            'completed' => $rescueRequests->whereIn('status', ['completed', 'rescued', 'safe'])->count(),
         ];
 
         if ($request->expectsJson() || $request->is('api/*')) {
@@ -282,7 +325,7 @@ class AdminController extends Controller
             'last_name' => 'required|string|max:255',
             'email' => 'required|email|unique:users,email',
             'role' => 'required|in:student,faculty,staff',
-            'phone' => 'nullable|string',
+            'phone' => 'nullable|string|regex:/^09[0-9]{9}$/|size:11',
             'student_id' => 'nullable|string',
             'faculty_id' => 'nullable|string',
             'staff_id' => 'nullable|string',
@@ -398,10 +441,10 @@ class AdminController extends Controller
             'last_name' => 'sometimes|string|max:255',
             'email' => 'sometimes|email|unique:users,email,' . $id,
             'role' => 'sometimes|in:student,faculty,staff,rescuer',
-            'status' => 'sometimes|string',
-            'phone' => 'nullable|string',
-            'phone_number' => 'nullable|string',
-            'contact_number' => 'nullable|string',
+            'status' => 'sometimes|string|in:available,on_rescue,off_duty,unavailable,pending',
+            'phone' => 'nullable|string|regex:/^09[0-9]{9}$/|size:11',
+            'phone_number' => 'nullable|string|regex:/^09[0-9]{9}$/|size:11',
+            'contact_number' => 'nullable|string|regex:/^09[0-9]{9}$/|size:11',
             'student_id' => 'nullable|string|size:9',
             'faculty_id' => 'nullable|string|size:9',
             'staff_id' => 'nullable|string|size:9',
@@ -480,7 +523,7 @@ class AdminController extends Controller
             'first_name' => 'required|string|max:255',
             'last_name' => 'required|string|max:255',
             'email' => 'required|email|unique:users,email',
-            'phone' => 'nullable|string',
+            'phone' => 'nullable|string|regex:/^09[0-9]{9}$/|size:11',
         ]);
 
         if ($validator->fails()) {

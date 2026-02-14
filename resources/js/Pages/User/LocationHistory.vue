@@ -27,26 +27,7 @@
                     <h1 class="hero-title">Rescue History</h1>
                     <p class="hero-subtitle">Track and review your past rescue requests</p>
                     <!-- Stats Row -->
-                    <div class="stats-row" v-if="!isLoading && locations.length > 0">
-                        <div class="stat-item">
-                            <span class="stat-value">{{ locations.length }}</span>
-                            <span class="stat-label">Total</span>
-                        </div>
-                        <div class="stat-divider"></div>
-                        <div class="stat-item">
-                            <span class="stat-value text-success">{{ rescuedCount }}</span>
-                            <span class="stat-label">Rescued</span>
-                        </div>
-                        <div class="stat-divider"></div>
-                        <div class="stat-item">
-                            <span class="stat-value text-warning">{{ pendingCount }}</span>
-                            <span class="stat-label">Pending</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Search & Date Filter -->
-                <div class="filter-bar mb-4">
+                     <div class="filter-bar mb-4">
                     <v-text-field
                         v-model="searchQuery"
                         placeholder="Search code or location..."
@@ -72,6 +53,10 @@
                         class="filter-input date-input"
                     />
                 </div>
+                </div>
+
+                <!-- Search & Date Filter -->
+               
 
                 <!-- Results Info -->
                 <div v-if="!isLoading && !error && filteredLocations.length > 0" class="results-bar mb-3">

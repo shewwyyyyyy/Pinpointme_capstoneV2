@@ -1,53 +1,8 @@
 <template>
     <v-app class="bg-grey-lighten-4">
 
-        <!-- App Bar (Unified) -->
-        <v-app-bar color="primary" elevation="2">
-            <v-app-bar-nav-icon @click="drawer = !drawer"></v-app-bar-nav-icon>
-            <v-app-bar-title>
-                <v-icon class="mr-2" color="white">mdi-shield-check</v-icon>
-                <span class="text-white font-weight-bold">PinPointMe Admin</span>
-            </v-app-bar-title>
-            <v-spacer />
-            <!-- Profile Avatar Menu -->
-            <v-menu offset-y>
-                <template v-slot:activator="{ props }">
-                    <v-btn icon v-bind="props">
-                        <v-avatar color="white" size="36">
-                            <span class="text-primary font-weight-bold">{{ adminInitials }}</span>
-                        </v-avatar>
-                    </v-btn>
-                </template>
-                <v-list>
-                    <v-list-item @click="goToProfile" prepend-icon="mdi-account">
-                        <v-list-item-title>Profile</v-list-item-title>
-                    </v-list-item>
-                    <v-list-item @click="toggleDarkMode" prepend-icon="mdi-theme-light-dark">
-                        <v-list-item-title>{{ isDark ? 'Light Mode' : 'Dark Mode' }}</v-list-item-title>
-                    </v-list-item>
-                    <v-list-item @click="logout" prepend-icon="mdi-logout">
-                        <v-list-item-title>Logout</v-list-item-title>
-                    </v-list-item>
-                </v-list>
-            </v-menu>
-        </v-app-bar>
-
-        <!-- Navigation Drawer (Unified) -->
-        <v-navigation-drawer
-            v-model="drawer"
-            :permanent="!isMobile"
-            :temporary="isMobile"
-            app
-        >
-            <v-list>
-                <v-list-item prepend-icon="mdi-view-dashboard" title="Dashboard" href="/admin/dashboard" @click="closeDrawerOnMobile"></v-list-item>
-                <v-list-item prepend-icon="mdi-account-group" title="Users" href="/admin/users" @click="closeDrawerOnMobile"></v-list-item>
-                <v-list-item prepend-icon="mdi-lifebuoy" title="Rescuers" href="/admin/rescuers" active @click="closeDrawerOnMobile"></v-list-item>
-                <v-list-item prepend-icon="mdi-office-building" title="Buildings" href="/admin/buildings" @click="closeDrawerOnMobile"></v-list-item>
-                <v-list-item prepend-icon="mdi-file-chart" title="Reports" href="/admin/reports" @click="closeDrawerOnMobile"></v-list-item>
-                <v-list-item prepend-icon="mdi-shield-alert" title="Preventive Measures" href="/admin/preventive-measures" @click="closeDrawerOnMobile"></v-list-item>
-            </v-list>
-        </v-navigation-drawer>
+        <!-- Admin App Bar -->
+        <AdminAppBar activePage="rescuers" />
 
         <!-- Main Content -->
         <v-main>
@@ -522,22 +477,16 @@
                             variant="outlined"
                             density="compact"
                             :rules="[rules.phoneNumber]"
-                            hint="Mobile number (e.g., 09171234567)"
+                            hint="Mobile number (11 digits starting with 09)"
                             persistent-hint
                             placeholder="09171234567"
                             class="mb-3"
+                            type="tel"
+                            inputmode="numeric"
+                            maxlength="11"
+                            @input="formData.phone = formData.phone.replace(/\\D/g, '')"
                         />
                         
-                        <!-- Status selector for editing -->
-                        <v-select
-                            v-if="isEditing"
-                            v-model="formData.status"
-                            :items="['available', 'on_rescue', 'off_duty', 'unavailable']"
-                            label="Status"
-                            variant="outlined"
-                            density="compact"
-                            class="mb-3"
-                        />
                         
                         <!-- OTP Activation Notice for new rescuers -->
                         <v-alert 
@@ -830,43 +779,15 @@
 
 <script setup>
 import { useDisplay } from 'vuetify';
+import AdminAppBar from '@/Components/AdminAppBar.vue';
 const { mobile } = useDisplay();
 const isMobile = computed(() => mobile.value);
 
-const isDark = ref(false);
-const toggleDarkMode = () => {
-    isDark.value = !isDark.value;
-    
-    // Apply theme to document
-    if (isDark.value) {
-        document.documentElement.classList.add('v-theme--dark');
-        document.documentElement.classList.remove('v-theme--light');
-        document.documentElement.setAttribute('data-theme', 'dark');
-    } else {
-        document.documentElement.classList.add('v-theme--light');
-        document.documentElement.classList.remove('v-theme--dark');
-        document.documentElement.setAttribute('data-theme', 'light');
-    }
-    
-    // Save preference to localStorage
-    localStorage.setItem('darkMode', isDark.value.toString());
-    
-    showSnackbar(`Switched to ${isDark.value ? 'dark' : 'light'} mode`, 'info');
-};
-const goToProfile = () => {
-    window.location.href = '/admin/profile';
-};
-const closeDrawerOnMobile = () => {
-    if (isMobile.value) {
-        drawer.value = false;
-    }
-};
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed } from 'vue';
 import * as XLSX from 'xlsx';
 import { getProfilePictureUrl } from '@/Composables/useApi';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { setUserActiveStatus } from '@/Utilities/firebase';
 
 const props = defineProps({
     rescuers: { type: Object, default: () => ({ data: [] }) },
@@ -875,8 +796,6 @@ const props = defineProps({
 });
 
 // State
-const drawer = ref(!mobile.value);
-const currentPage = ref('rescuers');
 const loading = ref(false);
 const dialog = ref(false);
 const bulkDialog = ref(false);
@@ -1001,29 +920,30 @@ const formData = ref({
 // Validation rules
 const rules = {
     required: (v) => !!v || 'Required',
-    // Phone number validation
+    // Phone number validation - only accepts 11 numeric digits
     phoneNumber: (v) => {
         if (!v) return true; // Optional field
-        const cleaned = v.replace(/[\s\-\(\)]/g, '');
         
-        // Must start with 09 and have exactly 11 digits
-        if (!/^09[0-9]{9}$/.test(cleaned)) {
-            return 'Please enter a valid number';
+        // Remove all non-digit characters
+        const cleaned = v.replace(/\D/g, '');
+        
+        // Must be exactly 11 digits and start with 09
+        if (cleaned.length !== 11) {
+            return 'Must be exactly 11 digits';
+        }
+        
+        if (!cleaned.startsWith('09')) {
+            return 'Must start with 09';
+        }
+        
+        // Ensure it's purely numeric (no letters)
+        if (!/^\d{11}$/.test(cleaned)) {
+            return 'Must contain only numbers';
         }
         
         return true;
     }
 };
-
-// Computed
-const adminInitials = computed(() => {
-    // Get from localStorage or default
-    const userData = JSON.parse(localStorage.getItem('userData') || '{}');
-    if (userData.first_name && userData.last_name) {
-        return `${userData.first_name[0]}${userData.last_name[0]}`.toUpperCase();
-    }
-    return 'AD';
-});
 
 // Activity pagination computed
 const totalActivityPages = computed(() => {
@@ -1049,7 +969,6 @@ const headers = [
     { title: 'ID', key: 'rescuer_id', sortable: false, width: '100px' },
     { title: 'Status', key: 'status', sortable: true },
     { title: 'Date created', key: 'created_at', sortable: true },
-    { title: '2F Auth', key: 'two_factor', sortable: false },
     { title: '', key: 'actions', sortable: false, align: 'end', width: '50px' }
 ];
 
@@ -1206,6 +1125,12 @@ const saveRescuer = async () => {
 
 const updateStatus = async (rescuer, status) => {
     try {
+        // Validate status change
+        if (status === 'on_rescue') {
+            showSnackbar('Cannot manually set rescuer to "On Rescue". This status is set automatically when they accept a rescue.', 'warning');
+            return;
+        }
+        
         const response = await fetch(`/admin/rescuers/${rescuer.id}`, {
             method: 'PUT',
             headers: {
@@ -1218,8 +1143,25 @@ const updateStatus = async (rescuer, status) => {
         
         const data = await response.json();
         if (data.success) {
-            showSnackbar(`Status updated to ${formatStatus(status)}`, 'success');
+            // Update local data immediately
+            const index = rescuersList.value.findIndex(r => r.id === rescuer.id);
+            if (index !== -1) {
+                rescuersList.value[index].status = status;
+            }
+            
+            // Show appropriate message based on status
+            const statusMessages = {
+                'available': 'Rescuer is now available and can accept rescue requests',
+                'off_duty': 'Rescuer is now off duty and cannot accept rescue requests',
+                'unavailable': 'Rescuer is now unavailable and cannot accept rescue requests'
+            };
+            
+            showSnackbar(statusMessages[status] || `Status updated to ${formatStatus(status)}`, 'success');
+            
+            // Refresh to get updated counts
             fetchRescuers();
+        } else {
+            showSnackbar(data.message || 'Error updating status', 'error');
         }
     } catch (error) {
         console.error('Error updating status:', error);
@@ -1428,34 +1370,6 @@ const showSnackbar = (text, color) => {
     snackbar.value = true;
 };
 
-const logout = async () => {
-    // Set user as inactive in Firebase (keep FCM token for offline notifications)
-    try {
-        const userData = JSON.parse(localStorage.getItem('userData') || '{}');
-        if (userData.id) {
-            await setUserActiveStatus(userData.id, false);
-            console.log('[Logout] User marked as inactive in Firebase');
-        }
-    } catch (e) {
-        console.error('[Logout] Error setting user inactive:', e);
-    }
-
-    localStorage.removeItem('userData');
-    localStorage.removeItem('authToken');
-    localStorage.removeItem('token');
-    
-    try {
-        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
-        await fetch('/logout', {
-            method: 'POST',
-            headers: { 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' },
-            credentials: 'include'
-        });
-    } catch (e) { console.error('Logout error:', e); }
-    
-    window.location.href = '/login';
-};
-
 // Helpers
 const getInitials = (rescuer) => {
     return `${rescuer.first_name?.[0] || ''}${rescuer.last_name?.[0] || ''}`.toUpperCase();
@@ -1526,24 +1440,6 @@ const formatAction = (action) => {
     return labels[action] || action;
 };
 
-onMounted(() => {
-    // Data comes from Inertia props
-    
-    // Initialize dark mode from localStorage
-    const savedDarkMode = localStorage.getItem('darkMode');
-    if (savedDarkMode !== null) {
-        isDark.value = savedDarkMode === 'true';
-        if (isDark.value) {
-            document.documentElement.classList.add('v-theme--dark');
-            document.documentElement.classList.remove('v-theme--light');
-            document.documentElement.setAttribute('data-theme', 'dark');
-        } else {
-            document.documentElement.classList.add('v-theme--light');
-            document.documentElement.classList.remove('v-theme--dark');
-            document.documentElement.setAttribute('data-theme', 'light');
-        }
-    }
-});
 </script>
 
 <style scoped>

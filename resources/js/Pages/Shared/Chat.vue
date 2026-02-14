@@ -1,43 +1,45 @@
 <template>
-    <v-app class="bg-user-gradient-light">
-        <!-- App Bar -->
-        <v-app-bar color="primary" density="comfortable">
-            <v-btn icon @click="goBack">
-                <v-icon>mdi-arrow-left</v-icon>
-            </v-btn>
-            
-            <!-- Participant Avatar with Photo -->
-            <v-avatar 
-                size="40" 
-                :color="!otherParticipantPicture ? avatarColor : undefined" 
-                class="mr-3 cursor-pointer"
-                @click="showPhotoViewer = true"
-            >
-                <v-img
-                    v-if="otherParticipantPicture"
-                    :src="otherParticipantPicture"
-                    cover
-                />
-                <span v-else class="text-white text-body-2 font-weight-bold">{{ initials }}</span>
-            </v-avatar>
-            
-            <div class="flex-grow-1">
-                <v-app-bar-title class="text-body-1 font-weight-medium">{{ chatTitle }}</v-app-bar-title>
-                <div v-if="rescueRequest" class="text-caption" style="opacity: 0.8;">
-                    {{ rescueRequest.room?.room_name || rescueRequest.room?.name }} • {{ formatStatus(rescueRequest.status) }}
+    <v-app class="chat-viewport">
+        <!-- Fixed Header -->
+        <div class="chat-header">
+            <v-toolbar color="primary" density="comfortable" class="chat-toolbar">
+                <v-btn icon @click="goBack">
+                    <v-icon>mdi-arrow-left</v-icon>
+                </v-btn>
+                
+                <!-- Participant Avatar with Photo -->
+                <v-avatar 
+                    size="40" 
+                    :color="!otherParticipantPicture ? avatarColor : undefined" 
+                    class="mr-3 cursor-pointer"
+                    @click="showPhotoViewer = true"
+                >
+                    <v-img
+                        v-if="otherParticipantPicture"
+                        :src="otherParticipantPicture"
+                        cover
+                    />
+                    <span v-else class="text-white text-body-2 font-weight-bold">{{ initials }}</span>
+                </v-avatar>
+                
+                <div class="flex-grow-1">
+                    <v-toolbar-title class="text-body-1 font-weight-medium">{{ chatTitle }}</v-toolbar-title>
+                    <div v-if="rescueRequest" class="text-caption" style="opacity: 0.8;">
+                        {{ rescueRequest.room?.room_name || rescueRequest.room?.name }} • {{ formatStatus(rescueRequest.status) }}
+                    </div>
                 </div>
-            </div>
-        </v-app-bar>
+            </v-toolbar>
+        </div>
 
-        <!-- Main Content -->
-        <v-main class="chat-main">
+        <!-- Scrollable Middle Section -->
+        <div class="chat-body">
             <!-- Loading State -->
-            <div v-if="loading" class="d-flex justify-center align-center" style="min-height: 60vh;">
+            <div v-if="loading" class="state-container">
                 <v-progress-circular indeterminate color="primary" size="64" />
             </div>
 
             <!-- No Rescuer Assigned State -->
-            <div v-else-if="!hasRescuerAssigned && !conversation" class="d-flex flex-column justify-center align-center pa-6" style="min-height: 60vh;">
+            <div v-else-if="!hasRescuerAssigned && !conversation" class="state-container">
                 <v-icon size="80" color="grey-lighten-1" class="mb-4">mdi-chat-processing-outline</v-icon>
                 <h3 class="text-h6 text-grey-darken-1 mb-2">Chat Not Available</h3>
                 <p class="text-body-2 text-grey text-center" style="max-width: 280px;">
@@ -46,11 +48,11 @@
             </div>
 
             <!-- Chat Container -->
-            <div v-else class="chat-container d-flex flex-column">
+            <div v-else class="chat-container">
                 <!-- Messages Area -->
                 <div 
                     ref="messagesContainer"
-                    class="messages-area flex-grow-1 pa-4 overflow-y-auto"
+                    class="messages-area"
                 >
                     <!-- Empty State -->
                     <div v-if="messages.length === 0" class="d-flex flex-column justify-center align-center py-8" style="min-height: 200px;">
@@ -167,8 +169,8 @@
                     </div>
                 </div>
 
-                <!-- Input Area -->
-                <div class="input-area pa-3 bg-white">
+                <!-- Sticky Input Area -->
+                <div class="input-area">
                     <!-- Recording UI -->
                     <div v-if="isRecording" class="recording-ui d-flex align-center pa-3">
                         <v-btn icon color="error" @click="cancelRecording">
@@ -265,7 +267,7 @@
                     </div>
                 </div>
             </div>
-        </v-main>
+        </div>
 
         <!-- Hidden File Inputs -->
         <input
@@ -387,16 +389,7 @@
                                 <span class="text-body-2">{{ rescueRequest.room.room_name || rescueRequest.room.name }}</span>
                             </div>
                             
-                            <div class="info-item">
-                                <v-icon size="16" class="mr-2 text-grey">mdi-information-outline</v-icon>
-                                <v-chip 
-                                    :color="getEmergencyColor(rescueRequest.emergency_type)" 
-                                    size="x-small" 
-                                    variant="tonal"
-                                >
-                                    {{ formatStatus(rescueRequest.status) }}
-                                </v-chip>
-                            </div>
+                             
                         </div>
 
                         <!-- Contact Actions -->
@@ -439,7 +432,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue';
+import { ref, computed, onMounted, onUnmounted, nextTick, watch, onBeforeUnmount } from 'vue';
 import { router } from '@inertiajs/vue3';
 import {
     getOrCreateConversation,
@@ -657,8 +650,8 @@ const fetchMessages = async (convId = null) => {
         const data = response.data || response;
         const newMessages = Array.isArray(data) ? data : data.data || [];
         
-        // Check for new messages from the other user (not initial load)
-        if (!isInitialLoad.value && newMessages.length > 0) {
+        // Only check for new messages if NOT initial load AND we have previous message IDs
+        if (!isInitialLoad.value && lastKnownMessageIds.value.size > 0 && newMessages.length > 0) {
             const currentIds = new Set(lastKnownMessageIds.value);
             let hasNewMessageFromOther = false;
             
@@ -1326,8 +1319,29 @@ const showSnackbar = (message, color = 'success') => {
     snackbar.value = { show: true, message, color };
 };
 
+// Prevent zoom on mobile/tablet
+const setNoZoomViewport = () => {
+    const viewport = document.querySelector('meta[name="viewport"]');
+    if (viewport) {
+        viewport.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover');
+    } else {
+        const meta = document.createElement('meta');
+        meta.name = 'viewport';
+        meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover';
+        document.head.appendChild(meta);
+    }
+};
+
+const restoreViewport = () => {
+    const viewport = document.querySelector('meta[name="viewport"]');
+    if (viewport) {
+        viewport.setAttribute('content', 'width=device-width, initial-scale=1');
+    }
+};
+
 // Lifecycle
 onMounted(async () => {
+    setNoZoomViewport();
     await initializeChat();
     
     // Poll for new messages every 5 seconds
@@ -1346,6 +1360,10 @@ const handleVisibilityChange = () => {
         markMessagesAsRead();
     }
 };
+
+onBeforeUnmount(() => {
+    restoreViewport();
+});
 
 onUnmounted(() => {
     isPageVisible.value = false;
@@ -1371,24 +1389,50 @@ watch(() => conversation.value?.id, (newId) => {
 </script>
 
 <style scoped>
-.chat-main {
+/* ============================
+   FIXED VIEWPORT LAYOUT
+   ============================ */
+.chat-viewport {
     height: 100vh;
     height: 100dvh;
     display: flex;
     flex-direction: column;
     overflow: hidden;
-}
-
-.chat-main :deep(.v-main__wrap) {
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    flex: 1;
-    min-height: 0;
-}
-
-.chat-container {
     background-color: #f5f5f5;
+    touch-action: pan-y;
+}
+
+/* Fixed Header */
+.chat-header {
+    flex-shrink: 0;
+    z-index: 100;
+}
+
+.chat-toolbar {
+    padding-top: env(safe-area-inset-top, 0);
+}
+
+/* Scrollable Middle Section */
+.chat-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* State containers (loading / no rescuer) */
+.state-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+}
+
+/* Chat container wraps messages + input */
+.chat-container {
     flex: 1;
     display: flex;
     flex-direction: column;
@@ -1396,17 +1440,25 @@ watch(() => conversation.value?.id, (newId) => {
     min-height: 0;
 }
 
+/* ============================
+   MESSAGES AREA
+   ============================ */
 .messages-area {
     background: linear-gradient(to bottom, #f8f0f0 0%, #ffffff 40%, #f8f8f8 50%, #d1f8ef 80%, #a1e3f9 100%);
-    flex: 1;
+    flex: 1 1 auto;
     overflow-y: auto;
     overflow-x: hidden;
     -webkit-overflow-scrolling: touch;
     min-height: 0;
+    padding: 12px 16px 16px;
 }
 
+/* ============================
+   MESSAGE BUBBLES
+   ============================ */
 .message-wrapper {
     display: flex;
+    margin-bottom: 8px;
 }
 
 .own-message {
@@ -1418,10 +1470,11 @@ watch(() => conversation.value?.id, (newId) => {
 }
 
 .message-bubble {
-    max-width: 75%;
+    max-width: 80%;
     border-radius: 16px;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
     word-break: break-word;
+    padding: 12px;
 }
 
 .own-message .message-bubble {
@@ -1431,6 +1484,7 @@ watch(() => conversation.value?.id, (newId) => {
 
 .other-message .message-bubble {
     border-bottom-left-radius: 4px;
+    background: white;
 }
 
 .message-content {
@@ -1443,14 +1497,21 @@ watch(() => conversation.value?.id, (newId) => {
 .message-meta {
     opacity: 0.7;
     font-size: 10px;
+    margin-top: 4px;
 }
 
 .own-message .message-meta {
     color: rgba(255, 255, 255, 0.8);
+    text-align: right;
 }
 
+/* ============================
+   DATE SEPARATOR
+   ============================ */
 .date-separator {
     position: relative;
+    text-align: center;
+    margin: 16px 0;
 }
 
 .date-separator::before,
@@ -1471,6 +1532,9 @@ watch(() => conversation.value?.id, (newId) => {
     right: 0;
 }
 
+/* ============================
+   TYPING INDICATOR
+   ============================ */
 .typing-indicator {
     display: flex;
     gap: 4px;
@@ -1494,17 +1558,17 @@ watch(() => conversation.value?.id, (newId) => {
 }
 
 @keyframes typing {
-    0%, 60%, 100% {
-        transform: translateY(0);
-    }
-    30% {
-        transform: translateY(-8px);
-    }
+    0%, 60%, 100% { transform: translateY(0); }
+    30% { transform: translateY(-8px); }
 }
 
+/* ============================
+   RECORDING UI
+   ============================ */
 .recording-ui {
     background-color: #ffebee;
     border-radius: 24px;
+    padding: 12px;
 }
 
 .recording-dot {
@@ -1516,14 +1580,13 @@ watch(() => conversation.value?.id, (newId) => {
 }
 
 @keyframes pulse {
-    0%, 100% {
-        opacity: 1;
-    }
-    50% {
-        opacity: 0.5;
-    }
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
 }
 
+/* ============================
+   AUDIO MESSAGE
+   ============================ */
 .audio-message {
     display: flex;
     align-items: center;
@@ -1544,14 +1607,24 @@ watch(() => conversation.value?.id, (newId) => {
     opacity: 0.6;
 }
 
+/* ============================
+   STICKY INPUT BAR
+   ============================ */
 .input-area {
-    border-top: 1px solid rgba(0, 0, 0, 0.08);
     flex-shrink: 0;
-    padding-bottom: calc(env(safe-area-inset-bottom, 8px) + 4px) !important;
+    border-top: 1px solid rgba(0, 0, 0, 0.08);
+    padding: 8px 12px;
+    padding-bottom: calc(env(safe-area-inset-bottom, 8px) + 8px);
+    background-color: white;
+    z-index: 10;
 }
 
 .chat-input-container {
-    padding: 8px 4px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 2px;
+    max-width: 100%;
 }
 
 .chat-icon-btn {
@@ -1567,25 +1640,32 @@ watch(() => conversation.value?.id, (newId) => {
 }
 
 .chat-text-input {
-    margin: 0 8px;
+    margin: 0 4px;
+    flex: 1;
+    min-width: 0;
 }
 
 .chat-text-input :deep(.v-field) {
     background-color: #f5f5f5;
     border-radius: 24px;
     min-height: 40px;
+    max-height: 120px;
 }
 
 .chat-text-input :deep(.v-field__input) {
-    padding: 8px 16px;
-    font-size: 16px;
+    padding: 10px 16px;
+    font-size: 15px;
     min-height: auto;
+    line-height: 1.4;
 }
 
 .chat-text-input :deep(.v-field__outline) {
     --v-field-border-opacity: 0.12;
 }
 
+/* ============================
+   UTILITIES
+   ============================ */
 .cursor-pointer {
     cursor: pointer;
 }
@@ -1603,19 +1683,21 @@ watch(() => conversation.value?.id, (newId) => {
     background-color: #000;
 }
 
-/* Mobile Small (< 360px) */
+/* ============================
+   RESPONSIVE - Small Mobile (< 360px)
+   ============================ */
 @media (max-width: 359px) {
     .messages-area {
-        padding: 8px 10px;
+        padding: 8px 8px 12px;
     }
     
     .message-bubble {
-        max-width: 85%;
-        padding: 8px 10px !important;
+        max-width: 88%;
+        padding: 8px 10px;
     }
     
     .message-content {
-        font-size: 0.8rem;
+        font-size: 0.85rem;
     }
     
     .message-meta {
@@ -1623,81 +1705,17 @@ watch(() => conversation.value?.id, (newId) => {
     }
     
     .input-area {
-        padding: 8px !important;
-        padding-bottom: calc(env(safe-area-inset-bottom, 8px) + 4px) !important;
+        padding: 6px 8px;
+        padding-bottom: calc(env(safe-area-inset-bottom, 8px) + 8px);
     }
     
-    .input-area .v-text-field {
-        font-size: 0.85rem;
-    }
-    
-    /* Smaller chat buttons on very small screens */
     .chat-icon-btn {
-        width: 32px !important;
-        height: 32px !important;
+        width: 34px !important;
+        height: 34px !important;
     }
     
     .chat-icon-btn .v-icon {
-        font-size: 16px !important;
-    }
-    
-    .chat-input-container {
-        padding: 6px 2px;
-    }
-    
-    .chat-text-input {
-        margin: 0 4px;
-    }
-    
-    .chat-text-input :deep(.v-field) {
-        min-height: 36px;
-    }
-    
-    .chat-text-input :deep(.v-field__input) {
-        padding: 6px 12px;
-        font-size: 14px;
-    }
-}
-
-/* Mobile (360px - 599px) */
-@media (min-width: 360px) and (max-width: 599px) {
-    .messages-area {
-        padding: 12px;
-    }
-    
-    .message-bubble {
-        max-width: 80%;
-    }
-    
-    .message-content {
-        font-size: 0.85rem;
-    }
-    
-    .message-meta {
-        font-size: 10px;
-    }
-    
-    .input-area {
-        padding: 10px !important;
-        padding-bottom: calc(env(safe-area-inset-bottom, 8px) + 4px) !important;
-    }
-    
-    /* Slightly smaller chat buttons on mobile */
-    .chat-icon-btn {
-        width: 36px !important;
-        height: 36px !important;
-    }
-    
-    .chat-icon-btn .v-icon {
-        font-size: 18px !important;
-    }
-    
-    .chat-input-container {
-        padding: 6px 3px;
-    }
-    
-    .chat-text-input {
-        margin: 0 6px;
+        font-size: 17px !important;
     }
     
     .chat-text-input :deep(.v-field) {
@@ -1705,12 +1723,58 @@ watch(() => conversation.value?.id, (newId) => {
     }
     
     .chat-text-input :deep(.v-field__input) {
-        padding: 7px 14px;
+        padding: 8px 12px;
+        font-size: 14px;
+    }
+}
+
+/* ============================
+   RESPONSIVE - Mobile (360px - 599px)
+   ============================ */
+@media (min-width: 360px) and (max-width: 599px) {
+    .messages-area {
+        padding: 10px 12px 16px;
+    }
+    
+    .message-bubble {
+        max-width: 85%;
+    }
+    
+    .message-content {
+        font-size: 0.9rem;
+    }
+    
+    .message-meta {
+        font-size: 10px;
+    }
+    
+    .input-area {
+        padding: 8px 12px;
+        padding-bottom: calc(env(safe-area-inset-bottom, 8px) + 8px);
+    }
+    
+    .chat-icon-btn {
+        width: 38px !important;
+        height: 38px !important;
+    }
+    
+    .chat-icon-btn .v-icon {
+        font-size: 19px !important;
+    }
+    
+    .chat-text-input :deep(.v-field) {
+        min-height: 40px;
+    }
+    
+    .chat-text-input :deep(.v-field__input) {
+        padding: 9px 14px;
         font-size: 15px;
     }
 }
 
-/* Tablet (600px - 1023px) */
+/* ============================
+   RESPONSIVE - Tablet (600px - 1023px)
+   ============================ */
 @media (min-width: 600px) and (max-width: 1023px) {
     .messages-area {
         padding: 16px 20px;
@@ -1729,19 +1793,16 @@ watch(() => conversation.value?.id, (newId) => {
     }
 }
 
-/* Desktop (1024px+) */
+/* ============================
+   RESPONSIVE - Desktop (1024px+)
+   ============================ */
 @media (min-width: 1024px) {
-    .chat-container {
-        max-width: 800px;
-        margin: 0 auto;
-    }
-    
     .messages-area {
-        padding: 20px 24px;
+        padding: 20px clamp(40px, 8vw, 120px);
     }
     
     .message-bubble {
-        max-width: 60%;
+        max-width: min(65%, 600px);
     }
     
     .message-content {
@@ -1753,11 +1814,14 @@ watch(() => conversation.value?.id, (newId) => {
     }
     
     .input-area {
-        padding: 16px !important;
+        padding: 12px clamp(40px, 8vw, 120px);
+        padding-bottom: calc(env(safe-area-inset-bottom, 8px) + 12px);
     }
 }
 
-/* Profile Dialog Styles */
+/* ============================
+   PROFILE DIALOG
+   ============================ */
 .profile-dialog {
     background: white;
 }

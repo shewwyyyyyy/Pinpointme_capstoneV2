@@ -128,8 +128,34 @@
                     <div class="card-header">
                         <v-icon size="20" color="orange">mdi-text-box</v-icon>
                         <span>Situation Details</span>
+                        <v-chip v-if="rescueRequest.original_description" size="x-small" color="info" variant="tonal" class="ml-auto">
+                            <v-icon start size="12">mdi-translate</v-icon>
+                            Translated
+                        </v-chip>
                     </div>
                     <p class="description-text">{{ rescueRequest.description }}</p>
+                    <!-- Translate button if non-English and not yet translated -->
+                    <div v-if="rescueRequest.is_translated && !rescueRequest.original_description" class="mt-2">
+                        <v-btn
+                            size="small"
+                            variant="tonal"
+                            color="info"
+                            :loading="isTranslating"
+                            @click="handleTranslate"
+                            prepend-icon="mdi-translate"
+                            class="rounded-lg"
+                        >
+                            Translate to English
+                        </v-btn>
+                    </div>
+                    <!-- Show original text if translated -->
+                    <div v-if="rescueRequest.original_description" class="mt-2" style="padding: 8px 12px; background: #f5f5f5; border-radius: 8px; border-left: 3px solid #42A5F5;">
+                        <div class="text-caption text-grey-darken-1 mb-1 d-flex align-center">
+                            <v-icon size="12" class="mr-1">mdi-translate</v-icon>
+                            Original text
+                        </div>
+                        <p class="text-caption" style="font-style: italic; margin: 0; color: #616161;">{{ rescueRequest.original_description }}</p>
+                    </div>
                 </div>
 
                 <!-- Additional Info Card -->
@@ -150,6 +176,10 @@
                         <v-chip v-if="rescueRequest.injuries" size="small" variant="tonal" color="error">
                             <v-icon start size="16">mdi-bandage</v-icon>
                             {{ rescueRequest.injuries }}
+                        </v-chip>
+                        <v-chip v-if="rescueRequest.original_injuries" size="x-small" variant="tonal" color="info">
+                            <v-icon start size="12">mdi-translate</v-icon>
+                            Original: {{ rescueRequest.original_injuries }}
                         </v-chip>
                     </div>
 
@@ -570,7 +600,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { router } from '@inertiajs/vue3';
-import { apiFetch, getProfilePictureUrl, getUnreadMessageCount } from '@/Composables/useApi';
+import { apiFetch, getProfilePictureUrl, getUnreadMessageCount, translateRescueRequest } from '@/Composables/useApi';
 import RescuerBottomNav from '@/Components/Pages/Rescuer/Menu/RescuerBottomNav.vue';
 
 const props = defineProps({
@@ -585,6 +615,7 @@ const props = defineProps({
 // State
 const loading = ref(true);
 const updating = ref(false);
+const isTranslating = ref(false);
 const rescueRequest = ref(null);
 const currentStatus = ref('');
 const statusTimestamps = ref({});
@@ -786,6 +817,23 @@ const fetchRescueDetails = async () => {
     }
 };
 
+const handleTranslate = async () => {
+    if (!rescueRequest.value?.id) return;
+    isTranslating.value = true;
+    try {
+        const result = await translateRescueRequest(rescueRequest.value.id);
+        if (result.success && result.data) {
+            rescueRequest.value = result.data;
+        }
+        showSnackbar('Translation completed', 'success');
+    } catch (err) {
+        console.error('Translation failed:', err);
+        showSnackbar('Translation failed. Please try again.', 'error');
+    } finally {
+        isTranslating.value = false;
+    }
+};
+
 const acceptRescue = async () => {
     updating.value = true;
     try {
@@ -974,6 +1022,14 @@ const viewMap = () => {
 };
 
 const openChat = () => {
+    // Check if rescuer is restricted
+    const userData = JSON.parse(localStorage.getItem('userData') || '{}');
+    const status = userData.status?.toLowerCase();
+    if (status === 'off_duty' || status === 'unavailable') {
+        showSnackbar('You cannot access messages while your status is restricted', 'warning');
+        return;
+    }
+    
     // Use rescue-chat route which will get or create conversation
     if (rescueRequest.value?.id) {
         router.visit(`/rescuer/rescue-chat/${rescueRequest.value.id}?from=active-rescue`);
@@ -1154,6 +1210,36 @@ const formatTimestamp = (dateString) => {
 
 const showSnackbar = (message, color = 'success') => {
     snackbar.value = { show: true, message, color };
+};
+
+// Check if text appears to be in English (simple heuristic)
+const isLikelyEnglish = (text) => {
+    if (!text) return true;
+    
+    const commonWords = [
+        'the', 'is', 'at', 'which', 'on', 'and', 'a', 'to', 'this', 'be', 
+        'has', 'have', 'it', 'in', 'of', 'for', 'not', 'with', 'he', 'as', 
+        'you', 'do', 'will', 'can', 'if', 'no', 'man', 'up', 'her', 'all', 
+        'any', 'may', 'say', 'she', 'or', 'an', 'are', 'his', 'your', 'how',
+        'help', 'need', 'emergency', 'hurt', 'pain', 'blood', 'injury', 'fire',
+        'stuck', 'trapped', 'fell', 'broken', 'stairs', 'bathroom', 'room',
+        'floor', 'building', 'urgent', 'please', 'quickly', 'fast', 'now'
+    ];
+    
+    const words = text.toLowerCase().trim().split(/\s+/);
+    const totalWords = words.length;
+    
+    if (totalWords === 0) return true;
+    
+    let englishWords = 0;
+    words.forEach(word => {
+        const cleanWord = word.replace(/[^a-z]/g, '');
+        if (commonWords.includes(cleanWord)) {
+            englishWords++;
+        }
+    });
+    
+    return (englishWords / totalWords) > 0.6; // 60% threshold
 };
 
 // Fetch unread message count

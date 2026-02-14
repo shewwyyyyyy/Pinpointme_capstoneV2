@@ -19,25 +19,6 @@
 
         <!-- Main Content -->
         <v-main class="notifications-main">
-            <!-- Notification Alert Banner -->
-            <v-slide-y-transition>
-                <v-alert
-                    v-if="notificationBanner.show"
-                    :type="notificationBanner.type"
-                    :icon="notificationBanner.icon"
-                    variant="tonal"
-                    class="notification-banner ma-3 rounded-xl"
-                    closable
-                    @click:close="notificationBanner.show = false"
-                >
-                    <div class="d-flex align-center">
-                        <div class="flex-grow-1">
-                            <div class="text-subtitle-2 font-weight-bold">{{ notificationBanner.title }}</div>
-                            <div class="text-caption">{{ notificationBanner.message }}</div>
-                        </div>
-                    </div>
-                </v-alert>
-            </v-slide-y-transition>
 
             <!-- Loading State -->
             <div v-if="loading" class="loading-container">
@@ -345,16 +326,7 @@ const triggerStatusNotification = (oldStatus, newStatus, notification) => {
         playNotificationSound(notificationData.sound);
         vibrate(notificationData.vibratePattern);
 
-        // Show banner
-        notificationBanner.value = {
-            show: true,
-            title: notificationData.title,
-            message: notificationData.message,
-            type: notificationData.type,
-            icon: notificationData.icon,
-        };
-
-        // Show popup
+        // Show popup alert (single notification only)
         popupAlert.value = {
             show: true,
             title: notificationData.title,
@@ -372,7 +344,6 @@ const triggerStatusNotification = (oldStatus, newStatus, notification) => {
 
         // Auto-hide after 5 seconds
         setTimeout(() => {
-            notificationBanner.value.show = false;
             popupAlert.value.show = false;
         }, 5000);
     }
@@ -939,13 +910,16 @@ onUnmounted(() => {
 
 @media (min-width: 1024px) {
     .notifications-main {
-        margin-left: 256px;
+        margin-left: 0;
         padding-bottom: 40px;
+        width: 100%;
     }
     
     .notifications-list {
-        max-width: 600px;
+        max-width: 800px;
         margin: 0 auto;
+        padding-left: clamp(24px, 5vw, 80px);
+        padding-right: clamp(24px, 5vw, 80px);
     }
 }
 

@@ -5,10 +5,12 @@ namespace App\Services;
 use App\Helpers\Helper;
 use App\Interfaces\RescueRequestInterface;
 use App\Models\RescueRequest;
+use App\Services\TranslationService;
 use App\Traits\HttpErrorCodeTrait;
 use App\Traits\ReturnModelCollectionTrait;
 use App\Traits\ReturnModelTrait;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class RescueRequestService implements RescueRequestInterface
@@ -16,6 +18,13 @@ class RescueRequestService implements RescueRequestInterface
     use HttpErrorCodeTrait,
         ReturnModelCollectionTrait,
         ReturnModelTrait;
+        
+    protected $translationService;
+    
+    public function __construct(TranslationService $translationService)
+    {
+        $this->translationService = $translationService;
+    }
 
     /**
      * Store a newly created resource in storage.
@@ -24,21 +33,24 @@ class RescueRequestService implements RescueRequestInterface
     {
         try {
             return DB::transaction(function () use ($data) {
+                // Translate text fields to English for rescuers
+                $translatedData = $this->translateTextFields($data);
+                
                 $rescueRequest = RescueRequest::create([
                     'rescue_code' => $this->generateUniqueRescueCode(),
-                    'assigned_rescuer' => $data['assigned_rescuer'] ?? null,
-                    'user_id' => $data['user_id'] ?? null,
-                    'status' => $data['status'] ?? 'pending',
-                    'building_id' => $data['building_id'] ?? null,
-                    'floor_id' => $data['floor_id'] ?? null,
-                    'room_id' => $data['room_id'] ?? null,
-                    'description' => $data['description'] ?? null,
-                    'mobility_status' => $data['mobility_status'] ?? null,
-                    'injuries' => $data['injuries'] ?? null,
-                    'urgency_level' => $data['urgency_level'] ?? null,
-                    'additional_info' => $data['additional_info'] ?? null,
-                    'firstName' => $data['firstName'] ?? null,
-                    'lastName' => $data['lastName'] ?? null,
+                    'assigned_rescuer' => $translatedData['assigned_rescuer'] ?? null,
+                    'user_id' => $translatedData['user_id'] ?? null,
+                    'status' => $translatedData['status'] ?? 'pending',
+                    'building_id' => $translatedData['building_id'] ?? null,
+                    'floor_id' => $translatedData['floor_id'] ?? null,
+                    'room_id' => $translatedData['room_id'] ?? null,
+                    'description' => $translatedData['description'] ?? null,
+                    'mobility_status' => $translatedData['mobility_status'] ?? null,
+                    'injuries' => $translatedData['injuries'] ?? null,
+                    'urgency_level' => $translatedData['urgency_level'] ?? null,
+                    'additional_info' => $translatedData['additional_info'] ?? null,
+                    'firstName' => $translatedData['firstName'] ?? null,
+                    'lastName' => $translatedData['lastName'] ?? null,
                 ]);
 
                 return $this->returnModel(201, 'success', 'Rescue request created successfully!', $rescueRequest, $rescueRequest->id);
@@ -137,6 +149,44 @@ class RescueRequestService implements RescueRequestInterface
         }
     }
 
+    /**
+     * Translate text fields to English for rescuers
+     */
+    private function translateTextFields(array $data): array
+    {
+        try {
+            $fieldsToTranslate = ['description', 'additional_info', 'injuries'];
+            
+            foreach ($fieldsToTranslate as $field) {
+                if (!empty($data[$field]) && is_string($data[$field])) {
+                    // Only translate if the text doesn't appear to be in English
+                    if (!$this->translationService->isLikelyEnglish($data[$field])) {
+                        Log::info('Translating emergency text', [
+                            'field' => $field,
+                            'original' => $data[$field]
+                        ]);
+                        
+                        $translated = $this->translationService->translateToEnglish($data[$field]);
+                        $data[$field] = $translated;
+                        
+                        Log::info('Translation completed', [
+                            'field' => $field,
+                            'translated' => $translated
+                        ]);
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+            Log::error('Translation failed during rescue request creation', [
+                'error' => $e->getMessage(),
+                'data' => $data
+            ]);
+            // Continue with original data if translation fails
+        }
+        
+        return $data;
+    }
+    
     /**
      * Generate unique rescue code.
      */

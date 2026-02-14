@@ -1,53 +1,7 @@
 <template>
     <v-app class="bg-grey-lighten-4">
-        <!-- App Bar -->
-        <v-app-bar color="primary" elevation="2">
-            <v-app-bar-nav-icon @click="drawer = !drawer"></v-app-bar-nav-icon>
-            <v-app-bar-title>
-                <v-icon class="mr-2" color="white">mdi-shield-check</v-icon>
-                <span class="text-white font-weight-bold">PinPointMe Admin</span>
-            </v-app-bar-title>
-            <v-spacer />
-            <!-- Profile Avatar Menu -->
-            <v-menu offset-y>
-                <template v-slot:activator="{ props }">
-                    <v-btn icon v-bind="props">
-                        <v-avatar color="white" size="36">
-                            <v-img v-if="profilePictureUrl" :src="profilePictureUrl" cover></v-img>
-                            <span v-else class="text-primary font-weight-bold">{{ adminInitials }}</span>
-                        </v-avatar>
-                    </v-btn>
-                </template>
-                <v-list>
-                    <v-list-item prepend-icon="mdi-account">
-                        <v-list-item-title>Profile</v-list-item-title>
-                    </v-list-item>
-                    <v-list-item @click="toggleDarkMode" prepend-icon="mdi-theme-light-dark">
-                        <v-list-item-title>{{ isDark ? 'Light Mode' : 'Dark Mode' }}</v-list-item-title>
-                    </v-list-item>
-                    <v-list-item @click="logout" prepend-icon="mdi-logout">
-                        <v-list-item-title>Logout</v-list-item-title>
-                    </v-list-item>
-                </v-list>
-            </v-menu>
-        </v-app-bar>
-
-        <!-- Navigation Drawer -->
-        <v-navigation-drawer
-            v-model="drawer"
-            :permanent="!isMobile"
-            :temporary="isMobile"
-            app
-        >
-            <v-list>
-                <v-list-item prepend-icon="mdi-view-dashboard" title="Dashboard" href="/admin/dashboard" @click="closeDrawerOnMobile"></v-list-item>
-                <v-list-item prepend-icon="mdi-account-group" title="Users" href="/admin/users" @click="closeDrawerOnMobile"></v-list-item>
-                <v-list-item prepend-icon="mdi-lifebuoy" title="Rescuers" href="/admin/rescuers" @click="closeDrawerOnMobile"></v-list-item>
-                <v-list-item prepend-icon="mdi-office-building" title="Buildings" href="/admin/buildings" @click="closeDrawerOnMobile"></v-list-item>
-                <v-list-item prepend-icon="mdi-file-chart" title="Reports" href="/admin/reports" @click="closeDrawerOnMobile"></v-list-item>
-                <v-list-item prepend-icon="mdi-shield-alert" title="Preventive Measures" href="/admin/preventive-measures" @click="closeDrawerOnMobile"></v-list-item>
-            </v-list>
-        </v-navigation-drawer>
+        <!-- Admin App Bar -->
+        <AdminAppBar activePage="profile" :profilePictureUrl="profilePictureUrl" />
 
         <!-- Main Content -->
         <v-main>
@@ -252,18 +206,14 @@
 
 <script setup>
 import { ref, computed, onMounted, reactive } from 'vue';
-import { usePage } from '@inertiajs/vue3';
 import { useDisplay } from 'vuetify';
 import { getProfilePictureUrl, updateUser, uploadProfilePicture, deleteProfilePicture } from '@/Composables/useApi';
-import { setUserActiveStatus } from '@/Utilities/firebase';
+import AdminAppBar from '@/Components/AdminAppBar.vue';
 
 const { mobile } = useDisplay();
 const isMobile = computed(() => mobile.value);
-const page = usePage();
 
 // State
-const drawer = ref(!mobile.value);
-const isDark = ref(false);
 const loading = ref(false);
 const saving = ref(false);
 const changingPassword = ref(false);
@@ -345,12 +295,6 @@ const fullName = computed(() => {
     return `${profile.value.first_name} ${profile.value.last_name}`.trim() || 'Administrator';
 });
 
-const adminInitials = computed(() => {
-    const first = profile.value.first_name?.[0] || '';
-    const last = profile.value.last_name?.[0] || '';
-    return (first + last).toUpperCase() || 'AD';
-});
-
 const profilePictureUrl = computed(() => {
     const picturePath = profile.value.profile_picture;
     if (!picturePath) return null;
@@ -383,32 +327,6 @@ const isPasswordValid = computed(() => {
 });
 
 // Methods
-const closeDrawerOnMobile = () => {
-    if (isMobile.value) {
-        drawer.value = false;
-    }
-};
-
-const toggleDarkMode = () => {
-    isDark.value = !isDark.value;
-    
-    // Apply theme to document
-    if (isDark.value) {
-        document.documentElement.classList.add('v-theme--dark');
-        document.documentElement.classList.remove('v-theme--light');
-        document.documentElement.setAttribute('data-theme', 'dark');
-    } else {
-        document.documentElement.classList.add('v-theme--light');
-        document.documentElement.classList.remove('v-theme--dark');
-        document.documentElement.setAttribute('data-theme', 'light');
-    }
-    
-    // Save preference to localStorage
-    localStorage.setItem('darkMode', isDark.value.toString());
-    
-    showSnackbar(`Switched to ${isDark.value ? 'dark' : 'light'} mode`, 'info');
-};
-
 const showSnackbar = (message, color = 'success') => {
     snackbar.message = message;
     snackbar.color = color;
@@ -598,51 +516,8 @@ const removePhoto = async () => {
     }
 };
 
-const logout = async () => {
-    // Set user as inactive in Firebase (keep FCM token for offline notifications)
-    try {
-        const userData = JSON.parse(localStorage.getItem('userData') || '{}');
-        if (userData.id) {
-            await setUserActiveStatus(userData.id, false);
-            console.log('[Logout] User marked as inactive in Firebase');
-        }
-    } catch (e) {
-        console.error('[Logout] Error setting user inactive:', e);
-    }
-
-    localStorage.removeItem('userData');
-    localStorage.removeItem('authToken');
-    localStorage.removeItem('token');
-    
-    try {
-        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
-        await fetch('/logout', {
-            method: 'POST',
-            headers: { 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' },
-            credentials: 'include'
-        });
-    } catch (e) { console.error('Logout error:', e); }
-    
-    window.location.href = '/login';
-};
-
 onMounted(() => {
     loadProfile();
-    
-    // Initialize dark mode from localStorage
-    const savedDarkMode = localStorage.getItem('darkMode');
-    if (savedDarkMode !== null) {
-        isDark.value = savedDarkMode === 'true';
-        if (isDark.value) {
-            document.documentElement.classList.add('v-theme--dark');
-            document.documentElement.classList.remove('v-theme--light');
-            document.documentElement.setAttribute('data-theme', 'dark');
-        } else {
-            document.documentElement.classList.add('v-theme--light');
-            document.documentElement.classList.remove('v-theme--dark');
-            document.documentElement.setAttribute('data-theme', 'light');
-        }
-    }
 });
 </script>
 

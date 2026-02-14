@@ -1,52 +1,7 @@
 <template>
     <v-app class="bg-grey-lighten-4">
-        <!-- App Bar -->
-        <v-app-bar color="primary" elevation="2">
-            <v-app-bar-nav-icon @click="drawer = !drawer"></v-app-bar-nav-icon>
-            <v-app-bar-title>
-                <v-icon class="mr-2">mdi-shield-check</v-icon>
-                PinPointMe Admin
-            </v-app-bar-title>
-            <v-spacer />
-            <!-- Profile Avatar Menu -->
-            <v-menu offset-y>
-                <template v-slot:activator="{ props }">
-                    <v-btn icon v-bind="props">
-                        <v-avatar color="white" size="36">
-                            <span class="text-primary font-weight-bold">{{ adminInitials }}</span>
-                        </v-avatar>
-                    </v-btn>
-                </template>
-                <v-list>
-                    <v-list-item @click="goToProfile" prepend-icon="mdi-account">
-                        <v-list-item-title>Profile</v-list-item-title>
-                    </v-list-item>
-                    <v-list-item @click="toggleDarkMode" prepend-icon="mdi-theme-light-dark">
-                        <v-list-item-title>{{ isDark ? 'Light Mode' : 'Dark Mode' }}</v-list-item-title>
-                    </v-list-item>
-                    <v-list-item @click="logout" prepend-icon="mdi-logout">
-                        <v-list-item-title>Logout</v-list-item-title>
-                    </v-list-item>
-                </v-list>
-            </v-menu>
-        </v-app-bar>
-
-        <!-- Navigation Drawer -->
-        <v-navigation-drawer
-            v-model="drawer"
-            :permanent="!isMobile"
-            :temporary="isMobile"
-            app
-        >
-            <v-list>
-                <v-list-item prepend-icon="mdi-view-dashboard" title="Dashboard" href="/admin/dashboard" @click="closeDrawerOnMobile"></v-list-item>
-                <v-list-item prepend-icon="mdi-account-group" title="Users" href="/admin/users" @click="closeDrawerOnMobile"></v-list-item>
-                <v-list-item prepend-icon="mdi-lifebuoy" title="Rescuers" href="/admin/rescuers" @click="closeDrawerOnMobile"></v-list-item>
-                <v-list-item prepend-icon="mdi-office-building" title="Buildings" href="/admin/buildings" @click="closeDrawerOnMobile"></v-list-item>
-                <v-list-item prepend-icon="mdi-file-chart" title="Reports" href="/admin/reports" @click="closeDrawerOnMobile"></v-list-item>
-                <v-list-item prepend-icon="mdi-shield-alert" title="Preventive Measures" href="/admin/preventive-measures" active @click="closeDrawerOnMobile"></v-list-item>
-            </v-list>
-        </v-navigation-drawer>
+        <!-- Admin App Bar -->
+        <AdminAppBar activePage="preventive-measures" />
 
         <!-- Main Content -->
         <v-main>
@@ -255,20 +210,7 @@
                             class="mb-3"
                         />
 
-                        <!-- Video Preview for Upload -->
-                        <v-alert 
-                            v-if="videoSourceType === 'upload' && (videoPreviewUrl || formData.video_path)"
-                            type="info" 
-                            variant="tonal" 
-                            class="mb-3"
-                        >
-                            <div class="d-flex align-center">
-                                <v-icon class="mr-2">mdi-check-circle</v-icon>
-                                <span v-if="videoPreviewUrl">New video selected</span>
-                                <span v-else>Current video: {{ formData.video_path }}</span>
-                            </div>
-                        </v-alert>
-
+                       
                         <!-- Thumbnail Upload -->
                         <v-file-input
                             v-model="thumbnailFile"
@@ -374,43 +316,19 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed } from 'vue';
 import { router } from '@inertiajs/vue3';
 import { useDisplay } from 'vuetify';
-import { setUserActiveStatus } from '@/Utilities/firebase';
+import AdminAppBar from '@/Components/AdminAppBar.vue';
 
 const { mobile } = useDisplay();
 const isMobile = computed(() => mobile.value);
-
-const isDark = ref(false);
-const toggleDarkMode = () => {
-    isDark.value = !isDark.value;
-    document.documentElement.classList.toggle('v-theme--dark', isDark.value);
-};
-const goToProfile = () => {
-    window.location.href = '/admin/profile';
-};
-const closeDrawerOnMobile = () => {
-    if (isMobile.value) {
-        drawer.value = false;
-    }
-};
-
-// Admin initials for profile
-const adminInitials = computed(() => {
-    const userData = JSON.parse(localStorage.getItem('userData') || '{}');
-    if (userData.first_name && userData.last_name) {
-        return `${userData.first_name[0]}${userData.last_name[0]}`.toUpperCase();
-    }
-    return 'AD';
-});
 
 const props = defineProps({
     measures: { type: Array, default: () => [] },
     categories: { type: Array, default: () => [] }
 });
 
-const drawer = ref(!mobile.value);
 const dialog = ref(false);
 const deleteDialog = ref(false);
 const previewDialog = ref(false);
@@ -688,38 +606,6 @@ const showSnackbar = (text, color) => {
     snackbarColor.value = color;
     snackbar.value = true;
 };
-
-const logout = async () => {
-    // Set user as inactive in Firebase (keep FCM token for offline notifications)
-    try {
-        const userData = JSON.parse(localStorage.getItem('userData') || '{}');
-        if (userData.id) {
-            await setUserActiveStatus(userData.id, false);
-            console.log('[Logout] User marked as inactive in Firebase');
-        }
-    } catch (e) {
-        console.error('[Logout] Error setting user inactive:', e);
-    }
-
-    localStorage.removeItem('userData');
-    localStorage.removeItem('authToken');
-    localStorage.removeItem('token');
-    
-    try {
-        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
-        await fetch('/logout', {
-            method: 'POST',
-            headers: { 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' },
-            credentials: 'include'
-        });
-    } catch (e) { console.error('Logout error:', e); }
-    
-    window.location.href = '/login';
-};
-
-onMounted(() => {
-    // Data comes from Inertia props
-});
 </script>
 
 <style scoped>

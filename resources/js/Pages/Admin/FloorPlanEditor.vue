@@ -1,19 +1,15 @@
 <template>
     <v-app class="bg-grey-lighten-4">
 
-        <!-- App Bar (Unified) -->
-        <v-app-bar color="primary" elevation="2">
-            <v-app-bar-nav-icon @click="goBack"></v-app-bar-nav-icon>
-            <v-app-bar-title>
-                <v-icon class="mr-2" color="white">mdi-shield-check</v-icon>
-                <span class="text-white font-weight-bold">PinPointMe Admin</span>
-            </v-app-bar-title>
-            <v-spacer />
-            <v-btn color="success" variant="elevated" class="mr-2" :loading="saving" @click="saveAnnotations">
-                <v-icon left>mdi-content-save</v-icon>
-                Save
-            </v-btn>
-        </v-app-bar>
+        <!-- Admin App Bar -->
+        <AdminAppBar activePage="" :backButton="true" :hideDrawer="true" :hideProfile="true" @back="goBack">
+            <template #actions>
+                <v-btn color="success" variant="elevated" class="mr-2" :loading="saving" @click="saveAnnotations">
+                    <v-icon start>mdi-content-save</v-icon>
+                    Save
+                </v-btn>
+            </template>
+        </AdminAppBar>
 
         <!-- Main Content -->
         <v-main>
@@ -345,6 +341,7 @@
 <script setup>
 import { ref, computed, onMounted, watch, nextTick } from 'vue';
 import { router } from '@inertiajs/vue3';
+import AdminAppBar from '@/Components/AdminAppBar.vue';
 
 const props = defineProps({
     floor: {

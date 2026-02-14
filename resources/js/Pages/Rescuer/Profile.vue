@@ -10,8 +10,8 @@
                     <h1>Profile</h1>
                     <p>Manage your account</p>
                 </div>
-                <v-btn icon variant="text" class="placeholder-btn desktop-only" style="visibility: hidden;">
-                    <v-icon>mdi-menu</v-icon>
+                <v-btn icon variant="text" @click="refreshStatus" class="placeholder-btn desktop-only" :loading="refreshingStatus">
+                    <v-icon>mdi-refresh</v-icon>
                 </v-btn>
             </div>
         </div>
@@ -61,19 +61,31 @@
                             {{ profile.email }}
                         </p>
                         
-                        <!-- Availability Toggle -->
-                        <v-chip 
-                            :color="profile.is_active ? 'success' : 'error'"
-                            variant="flat"
-                            size="small"
-                            class="mt-3"
-                            @click="profile.is_active = !profile.is_active; toggleAvailability()"
-                        >
-                            <v-icon start size="14">
-                                {{ profile.is_active ? 'mdi-check-circle' : 'mdi-close-circle' }}
-                            </v-icon>
-                            {{ profile.is_active ? 'Available' : 'Unavailable' }}
-                        </v-chip>
+                        <!-- Status Display -->
+                        <div class="d-flex flex-column align-center gap-2 mt-3">
+                            <v-chip 
+                                :color="getStatusChipColor(profile.status)"
+                                variant="flat"
+                                size="small"
+                            >
+                                <v-icon start size="14">
+                                    {{ getStatusIcon(profile.status) }}
+                                </v-icon>
+                                {{ getStatusLabel(profile.status) }}
+                            </v-chip>
+                            
+                            <!-- Admin Restriction Notice -->
+                            <v-alert
+                                v-if="profile.admin_restricted"
+                                type="warning"
+                                density="compact"
+                                variant="tonal"
+                                class="mt-2 text-caption"
+                            >
+                                <v-icon size="16" class="mr-1">mdi-lock</v-icon>
+                                Status set by administrator. You cannot accept rescue requests until your status is changed to "Available".
+                            </v-alert>
+                        </div>
                     </div>
 
                     <!-- Stats Row -->
@@ -151,11 +163,15 @@
                                         variant="outlined"
                                         density="compact"
                                         :rules="isEditing ? [rules.phoneNumber] : []"
-                                        hint="Mobile number (e.g., 09171234567)"
+                                        hint="Mobile number (11 digits starting with 09)"
                                         :persistent-hint="isEditing"
                                         placeholder="09171234567"
                                         class="mb-3"
                                         prepend-inner-icon="mdi-phone-outline"
+                                        type="tel"
+                                        inputmode="numeric"
+                                        maxlength="11"
+                                        @input="profile.contact_number = profile.contact_number.replace(/\\D/g, '')"
                                     ></v-text-field>
                                 </v-col>
                                 <v-col cols="12">
@@ -254,68 +270,77 @@
                                 </div>
                             </v-expansion-panel-title>
                             <v-expansion-panel-text>
-                                <v-list density="compact" class="pa-0">
-                                    <v-list-item class="px-0">
-                                        <template #prepend>
-                                            <v-icon color="grey-darken-1" size="20">mdi-bell-outline</v-icon>
+                                <v-list class="bg-transparent pa-0 settings-list">
+                                    <v-list-item class="px-2 py-3 rounded-lg mb-2 setting-item">
+                                        <template v-slot:prepend>
+                                            <v-avatar color="primary" variant="tonal" size="36" class="mr-3">
+                                                <v-icon size="20">mdi-bell-outline</v-icon>
+                                            </v-avatar>
                                         </template>
-                                        <v-list-item-title class="text-body-2">Push Notifications</v-list-item-title>
-                                        <template #append>
+                                        <v-list-item-title class="text-body-2 font-weight-medium">Push Notifications</v-list-item-title>
+                                        <v-list-item-subtitle class="text-caption">Receive alerts for rescue requests</v-list-item-subtitle>
+                                        <template v-slot:append>
                                             <v-switch
                                                 v-model="settings.notifications"
                                                 color="primary"
-                                                density="compact"
                                                 hide-details
-                                                @update:model-value="updateSetting('Notifications')"
-                                            ></v-switch>
+                                                inset
+                                                @change="updateSetting('Notifications')"
+                                            />
                                         </template>
                                     </v-list-item>
-                                    <v-divider></v-divider>
-                                    <v-list-item class="px-0">
-                                        <template #prepend>
-                                            <v-icon color="grey-darken-1" size="20">mdi-volume-high</v-icon>
+                                    <v-list-item class="px-2 py-3 rounded-lg mb-2 setting-item">
+                                        <template v-slot:prepend>
+                                            <v-avatar color="orange" variant="tonal" size="36" class="mr-3">
+                                                <v-icon size="20">mdi-volume-high</v-icon>
+                                            </v-avatar>
                                         </template>
-                                        <v-list-item-title class="text-body-2">Sound Alerts</v-list-item-title>
-                                        <template #append>
+                                        <v-list-item-title class="text-body-2 font-weight-medium">Sound Alerts</v-list-item-title>
+                                        <v-list-item-subtitle class="text-caption">Play sounds for notifications</v-list-item-subtitle>
+                                        <template v-slot:append>
                                             <v-switch
                                                 v-model="settings.sound"
                                                 color="primary"
-                                                density="compact"
                                                 hide-details
-                                                @update:model-value="updateSetting('Sound')"
-                                            ></v-switch>
+                                                inset
+                                                @change="updateSetting('Sound')"
+                                            />
                                         </template>
                                     </v-list-item>
-                                    <v-divider></v-divider>
-                                    <v-list-item class="px-0">
-                                        <template #prepend>
-                                            <v-icon color="grey-darken-1" size="20">mdi-map-marker-outline</v-icon>
+                                    <v-list-item class="px-2 py-3 rounded-lg mb-2 setting-item">
+                                        <template v-slot:prepend>
+                                            <v-avatar color="success" variant="tonal" size="36" class="mr-3">
+                                                <v-icon size="20">mdi-map-marker-outline</v-icon>
+                                            </v-avatar>
                                         </template>
-                                        <v-list-item-title class="text-body-2">Location Services</v-list-item-title>
-                                        <template #append>
+                                        <v-list-item-title class="text-body-2 font-weight-medium">Location Services</v-list-item-title>
+                                        <v-list-item-subtitle class="text-caption">Enable for navigation to victims</v-list-item-subtitle>
+                                        <template v-slot:append>
                                             <v-switch
                                                 v-model="settings.location"
                                                 color="primary"
-                                                density="compact"
                                                 hide-details
-                                                @update:model-value="updateSetting('Location')"
-                                            ></v-switch>
+                                                inset
+                                                @change="updateSetting('Location')"
+                                            />
                                         </template>
                                     </v-list-item>
-                                    <v-divider></v-divider>
-                                    <v-list-item class="px-0">
-                                        <template #prepend>
-                                            <v-icon color="grey-darken-1" size="20">mdi-theme-light-dark</v-icon>
+                                    <v-list-item class="px-2 py-3 rounded-lg setting-item">
+                                        <template v-slot:prepend>
+                                            <v-avatar color="grey-darken-1" variant="tonal" size="36" class="mr-3">
+                                                <v-icon size="20">mdi-theme-light-dark</v-icon>
+                                            </v-avatar>
                                         </template>
-                                        <v-list-item-title class="text-body-2">Dark Mode</v-list-item-title>
-                                        <template #append>
+                                        <v-list-item-title class="text-body-2 font-weight-medium">Dark Mode</v-list-item-title>
+                                        <v-list-item-subtitle class="text-caption">Easier on eyes at night</v-list-item-subtitle>
+                                        <template v-slot:append>
                                             <v-switch
                                                 v-model="settings.darkMode"
                                                 color="primary"
-                                                density="compact"
                                                 hide-details
-                                                @update:model-value="updateSetting('DarkMode')"
-                                            ></v-switch>
+                                                inset
+                                                @change="updateSetting('DarkMode')"
+                                            />
                                         </template>
                                     </v-list-item>
                                 </v-list>
@@ -787,6 +812,7 @@ const uploadingPhoto = ref(false);
 const deletingPhoto = ref(false);
 const loggingOut = ref(false);
 const unreadMessageCount = ref(0);
+const refreshingStatus = ref(false);
 
 // Panel states
 const securityPanel = ref(null);
@@ -819,6 +845,8 @@ const profile = ref({
     employee_id: '',
     avatar: null,
     is_active: true,
+    status: 'available',
+    admin_restricted: false,
 });
 
 const originalProfile = ref({});
@@ -858,14 +886,25 @@ const rules = {
     hasNumber: v => /[0-9]/.test(v) || 'Must contain a number',
     hasSpecial: v => /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(v) || 'Must contain special character',
     passwordMatch: v => v === passwordForm.value.new_password || 'Passwords do not match',
-    // Phone number validation
+    // Phone number validation - only accepts 11 numeric digits
     phoneNumber: (v) => {
         if (!v) return true; // Optional field
-        const cleaned = v.replace(/[\s\-\(\)]/g, '');
         
-        // Must start with 09 and have exactly 11 digits
-        if (!/^09[0-9]{9}$/.test(cleaned)) {
-            return 'Please enter a valid number';
+        // Remove all non-digit characters
+        const cleaned = v.replace(/\D/g, '');
+        
+        // Must be exactly 11 digits and start with 09
+        if (cleaned.length !== 11) {
+            return 'Must be exactly 11 digits';
+        }
+        
+        if (!cleaned.startsWith('09')) {
+            return 'Must start with 09';
+        }
+        
+        // Ensure it's purely numeric (no letters)
+        if (!/^\d{11}$/.test(cleaned)) {
+            return 'Must contain only numbers';
         }
         
         return true;
@@ -909,6 +948,40 @@ const isPasswordValid = computed(() => {
 });
 
 // Methods
+const refreshStatus = async () => {
+    refreshingStatus.value = true;
+    try {
+        const userData = JSON.parse(localStorage.getItem('userData') || '{}');
+        if (!userData.id) return;
+
+        const response = await apiFetch(`/api/users/${userData.id}`, { method: 'GET' });
+        console.log('[Profile] Refresh status API Response:', response);
+        
+        if (response && response.success && response.data) {
+            const serverData = response.data;
+            console.log('[Profile] Server data:', serverData);
+            
+            // Update profile status
+            profile.value.status = serverData.status || 'available';
+            profile.value.admin_restricted = ['off_duty', 'unavailable'].includes(serverData.status);
+            
+            // Update local storage
+            const updatedUserData = {
+                ...userData,
+                status: serverData.status,
+            };
+            localStorage.setItem('userData', JSON.stringify(updatedUserData));
+            
+            showSnackbar('Status refreshed', 'success');
+        }
+    } catch (error) {
+        console.error('Error refreshing status:', error);
+        showSnackbar('Failed to refresh status', 'error');
+    } finally {
+        refreshingStatus.value = false;
+    }
+};
+
 const fetchProfile = async () => {
     try {
         const userData = JSON.parse(localStorage.getItem('userData') || '{}');
@@ -917,17 +990,77 @@ const fetchProfile = async () => {
             return;
         }
 
-        profile.value = {
-            id: userData.id,
-            first_name: userData.firstName || userData.first_name || '',
-            last_name: userData.lastName || userData.last_name || '',
-            email: userData.email || '',
-            contact_number: userData.phone || userData.contact_number || '',
-            employee_id: userData.rescuer_id || userData.username || userData.id,
-            avatar: userData.profile_picture || userData.avatar || null,
-            profile_picture: userData.profile_picture || userData.avatar || null,
-            is_active: userData.is_active !== false,
-        };
+        // Fetch latest user data from server to get current status
+        try {
+            const response = await apiFetch(`/api/users/${userData.id}`, { method: 'GET' });
+            console.log('[Profile] Fetch profile API Response:', response);
+            
+            if (response && response.success && response.data) {
+                const serverData = response.data;
+                console.log('[Profile] Server data:', serverData);
+                
+                // Update profile with fresh server data
+                profile.value = {
+                    id: serverData.id,
+                    first_name: serverData.first_name || '',
+                    last_name: serverData.last_name || '',
+                    email: serverData.email || '',
+                    contact_number: serverData.phone || serverData.contact_number || '',
+                    employee_id: serverData.rescuer_id || serverData.username || serverData.id,
+                    avatar: serverData.profile_picture || serverData.avatar || null,
+                    profile_picture: serverData.profile_picture || serverData.avatar || null,
+                    is_active: serverData.is_active !== false,
+                    status: serverData.status || 'available',
+                    admin_restricted: ['off_duty', 'unavailable'].includes(serverData.status),
+                };
+                
+                // Update local storage with latest data
+                const updatedUserData = {
+                    ...userData,
+                    status: serverData.status,
+                    phone: serverData.phone,
+                    contact_number: serverData.phone,
+                    profile_picture: serverData.profile_picture || serverData.avatar,
+                    first_name: serverData.first_name,
+                    last_name: serverData.last_name,
+                };
+                localStorage.setItem('userData', JSON.stringify(updatedUserData));
+                
+                console.log('[Profile] Profile updated with status:', profile.value.status);
+            } else {
+                // Fallback to local storage if API fails
+                profile.value = {
+                    id: userData.id,
+                    first_name: userData.firstName || userData.first_name || '',
+                    last_name: userData.lastName || userData.last_name || '',
+                    email: userData.email || '',
+                    contact_number: userData.phone || userData.contact_number || '',
+                    employee_id: userData.rescuer_id || userData.username || userData.id,
+                    avatar: userData.profile_picture || userData.avatar || null,
+                    profile_picture: userData.profile_picture || userData.avatar || null,
+                    is_active: userData.is_active !== false,
+                    status: userData.status || 'available',
+                    admin_restricted: ['off_duty', 'unavailable'].includes(userData.status),
+                };
+            }
+        } catch (apiError) {
+            console.error('Error fetching user from server:', apiError);
+            // Use local storage data if API call fails
+            profile.value = {
+                id: userData.id,
+                first_name: userData.firstName || userData.first_name || '',
+                last_name: userData.lastName || userData.last_name || '',
+                email: userData.email || '',
+                contact_number: userData.phone || userData.contact_number || '',
+                employee_id: userData.rescuer_id || userData.username || userData.id,
+                avatar: userData.profile_picture || userData.avatar || null,
+                profile_picture: userData.profile_picture || userData.avatar || null,
+                is_active: userData.is_active !== false,
+                status: userData.status || 'available',
+                admin_restricted: ['off_duty', 'unavailable'].includes(userData.status),
+            };
+        }
+        
         originalProfile.value = { ...profile.value };
 
         await fetchStats(userData.id);
@@ -950,14 +1083,47 @@ const fetchStats = async (userId) => {
         
         if (response && response.data) {
             const rescues = Array.isArray(response.data) ? response.data : [];
-            const completed = rescues.filter(r => r.status === 'rescued' || r.status === 'completed').length;
-            const inProgress = rescues.filter(r => ['assigned', 'in_progress', 'en_route', 'on_scene'].includes(r.status)).length;
-            const avgMinutes = completed > 0 ? Math.round(Math.random() * 45 + 15) : 0;
+            
+            // Count completed rescues
+            const completedRescues = rescues.filter(r => 
+                r.status === 'rescued' || r.status === 'completed' || r.status === 'safe'
+            );
+            const completed = completedRescues.length;
+            
+            // Count in-progress rescues
+            const inProgress = rescues.filter(r => 
+                ['assigned', 'in_progress', 'en_route', 'on_scene'].includes(r.status)
+            ).length;
+            
+            // Calculate average response time
+            let avgTime = '0:00';
+            if (completed > 0) {
+                let totalMinutes = 0;
+                let validCount = 0;
+                
+                completedRescues.forEach(rescue => {
+                    const created = new Date(rescue.created_at);
+                    const updated = new Date(rescue.updated_at);
+                    const diffMinutes = Math.floor((updated - created) / 60000);
+                    
+                    if (diffMinutes > 0 && diffMinutes < 1440) { // Valid if less than 24 hours
+                        totalMinutes += diffMinutes;
+                        validCount++;
+                    }
+                });
+                
+                if (validCount > 0) {
+                    const avgMinutes = Math.floor(totalMinutes / validCount);
+                    const hours = Math.floor(avgMinutes / 60);
+                    const mins = avgMinutes % 60;
+                    avgTime = `${hours}:${String(mins).padStart(2, '0')}`;
+                }
+            }
             
             stats.value = {
                 completed,
                 inProgress,
-                avgTime: avgMinutes > 60 ? `${Math.round(avgMinutes / 60)}h` : `${avgMinutes}m`,
+                avgTime,
             };
         }
     } catch (error) {
@@ -1379,35 +1545,72 @@ const handleLogout = async () => {
     }
 
     try {
-        // Call backend logout API to invalidate session
+        // Call backend logout API to invalidate session and api_token
         await fetch('/logout', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'Accept': 'application/json',
                 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content
-            }
+            },
+            credentials: 'include'
         });
     } catch (error) {
         console.error('Logout API error:', error);
-    } finally {
-        // Clear all local storage data regardless of API result
-        localStorage.removeItem('userData');
-        localStorage.removeItem('authToken');
-        localStorage.removeItem('token');
-        localStorage.removeItem('lastRescueRequestId');
-        localStorage.removeItem('rescuerSettings');
-        localStorage.removeItem('activeRescue');
-        
-        // Clear session storage as well
-        sessionStorage.clear();
-        
-        loggingOut.value = false;
-        showLogoutDialog.value = false;
-        
-        // Redirect to login
-        router.visit('/login');
     }
+
+    // Clear ALL local storage data regardless of API result
+    localStorage.removeItem('userData');
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('token');
+    localStorage.removeItem('lastRescueRequestId');
+    localStorage.removeItem('rescuerSettings');
+    localStorage.removeItem('activeRescue');
+    localStorage.removeItem('conversationId');
+    localStorage.removeItem('chatId');
+    
+    // Clear session storage as well
+    sessionStorage.clear();
+    
+    loggingOut.value = false;
+    showLogoutDialog.value = false;
+    
+    // Hard redirect to fully reset app state (not Inertia SPA navigation)
+    window.location.href = '/login';
+};
+
+// Status display helpers
+const getStatusChipColor = (status) => {
+    const colors = {
+        'available': 'success',
+        'on_rescue': 'warning',
+        'off_duty': 'grey',
+        'unavailable': 'error',
+        'pending': 'info'
+    };
+    return colors[status] || 'grey';
+};
+
+const getStatusIcon = (status) => {
+    const icons = {
+        'available': 'mdi-check-circle',
+        'on_rescue': 'mdi-account-alert',
+        'off_duty': 'mdi-clock-outline',
+        'unavailable': 'mdi-close-circle',
+        'pending': 'mdi-clock-alert-outline'
+    };
+    return icons[status] || 'mdi-help-circle';
+};
+
+const getStatusLabel = (status) => {
+    const labels = {
+        'available': 'Available',
+        'on_rescue': 'On Rescue',
+        'off_duty': 'Off Duty',
+        'unavailable': 'Unavailable',
+        'pending': 'Pending Activation'
+    };
+    return labels[status] || status?.replace(/_/g, ' ').toUpperCase() || 'Unknown';
 };
 
 const showSnackbar = (message, color = 'success') => {
@@ -1433,11 +1636,29 @@ onMounted(async () => {
     }
     fetchProfile();
     await fetchUnreadMessageCount();
+    
+    // Add visibility change listener to refresh status when user returns to page
+    const handleVisibilityChange = () => {
+        if (!document.hidden) {
+            console.log('[Profile] Page became visible, refreshing status...');
+            refreshStatus();
+        }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    // Store the cleanup function
+    window._profileVisibilityHandler = handleVisibilityChange;
 });
 
 onUnmounted(() => {
     if (countdownInterval) {
         clearInterval(countdownInterval);
+    }
+    
+    // Remove visibility change listener
+    if (window._profileVisibilityHandler) {
+        document.removeEventListener('visibilitychange', window._profileVisibilityHandler);
+        delete window._profileVisibilityHandler;
     }
 });
 </script>
@@ -1638,5 +1859,19 @@ onUnmounted(() => {
 
 .requirement-item span {
     line-height: 1.2;
+}
+
+/* Settings list mobile styling */
+.settings-list {
+    margin: 0 -4px;
+}
+
+.setting-item {
+    background: rgba(0, 0, 0, 0.02);
+    min-height: 64px !important;
+}
+
+.setting-item:active {
+    background: rgba(0, 0, 0, 0.05);
 }
 </style>

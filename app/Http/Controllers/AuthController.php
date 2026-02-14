@@ -212,15 +212,22 @@ class AuthController extends Controller
      */
     public function logout(Request $request)
     {
+        // Invalidate the user's API token before logging out
+        if (Auth::check()) {
+            $user = Auth::user();
+            $user->api_token = null;
+            $user->save();
+        }
+
         // Clear session and log out user
         Auth::logout();
         
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
-        // For Inertia requests, redirect properly
-        if ($request->header('X-Inertia')) {
-            return redirect('/login');
+        // For JSON/fetch requests, return JSON so the frontend handles redirect
+        if ($request->expectsJson() || $request->header('Accept') === 'application/json') {
+            return response()->json(['success' => true, 'message' => 'Logged out successfully']);
         }
 
         return redirect('/login');
@@ -651,7 +658,25 @@ class AuthController extends Controller
      */
     public function showUser(User $user)
     {
-        return response()->json($user);
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'id' => $user->id,
+                'first_name' => $user->first_name,
+                'last_name' => $user->last_name,
+                'email' => $user->email,
+                'phone' => $user->phone,
+                'contact_number' => $user->phone,
+                'rescuer_id' => $user->rescuer_id,
+                'username' => $user->username,
+                'profile_picture' => $user->profile_picture,
+                'avatar' => $user->profile_picture,
+                'is_active' => $user->is_active,
+                'status' => $user->status ?? 'available',
+                'role' => $user->role,
+                'is_verified' => $user->is_verified,
+            ]
+        ]);
     }
 
     /**
@@ -1705,19 +1730,23 @@ class AuthController extends Controller
                     }
                 },
             ],
-            'emergency_contact_name' => 'nullable|string|max:255',
+            'emergency_contact_name' => 'required|string|max:255',
             'emergency_contact_phone' => [
-                'nullable',
+                'required',
                 'string',
                 'regex:/^(09|\+639|639)[0-9]{9}$/',
             ],
-            'emergency_contact_relationship' => 'nullable|string|max:100',
+            'emergency_contact_relationship' => 'required|string|max:100',
         ], [
             'id_number.required' => 'ID number is required.',
             'id_number.digits' => 'ID number must be exactly 9 digits.',
             'id_number.regex' => 'ID number must contain only numbers.',
             'phone_number.required' => 'Phone number is required.',
-            'phone_number.regex' => 'Please enter a valid   (e.g., 09171234567).',
+            'phone_number.regex' => 'Please enter a valid phone number (e.g., 09171234567).',
+            'emergency_contact_name.required' => 'Emergency contact name is required.',
+            'emergency_contact_phone.required' => 'Emergency contact phone number is required.',
+            'emergency_contact_phone.regex' => 'Please enter a valid emergency contact phone number (e.g., 09171234567).',
+            'emergency_contact_relationship.required' => 'Emergency contact relationship is required.',
         ]);
         
         if ($validator->fails()) {

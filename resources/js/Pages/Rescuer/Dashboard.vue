@@ -28,12 +28,23 @@
 
             <v-divider />
 
-            <div v-if="pendingRequests.length === 0" class="text-center py-8">
-                <v-icon size="48" color="grey">mdi-bell-off-outline</v-icon>
-                <p class="text-grey mt-2">No new notifications</p>
+            <!-- Show restriction message if rescuer is restricted -->
+            <div v-if="isRescuerRestricted" class="text-center py-8 px-4">
+                <v-icon size="48" color="warning">mdi-lock-alert</v-icon>
+                <p class="text-grey mt-2 font-weight-bold">Access Restricted</p>
+                <p class="text-grey text-caption">
+                    Your status is set to {{ rescuerStatus }} by an administrator.
+                </p>
             </div>
 
-            <v-list v-else lines="three">
+            <!-- Show empty state or pending requests only if not restricted -->
+            <template v-else>
+                <div v-if="pendingRequests.length === 0" class="text-center py-8">
+                    <v-icon size="48" color="grey">mdi-bell-off-outline</v-icon>
+                    <p class="text-grey mt-2">No new notifications</p>
+                </div>
+
+                <v-list v-else lines="three">
                 <v-list-item
                     v-for="request in pendingRequests"
                     :key="request.id"
@@ -67,9 +78,10 @@
                     </template>
                 </v-list-item>
             </v-list>
+            </template>
 
             <template v-slot:append>
-                <div class="pa-4">
+                <div class="pa-4" v-if="!isRescuerRestricted">
                     <v-btn
                         block
                         color="primary"
@@ -130,6 +142,25 @@
                 </div>
             </div>
 
+            <!-- Admin Restriction Warning -->
+            <v-alert
+                v-if="isRescuerRestricted"
+                type="warning"
+                variant="tonal"
+                prominent
+                border="start"
+                class="mx-4 mt-3 mb-2"
+            >
+                <template v-slot:prepend>
+                    <v-icon size="28">mdi-lock</v-icon>
+                </template>
+                <div class="text-subtitle-2 font-weight-bold mb-1">Account Restricted</div>
+                <div class="text-caption">
+                    Your status is set to <strong>{{ rescuerStatus }}</strong> by an administrator. 
+                    You cannot view or accept rescue requests. Please contact an admin to change your status.
+                </div>
+            </v-alert>
+
             <!-- Content Area -->
             <div class="content-area">
                 <!-- Loading State -->
@@ -141,33 +172,45 @@
                 <div v-else class="request-list">
                     <!-- Pending/Need Help Tab -->
                     <div v-if="selectedTab === 'pending'">
-                        <div v-if="pendingRequests.length === 0" class="empty-state">
-                            <v-icon size="64" color="grey-lighten-1">mdi-inbox-outline</v-icon>
-                            <p class="text-grey mt-2">No pending rescue requests</p>
+                        <!-- Show restriction message if rescuer is off_duty or unavailable -->
+                        <div v-if="isRescuerRestricted" class="empty-state">
+                            <v-icon size="64" color="warning">mdi-lock-alert</v-icon>
+                            <p class="text-grey mt-2 text-h6">Access Restricted</p>
+                            <p class="text-grey text-body-2 px-4">
+                                Your account is currently set to <strong>{{ rescuerStatus }}</strong>.<br>
+                                Contact an administrator to change your status.
+                            </p>
                         </div>
-                        <div
-                            v-for="request in pendingRequests"
-                            :key="request.id"
-                            class="request-card"
-                            @click="viewPendingRequest(request)"
-                        >
-                            <div class="request-card-content">
-                                <div class="request-info">
-                                    <h3 class="request-name">
-                                        {{ request.firstName || 'User Name' }} {{ request.lastName || '' }}
-                                        <span v-if="request.description" class="injury-type">({{ getInjuryType(request.description) }})</span>
-                                    </h3>
-                                    <p class="request-location">
-                                        Scanned at {{ getLocationDisplay(request) }} on ...
-                                    </p>
-                                </div>
-                                <div class="request-status">
-                                    <div :class="['timer-badge', getTimerColorClass(request.urgency_level)]">
-                                        {{ formatElapsedTime(request.created_at) }}
+                        
+                        <!-- Show requests only if not restricted -->
+                        <template v-else>
+                            <div v-if="pendingRequests.length === 0" class="empty-state">
+                                <v-icon size="64" color="grey-lighten-1">mdi-inbox-outline</v-icon>
+                                <p class="text-grey mt-2">No pending rescue requests</p>
+                            </div>
+                            <div
+                                v-for="request in pendingRequests"
+                                :key="request.id"
+                                class="request-card"
+                                @click="viewPendingRequest(request)"
+                            >
+                                <div class="request-card-content">
+                                    <div class="request-info">
+                                        <h3 class="request-name">
+                                            {{ request.firstName || 'User Name' }} {{ request.lastName || '' }}
+                                        </h3>
+                                        <p class="request-location">
+                                            Scanned at {{ getLocationDisplay(request) }} on ...
+                                        </p>
+                                    </div>
+                                    <div class="request-status">
+                                        <div :class="['timer-badge', getTimerColorClass(request.urgency_level)]">
+                                            {{ formatElapsedTime(request.created_at) }}
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                        </div>
+                        </template>
                     </div>
 
                     <!-- In Progress Tab -->
@@ -499,13 +542,21 @@ const hasActiveAssignment = computed(() => {
 // Rescuer's current status (refreshed on each poll)
 const rescuerStatus = ref(authUser.value?.status || 'available');
 
+// Check if rescuer is restricted (off_duty or unavailable)
+const isRescuerRestricted = computed(() => {
+    const status = rescuerStatus.value?.toLowerCase();
+    return status === 'off_duty' || status === 'unavailable';
+});
+
 // Eligibility check — rescuer can receive force alert only if ALL are true:
 // 1. No active rescue (active_request = none)
 // 2. Status is "available"
 // 3. Has not accepted another request (covered by #1)
+// 4. Not restricted by admin
 const isEligibleForForceAlert = computed(() => {
     return !hasActiveAssignment.value && 
-           rescuerStatus.value?.toLowerCase() === 'available';
+           rescuerStatus.value?.toLowerCase() === 'available' &&
+           !isRescuerRestricted.value;
 });
 
 // Toast
@@ -539,8 +590,17 @@ onMounted(async () => {
     loadUserData();
     await fetchRescueRequests();
     
+    // Refresh rescuer status on mount to get latest from server
+    await refreshRescuerStatus();
+    
     // Register new message notification callback
     const unregisterMessageCallback = onNewMessages((newCount) => {
+        // Don't show message notifications if rescuer is restricted
+        if (isRescuerRestricted.value) {
+            console.log('[Dashboard] Rescuer is restricted, skipping message notification');
+            return;
+        }
+        
         showPopupNotification(
             '\uD83D\uDCAC New Message',
             `You have ${newCount} new message${newCount > 1 ? 's' : ''}`,
@@ -596,19 +656,24 @@ const pollForNewRequests = async () => {
         const newRequests = currentPending.filter(r => !previousPendingIds.value.includes(r.id));
         
         if (newRequests.length > 0) {
-            // If rescuer is not eligible (busy/unavailable) → default sound only
-            // If rescuer is available → emergency alarm
-            if (!isEligibleForForceAlert.value) {
+            // Don't send any notifications if rescuer is restricted by admin
+            if (isRescuerRestricted.value) {
+                console.log('[Dashboard] Rescuer is restricted, skipping notifications');
+            }
+            // If rescuer has active assignment → soft notification only
+            else if (hasActiveAssignment.value) {
                 triggerSoftRequestNotification(newRequests[0], newRequests.length);
-            } else {
+            }
+            // If rescuer is available → emergency alarm
+            else {
                 triggerNewRequestNotification(newRequests[0], newRequests.length);
             }
         }
         
         // Check for force-alert requests from admin
-        // Only trigger for ELIGIBLE rescuers — skip entirely if busy
+        // Only trigger for ELIGIBLE rescuers — skip entirely if busy or restricted
         const forceAlertRequests = currentPending.filter(r => r.force_alert === true || r.force_alert === 1);
-        if (forceAlertRequests.length > 0 && !isForceAlertPlaying.value && isEligibleForForceAlert.value) {
+        if (forceAlertRequests.length > 0 && !isForceAlertPlaying.value && isEligibleForForceAlert.value && !isRescuerRestricted.value) {
             const req = forceAlertRequests[0];
             const name = req.firstName || 'Someone';
             const location = getLocationDisplay(req);
@@ -727,6 +792,10 @@ const loadUserData = () => {
         rescuerName.value = parsed.firstName
             ? `${parsed.firstName} ${parsed.lastName || ''}`.trim()
             : parsed.name || 'Rescuer';
+        // Get status from localStorage
+        if (parsed.status) {
+            rescuerStatus.value = parsed.status;
+        }
     }
     // Also read status from Inertia auth (most up-to-date)
     if (authUser.value?.status) {
@@ -739,11 +808,24 @@ const refreshRescuerStatus = async () => {
     if (!rescuerId.value) return;
     try {
         const response = await apiFetch(`/api/users/${rescuerId.value}`, { method: 'GET' });
+        console.log('[Dashboard] Status refresh response:', response);
+        
         const user = response?.data || response;
         if (user?.status) {
             rescuerStatus.value = user.status;
+            console.log('[Dashboard] Updated rescuer status to:', user.status);
+            
+            // Also update localStorage so other components see the change
+            const storedData = localStorage.getItem('userData');
+            if (storedData) {
+                const parsed = JSON.parse(storedData);
+                parsed.status = user.status;
+                localStorage.setItem('userData', JSON.stringify(parsed));
+            }
         }
-    } catch { /* silent — status check is non-critical */ }
+    } catch (error) {
+        console.error('[Dashboard] Error refreshing status:', error);
+    }
 };
 
 const fetchRescueRequests = async () => {
@@ -774,6 +856,13 @@ const refreshData = async () => {
 };
 
 const acceptRescue = async (request) => {
+    // Check if rescuer status allows accepting requests
+    if (rescuerStatus.value && ['off_duty', 'unavailable'].includes(rescuerStatus.value.toLowerCase())) {
+        const statusText = rescuerStatus.value === 'off_duty' ? 'off duty' : 'unavailable';
+        showNotification(`You cannot accept rescue requests while you are ${statusText}. Please contact an administrator to change your status.`, 'error');
+        return;
+    }
+    
     // Check if rescuer already has an active assignment
     if (hasActiveAssignment.value) {
         showNotification('You are only allowed to accept requests one at a time.', 'warning');
@@ -792,6 +881,13 @@ const acceptRescue = async (request) => {
                 assigned_rescuer: rescuerId.value,
             }),
         });
+        
+        // Handle API response errors
+        if (response && !response.success) {
+            showNotification(response.message || 'Failed to accept rescue', 'error');
+            return;
+        }
+        
         // Stop force-alert ringtone if it was playing
         stopForceAlert();
         popupAlert.value.show = false;
@@ -800,7 +896,8 @@ const acceptRescue = async (request) => {
         router.visit(`/rescuer/active/${request.id}`);
     } catch (error) {
         console.error('Failed to accept rescue:', error);
-        showNotification('Failed to accept rescue', 'error');
+        const errorMessage = error.data?.message || error.message || 'Failed to accept rescue';
+        showNotification(errorMessage, 'error');
     } finally {
         updatingId.value = null;
     }
@@ -842,6 +939,12 @@ const viewRescuedRequest = (request) => {
 };
 
 const openChat = (request) => {
+    // Prevent opening chat if rescuer is restricted
+    if (isRescuerRestricted.value) {
+        showNotification('You cannot access messages while your status is restricted', 'warning');
+        return;
+    }
+    
     // Always use rescue-chat route which handles conversation creation properly
     router.visit(`/rescuer/rescue-chat/${request.id}?from=dashboard-inprogress`);
 };
@@ -928,9 +1031,14 @@ const formatTimeAgo = (timestamp) => {
     const diffDays = Math.floor(diffMs / 86400000);
     
     if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins} min${diffMins > 1 ? 's' : ''} ago`;
-    if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
-    return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+    if (diffMins < 60) {
+        return `0:${String(diffMins).padStart(2, '0')}`;
+    }
+    if (diffHours < 24) {
+        const mins = diffMins % 60;
+        return `${diffHours}:${String(mins).padStart(2, '0')}`;
+    }
+    return `${diffDays}d ago`;
 };
 
 // Format date for rescued filter display

@@ -8,36 +8,12 @@
             :notification-count="0"
             @go-back="handleGoBack"
         >
-            <template #actions>
-                <v-btn icon variant="text" class="bar-btn" style="color: white;" @click="fetchRescueData">
-                    <v-icon>mdi-refresh</v-icon>
-                </v-btn>
-            </template>
         </UserAppBar>
 
         <!-- Navigation Drawer - handles its own visibility -->
         <UserMenu v-model="drawer" />
 
         <v-main class="bg-grey-lighten-4">
-            <!-- Notification Alert Banner -->
-            <v-slide-y-transition>
-                <v-alert
-                    v-if="notificationBanner.show"
-                    :type="notificationBanner.type"
-                    :icon="notificationBanner.icon"
-                    variant="tonal"
-                    class="notification-banner ma-3 rounded-xl"
-                    closable
-                    @click:close="notificationBanner.show = false"
-                >
-                    <div class="d-flex align-center">
-                        <div class="flex-grow-1">
-                            <div class="text-subtitle-2 font-weight-bold">{{ notificationBanner.title }}</div>
-                            <div class="text-caption">{{ notificationBanner.message }}</div>
-                        </div>
-                    </div>
-                </v-alert>
-            </v-slide-y-transition>
 
             <v-container fluid class="pa-0">
                 <!-- Loading State -->
@@ -115,45 +91,54 @@
                                 </v-avatar>
                                 <div class="card-header-text">
                                     <h3>Your Location</h3>
-                                    <p>Where help is coming</p>
+                                    <p>{{ needsLocationUpdate ? 'Location not yet provided' : 'Where help is coming' }}</p>
                                 </div>
                             </div>
                             <v-card-text class="pt-0">
-                                <div class="location-details">
-                                    <div class="location-item">
-                                        <v-icon color="primary" size="18">mdi-office-building</v-icon>
-                                        <div>
-                                            <span class="label">Building</span>
-                                            <span class="value">{{ locationDetails.buildingName }}</span>
+                                <template v-if="!needsLocationUpdate">
+                                    <div class="location-details">
+                                        <div class="location-item">
+                                            <v-icon color="primary" size="18">mdi-office-building</v-icon>
+                                            <div>
+                                                <span class="label">Building</span>
+                                                <span class="value">{{ locationDetails.buildingName }}</span>
+                                            </div>
+                                        </div>
+                                        <div class="location-item">
+                                            <v-icon color="secondary" size="18">mdi-stairs</v-icon>
+                                            <div>
+                                                <span class="label">Floor</span>
+                                                <span class="value">{{ locationDetails.floorName || 'Loading...' }}</span>
+                                            </div>
+                                        </div>
+                                        <div class="location-item">
+                                            <v-icon color="success" size="18">mdi-door</v-icon>
+                                            <div>
+                                                <span class="label">Room</span>
+                                                <span class="value">{{ locationDetails.roomName || 'Loading...' }}</span>
+                                            </div>
                                         </div>
                                     </div>
-                                    <div class="location-item">
-                                        <v-icon color="secondary" size="18">mdi-stairs</v-icon>
-                                        <div>
-                                            <span class="label">Floor</span>
-                                            <span class="value">{{ locationDetails.floorName || 'Loading...' }}</span>
+                                    <!-- View Map Button -->
+                                    <v-btn
+                                        variant="tonal"
+                                        color="primary"
+                                        size="small"
+                                        class="mt-3 view-map-btn"
+                                        block
+                                        @click="viewMap"
+                                    >
+                                        <v-icon start size="18">mdi-map</v-icon>
+                                        View Floor Map
+                                    </v-btn>
+                                </template>
+                                <template v-else>
+                                    <v-alert type="warning" variant="tonal" density="compact" class="rounded-lg">
+                                        <div class="text-caption">
+                                            Location not yet provided. Tap "Update Details" below to add your location so rescuers can find you.
                                         </div>
-                                    </div>
-                                    <div class="location-item">
-                                        <v-icon color="success" size="18">mdi-door</v-icon>
-                                        <div>
-                                            <span class="label">Room</span>
-                                            <span class="value">{{ locationDetails.roomName || 'Loading...' }}</span>
-                                        </div>
-                                    </div>
-                                </div>
-                                <!-- View Map Button -->
-                                <v-btn
-                                    variant="tonal"
-                                    color="primary"
-                                    size="small"
-                                    class="mt-3 view-map-btn"
-                                    block
-                                    @click="viewMap"
-                                >
-                                    <v-icon start size="18">mdi-map</v-icon>
-                                    View Floor Map
-                                </v-btn>
+                                    </v-alert>
+                                </template>
                             </v-card-text>
                         </v-card>
 
@@ -181,9 +166,9 @@
                                     <div class="rescuer-details">
                                         <h4>{{ getRescuerName() }}</h4>
                                         <p>Certified Rescuer</p>
-                                        <v-chip color="success" variant="tonal" size="x-small" v-if="rescue.status === 'en_route'">
-                                            <v-icon start size="12">mdi-run-fast</v-icon>
-                                            On the way
+                                        <v-chip :color="getRescuerStatusColor()" variant="tonal" size="x-small">
+                                            <v-icon start size="12">{{ getRescuerStatusIcon() }}</v-icon>
+                                            {{ getRescuerStatusText() }}
                                         </v-chip>
                                     </div>
                                     <v-icon color="grey" size="20">mdi-chevron-right</v-icon>
@@ -208,7 +193,33 @@
                                     <!-- Description -->
                                     <div v-if="rescue.description" class="detail-item">
                                         <span class="detail-label">Description</span>
-                                        <p class="detail-value">{{ rescue.description }}</p>
+                                        <p class="detail-value">
+                                            {{ rescue.description }}
+                                        </p>
+                                        <!-- Show translate button if language is not English -->
+                                        <div v-if="rescue.is_translated && !rescue.original_description" class="mt-2">
+                                            <v-btn
+                                                size="small"
+                                                variant="tonal"
+                                                color="info"
+                                                :loading="isTranslating"
+                                                @click="handleTranslate"
+                                                prepend-icon="mdi-translate"
+                                                class="rounded-lg"
+                                            >
+                                                Translate to English
+                                            </v-btn>
+                                        </div>
+                                        <!-- Show translated text with original -->
+                                        <div v-if="rescue.original_description" class="translation-info mt-1">
+                                            <v-chip size="x-small" color="info" variant="tonal" class="mb-1">
+                                                <v-icon start size="10">mdi-translate</v-icon>
+                                                Translated to English
+                                            </v-chip>
+                                            <p class="original-text text-caption text-grey-darken-1" style="font-style: italic;">
+                                                Original: "{{ rescue.original_description }}"
+                                            </p>
+                                        </div>
                                     </div>
 
                                     <!-- Urgency & Mobility Row -->
@@ -251,7 +262,18 @@
                                     <!-- Injuries -->
                                     <div v-if="rescue.injuries" class="detail-item">
                                         <span class="detail-label">Injuries Reported</span>
-                                        <p class="detail-value">{{ rescue.injuries }}</p>
+                                        <p class="detail-value">
+                                            {{ rescue.injuries }}
+                                        </p>
+                                        <div v-if="rescue.original_injuries" class="translation-info mt-1">
+                                            <v-chip size="x-small" color="info" variant="tonal" class="mb-1">
+                                                <v-icon start size="10">mdi-translate</v-icon>
+                                                Translated
+                                            </v-chip>
+                                            <p class="original-text text-caption text-grey-darken-1" style="font-style: italic;">
+                                                Original: "{{ rescue.original_injuries }}"
+                                            </p>
+                                        </div>
                                     </div>
 
                                     <!-- Completion Time -->
@@ -264,6 +286,140 @@
                                     </div>
                                 </div>
                             </v-card-text>
+                        </v-card>
+
+                        <!-- Update Details Card (when location or details are missing) -->
+                        <v-card v-if="(needsLocationUpdate || needsDetailsUpdate) && rescue.status !== 'rescued' && rescue.status !== 'safe' && rescue.status !== 'cancelled'" class="mb-3 rounded-xl" elevation="0">
+                            <div class="card-header-icon" style="cursor: pointer;" @click="toggleUpdateForm">
+                                <v-avatar color="warning" size="40">
+                                    <v-icon color="white" size="20">mdi-pencil-plus</v-icon>
+                                </v-avatar>
+                                <div class="card-header-text">
+                                    <h3>Update Details</h3>
+                                    <p>Add missing information to help rescuers</p>
+                                </div>
+                                <v-icon class="ml-auto" color="grey">{{ showUpdateForm ? 'mdi-chevron-up' : 'mdi-chevron-down' }}</v-icon>
+                            </div>
+                            
+                            <v-expand-transition>
+                                <v-card-text v-if="showUpdateForm" class="pt-0">
+                                    <v-form @submit.prevent="handleUpdateDetails">
+                                        <!-- Location Selection (if missing) -->
+                                        <template v-if="needsLocationUpdate">
+                                            <p class="text-subtitle-2 font-weight-bold mb-2">
+                                                <v-icon size="16" class="mr-1">mdi-map-marker</v-icon>
+                                                Location
+                                            </p>
+                                            <v-select
+                                                v-model="updateForm.building_id"
+                                                :items="buildings"
+                                                item-title="name"
+                                                item-value="id"
+                                                label="Building"
+                                                variant="outlined"
+                                                density="comfortable"
+                                                prepend-inner-icon="mdi-office-building"
+                                                hide-details
+                                                class="mb-3"
+                                                @update:modelValue="updateForm.floor_id = null; updateForm.room_id = null"
+                                            />
+                                            <v-select
+                                                v-model="updateForm.floor_id"
+                                                :items="updateFloors"
+                                                item-title="floor_name"
+                                                item-value="id"
+                                                label="Floor"
+                                                variant="outlined"
+                                                density="comfortable"
+                                                prepend-inner-icon="mdi-stairs"
+                                                hide-details
+                                                class="mb-3"
+                                                :disabled="!updateForm.building_id"
+                                                @update:modelValue="updateForm.room_id = null"
+                                            />
+                                            <v-select
+                                                v-model="updateForm.room_id"
+                                                :items="updateRooms"
+                                                item-title="room_name"
+                                                item-value="id"
+                                                label="Room"
+                                                variant="outlined"
+                                                density="comfortable"
+                                                prepend-inner-icon="mdi-door"
+                                                hide-details
+                                                class="mb-3"
+                                                :disabled="!updateForm.floor_id"
+                                            />
+                                            <v-divider class="mb-3" />
+                                        </template>
+
+                                        <!-- Emergency Details (if missing) -->
+                                        <template v-if="needsDetailsUpdate">
+                                            <p class="text-subtitle-2 font-weight-bold mb-2">
+                                                <v-icon size="16" class="mr-1">mdi-alert-circle</v-icon>
+                                                Emergency Details
+                                            </p>
+                                            <v-textarea
+                                                v-model="updateForm.description"
+                                                label="Describe your emergency"
+                                                variant="outlined"
+                                                rows="2"
+                                                prepend-inner-icon="mdi-text"
+                                                hide-details
+                                                class="mb-3"
+                                                placeholder="Briefly describe the situation"
+                                            />
+                                            <v-row dense class="mb-3">
+                                                <v-col cols="6">
+                                                    <v-select
+                                                        v-model="updateForm.mobility_status"
+                                                        :items="mobilityOptions"
+                                                        label="Mobility"
+                                                        variant="outlined"
+                                                        density="comfortable"
+                                                        prepend-inner-icon="mdi-walk"
+                                                        hide-details
+                                                        clearable
+                                                    />
+                                                </v-col>
+                                                <v-col cols="6">
+                                                    <v-select
+                                                        v-model="updateForm.urgency_level"
+                                                        :items="urgencyOptions"
+                                                        label="Urgency"
+                                                        variant="outlined"
+                                                        density="comfortable"
+                                                        prepend-inner-icon="mdi-speedometer"
+                                                        hide-details
+                                                        clearable
+                                                    />
+                                                </v-col>
+                                            </v-row>
+                                            <v-text-field
+                                                v-model="updateForm.injuries"
+                                                label="Injuries (if any)"
+                                                variant="outlined"
+                                                density="comfortable"
+                                                prepend-inner-icon="mdi-medical-bag"
+                                                hide-details
+                                                class="mb-3"
+                                            />
+                                        </template>
+
+                                        <v-btn
+                                            color="warning"
+                                            variant="flat"
+                                            block
+                                            :loading="isUpdating"
+                                            type="submit"
+                                            class="rounded-xl"
+                                        >
+                                            <v-icon start>mdi-content-save</v-icon>
+                                            Save Details
+                                        </v-btn>
+                                    </v-form>
+                                </v-card-text>
+                            </v-expand-transition>
                         </v-card>
 
                         <!-- Action Buttons -->
@@ -350,7 +506,28 @@
                             <span v-else class="text-h4 text-white">{{ getRescuerInitials() }}</span>
                         </v-avatar>
                         <h3 class="text-h5 font-weight-bold mb-1">{{ getRescuerName() }}</h3>
-                        <p class="text-grey mb-4">Certified Rescuer</p>
+                        <p class="text-grey mb-2">Certified Rescuer</p>
+                        
+                        <!-- Rescuer Status -->
+                        <div class="d-flex justify-center gap-2 mb-4">
+                            <v-chip 
+                                :color="getRescuerStatusColor()" 
+                                variant="flat" 
+                                size="small"
+                            >
+                                <v-icon start size="14">{{ getRescuerStatusIcon() }}</v-icon>
+                                {{ getRescuerStatusText() }}
+                            </v-chip>
+                            <v-chip 
+                                v-if="rescue?.status && rescue.status !== 'rescued' && rescue.status !== 'safe'"
+                                color="info" 
+                                variant="tonal" 
+                                size="small"
+                            >
+                                <v-icon start size="14">mdi-shield-account</v-icon>
+                                Assigned to you
+                            </v-chip>
+                        </div>
                         
                         <v-divider class="mb-4" />
                         
@@ -416,6 +593,9 @@ import {
     getRescueRequestByCode,
     getRescueRequestById,
     markRescueSafe,
+    translateRescueRequest,
+    updateRescueRequest,
+    getBuildingsFullStructure,
     getLocationDetails,
     getProfilePictureUrl,
 } from '@/Composables/useApi';
@@ -450,11 +630,95 @@ const error = ref(null);
 const showConfirmSafe = ref(false);
 const showRescuerProfile = ref(false);
 const isMarkingSafe = ref(false);
+const isTranslating = ref(false);
 const locationDetails = ref({
     buildingName: '',
     floorName: '',
     roomName: '',
 });
+
+// Update Details State
+const showUpdateForm = ref(false);
+const isUpdating = ref(false);
+const buildings = ref([]);
+const updateForm = ref({
+    building_id: null,
+    floor_id: null,
+    room_id: null,
+    description: '',
+    mobility_status: '',
+    urgency_level: '',
+    injuries: '',
+});
+
+const needsLocationUpdate = computed(() => {
+    return rescue.value && (!rescue.value.building_id || !rescue.value.floor_id || !rescue.value.room_id);
+});
+
+const needsDetailsUpdate = computed(() => {
+    return rescue.value && !rescue.value.description && !rescue.value.urgency_level && !rescue.value.injuries;
+});
+
+const selectedUpdateBuilding = computed(() => {
+    return buildings.value.find(b => b.id === updateForm.value.building_id) || null;
+});
+
+const updateFloors = computed(() => {
+    return selectedUpdateBuilding.value?.floors || [];
+});
+
+const selectedUpdateFloor = computed(() => {
+    return updateFloors.value.find(f => f.id === updateForm.value.floor_id) || null;
+});
+
+const updateRooms = computed(() => {
+    return selectedUpdateFloor.value?.rooms || [];
+});
+
+const mobilityOptions = ['Can walk', 'Need assistance', 'Cannot move', 'Wheelchair user'];
+const urgencyOptions = ['low', 'medium', 'high', 'critical'];
+
+const loadBuildings = async () => {
+    try {
+        buildings.value = await getBuildingsFullStructure();
+    } catch (err) {
+        console.error('Failed to load buildings:', err);
+    }
+};
+
+const handleUpdateDetails = async () => {
+    isUpdating.value = true;
+    try {
+        const payload = {};
+        if (updateForm.value.building_id) payload.building_id = updateForm.value.building_id;
+        if (updateForm.value.floor_id) payload.floor_id = updateForm.value.floor_id;
+        if (updateForm.value.room_id) payload.room_id = updateForm.value.room_id;
+        if (updateForm.value.description) payload.description = updateForm.value.description;
+        if (updateForm.value.mobility_status) payload.mobility_status = updateForm.value.mobility_status;
+        if (updateForm.value.urgency_level) payload.urgency_level = updateForm.value.urgency_level;
+        if (updateForm.value.injuries) payload.injuries = updateForm.value.injuries;
+
+        const result = await updateRescueRequest(rescue.value.id, payload);
+        if (result.success && result.data) {
+            rescue.value = result.data;
+            // Update location details display
+            if (result.data.building_id && result.data.floor_id && result.data.room_id) {
+                await fetchLocationDetails(result.data.building_id, result.data.floor_id, result.data.room_id);
+            }
+            showUpdateForm.value = false;
+            toastMessage.value = 'Details updated successfully!';
+            toastColor.value = 'success';
+            showToast.value = true;
+        }
+    } catch (err) {
+        console.error('Update failed:', err);
+        toastMessage.value = 'Failed to update details. Please try again.';
+        toastColor.value = 'error';
+        showToast.value = true;
+    } finally {
+        isUpdating.value = false;
+    }
+};
 
 // Photo Viewer State
 const showPhotoViewer = ref(false);
@@ -496,6 +760,40 @@ const getRescuerContact = () => {
 const getRescuerEmail = () => {
     const rescuer = rescue.value?.rescuer || rescue.value?.assigned_rescuer;
     return rescuer?.email || null;
+};
+
+// Rescuer status helpers
+const getRescuerStatusColor = () => {
+    const rescuer = rescue.value?.rescuer || rescue.value?.assigned_rescuer;
+    const status = rescuer?.status;
+    if (status === 'active') return 'success';
+    if (status === 'inactive') return 'grey';
+    if (status === 'busy') return 'warning';
+    return 'info';
+};
+
+const getRescuerStatusIcon = () => {
+    const rescuer = rescue.value?.rescuer || rescue.value?.assigned_rescuer;
+    const status = rescuer?.status;
+    if (status === 'active') return 'mdi-check-circle';
+    if (status === 'inactive') return 'mdi-minus-circle';
+    if (status === 'busy') return 'mdi-clock';
+    return 'mdi-account';
+};
+
+const getRescuerStatusText = () => {
+    const rescueStatus = rescue.value?.status;
+    // Use rescue request status to show contextual rescuer status
+    if (rescueStatus === 'in_progress' || rescueStatus === 'en_route') return 'On Rescue Duty';
+    if (rescueStatus === 'on_scene') return 'On Scene';
+    if (rescueStatus === 'rescued' || rescueStatus === 'safe') return 'Rescue Completed';
+    
+    const rescuer = rescue.value?.rescuer || rescue.value?.assigned_rescuer;
+    const status = rescuer?.status;
+    if (status === 'active') return 'Active';
+    if (status === 'inactive') return 'Inactive';
+    if (status === 'busy') return 'Busy';
+    return 'Available';
 };
 
 // Toast
@@ -540,16 +838,7 @@ const showNotification = (options) => {
         vibrate(vibratePattern);
     }
     
-    // Show banner notification
-    notificationBanner.value = {
-        show: true,
-        title,
-        message,
-        type,
-        icon,
-    };
-    
-    // Show popup alert
+    // Show popup alert (single notification only)
     popupAlert.value = {
         show: true,
         title,
@@ -564,11 +853,6 @@ const showNotification = (options) => {
         body: message,
         icon: '/images/logo.png'
     });
-    
-    // Auto-hide banner after 5 seconds
-    setTimeout(() => {
-        notificationBanner.value.show = false;
-    }, 5000);
     
     // Auto-hide popup after 5 seconds
     setTimeout(() => {
@@ -660,6 +944,36 @@ const rescueId = ref('');
 // Store poll interval for cleanup
 let pollInterval = null;
 
+// Check if text appears to be in English (simple heuristic)
+const isLikelyEnglish = (text) => {
+    if (!text) return true;
+    
+    const commonWords = [
+        'the', 'is', 'at', 'which', 'on', 'and', 'a', 'to', 'this', 'be', 
+        'has', 'have', 'it', 'in', 'of', 'for', 'not', 'with', 'he', 'as', 
+        'you', 'do', 'will', 'can', 'if', 'no', 'man', 'up', 'her', 'all', 
+        'any', 'may', 'say', 'she', 'or', 'an', 'are', 'his', 'your', 'how',
+        'help', 'need', 'emergency', 'hurt', 'pain', 'blood', 'injury', 'fire',
+        'stuck', 'trapped', 'fell', 'broken', 'stairs', 'bathroom', 'room',
+        'floor', 'building', 'urgent', 'please', 'quickly', 'fast', 'now'
+    ];
+    
+    const words = text.toLowerCase().trim().split(/\s+/);
+    const totalWords = words.length;
+    
+    if (totalWords === 0) return true;
+    
+    let englishWords = 0;
+    words.forEach(word => {
+        const cleanWord = word.replace(/[^a-z]/g, '');
+        if (commonWords.includes(cleanWord)) {
+            englishWords++;
+        }
+    });
+    
+    return (englishWords / totalWords) > 0.6; // 60% threshold
+};
+
 onMounted(async () => {
     // Get from props (Inertia) first, then localStorage
     rescueCode.value = props.code || localStorage.getItem('lastRescueCode') || '';
@@ -738,6 +1052,14 @@ const fetchRescueData = async (silent = false) => {
         // Fetch location details if not already available
         else if (rescue.value.building_id && rescue.value.floor_id && rescue.value.room_id) {
             await fetchLocationDetails(rescue.value.building_id, rescue.value.floor_id, rescue.value.room_id);
+        }
+        // No location data available
+        else {
+            locationDetails.value = {
+                buildingName: 'Not provided',
+                floorName: 'Not provided',
+                roomName: 'Not provided',
+            };
         }
     } catch (err) {
         console.error('Failed to fetch rescue data:', err);
@@ -987,6 +1309,10 @@ const markAsSafe = async () => {
         rescue.value.status = 'safe';
         showConfirmSafe.value = false;
 
+        // Clear emergency form data from localStorage
+        localStorage.removeItem('emergency_form_data');
+        localStorage.removeItem('location_selection_data');
+
         // Show notification with sound and vibration
         showNotification({
             title: '✅ Marked as Safe!',
@@ -996,10 +1322,6 @@ const markAsSafe = async () => {
             sound: 'success',
             vibratePattern: 'success'
         });
-
-        toastMessage.value = 'You have been marked as safe!';
-        toastColor.value = 'success';
-        showToast.value = true;
 
         // Clear localStorage
         localStorage.removeItem('lastRescueCode');
@@ -1015,6 +1337,34 @@ const markAsSafe = async () => {
         showToast.value = true;
     } finally {
         isMarkingSafe.value = false;
+    }
+};
+
+const toggleUpdateForm = async () => {
+    showUpdateForm.value = !showUpdateForm.value;
+    if (showUpdateForm.value && buildings.value.length === 0) {
+        await loadBuildings();
+    }
+};
+
+const handleTranslate = async () => {
+    if (!rescue.value?.id) return;
+    isTranslating.value = true;
+    try {
+        const result = await translateRescueRequest(rescue.value.id);
+        if (result.success && result.data) {
+            rescue.value = result.data;
+        }
+        toastMessage.value = 'Translation completed';
+        toastColor.value = 'success';
+        showToast.value = true;
+    } catch (err) {
+        console.error('Translation failed:', err);
+        toastMessage.value = 'Translation failed. Please try again.';
+        toastColor.value = 'error';
+        showToast.value = true;
+    } finally {
+        isTranslating.value = false;
     }
 };
 
@@ -1326,7 +1676,7 @@ const handleGoBack = () => {
     border-radius: 24px 24px 0 0;
     position: relative;
     z-index: 2;
-    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 120px) !important; /* Space for bottom nav */
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 120px); /* Space for bottom nav on mobile */
 }
 
 /* Safe area bottom padding for buttons */
@@ -1647,28 +1997,161 @@ const handleGoBack = () => {
 /* Show side menu on laptop and up (1024px+) */
 @media (min-width: 1024px) {
     .v-main {
-        margin-left: 256px !important;
+        margin-left: 0 !important;
+        min-height: 100vh !important;
+        overflow-y: auto !important;
+        width: 100% !important;
+    }
+
+    .v-main :deep(.v-container) {
+        max-width: 100% !important;
+        width: 100% !important;
+        padding: 0 !important;
+        min-height: 100% !important;
+    }
+
+    .status-hero {
+        padding: 24px 16px 32px !important;
+        width: 100% !important;
+    }
+
+    .status-avatar {
+        width: 80px !important;
+        height: 80px !important;
+    }
+
+    .status-avatar .v-icon {
+        font-size: 40px !important;
+    }
+
+    .status-title {
+        font-size: 1.3rem !important;
+        margin-bottom: 8px !important;
+    }
+
+    .status-icon-wrapper {
+        margin-bottom: 10px !important;
+    }
+
+    .pulse-ring {
+        width: 80px !important;
+        height: 80px !important;
+    }
+
+    .progress-steps-container {
+        margin-top: 20px !important;
+        max-width: 600px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+    .step-dot {
+        width: 32px !important;
+        height: 32px !important;
+    }
+
+    .progress-track {
+        top: 16px !important;
     }
     
     .content-area {
-        padding-bottom: 40px !important;
+        padding: 20px clamp(24px, 5vw, 80px) 60px !important;
+        max-width: 1200px !important;
+        margin: -20px auto 0 auto !important;
+        width: 100% !important;
+        min-height: auto !important;
+        box-sizing: border-box !important;
     }
     
     .pb-safe {
-        padding-bottom: 20px !important;
+        padding-bottom: 40px !important;
+    }
+    
+    .status-hero-content {
+        max-width: 900px;
+        margin: 0 auto;
+    }
+
+    /* Better card spacing for desktop */
+    .content-area > .v-card {
+        margin-bottom: 16px !important;
+        width: 100% !important;
+    }
+
+    .card-header-icon {
+        padding: 14px 16px 8px !important;
+    }
+
+    /* Ensure action buttons are visible with proper spacing */
+    .action-buttons {
+        margin-top: 20px !important;
+        margin-bottom: 0 !important;
+        padding-bottom: 40px !important;
+        width: 100% !important;
+    }
+
+    .action-buttons .v-btn {
+        min-height: 48px !important;
     }
 }
 
-@media (min-width: 600px) {
+/* Tablet screens */
+@media (min-width: 600px) and (max-width: 1023px) {
     .content-area {
-        max-width: 600px;
+        max-width: 720px;
         margin-left: auto;
         margin-right: auto;
     }
     
     .status-hero-content {
-        max-width: 600px;
+        max-width: 720px;
         margin: 0 auto;
+    }
+
+    .status-hero {
+        padding: 16px 16px 28px !important;
+    }
+    
+    .status-avatar {
+        width: 76px !important;
+        height: 76px !important;
+    }
+
+    .status-avatar .v-icon {
+        font-size: 38px !important;
+    }
+
+    .pulse-ring {
+        width: 76px !important;
+        height: 76px !important;
+    }
+}
+
+/* Large desktop screens */
+@media (min-width: 1440px) {
+    .content-area {
+        max-width: 1100px !important;
+    }
+    
+    .status-hero-content {
+        max-width: 1000px;
+    }
+
+    .status-hero {
+        padding: 20px 16px 32px !important;
+    }
+
+    .status-avatar {
+        width: 84px !important;
+        height: 84px !important;
+    }
+
+    .status-avatar .v-icon {
+        font-size: 42px !important;
+    }
+
+    .status-title {
+        font-size: 1.25rem !important;
     }
 }
 
@@ -1679,5 +2162,79 @@ const handleGoBack = () => {
 
 :deep(.v-expansion-panel-text__wrapper) {
     padding: 0 16px 16px !important;
+}
+
+/* Desktop: improved responsive layout */
+@media (min-width: 768px) and (max-width: 1023px) {
+    .content-area {
+        display: flex !important;
+        flex-wrap: wrap !important;
+        gap: 12px !important;
+        align-items: flex-start !important;
+    }
+    
+    .content-area > .v-card {
+        flex: 1 1 calc(50% - 6px) !important;
+        min-width: 280px !important;
+        margin-bottom: 0 !important;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+    }
+    
+    .content-area > .action-buttons,
+    .content-area > .text-center {
+        flex: 1 1 100% !important;
+        margin-top: 12px !important;
+    }
+
+    .action-buttons .v-btn {
+        min-height: 44px !important;
+    }
+}
+
+/* Laptop/Desktop single column with proper centering */
+@media (min-width: 1024px) {
+    .content-area {
+        display: block !important;
+    }
+    
+    .content-area > .v-card {
+        max-width: 100% !important;
+        margin-left: auto !important;
+        margin-right: auto !important;
+        margin-bottom: 16px !important;
+    }
+    
+    .content-area > .action-buttons {
+        max-width: 100% !important;
+        margin: 24px auto 0 auto !important;
+    }
+
+    .content-area > .text-center {
+        max-width: 100% !important;
+        margin: 20px auto 0 auto !important;
+    }
+}
+
+/* Tablet: single column with wider cards */
+@media (min-width: 600px) and (max-width: 767px) {
+    .content-area > .v-card {
+        max-width: none !important;
+        margin-left: auto !important;
+        margin-right: auto !important;
+    }
+}
+
+/* Mobile: ensure proper stacking */
+@media (max-width: 599px) {
+    .content-area {
+        display: block !important;
+    }
+    
+    .content-area > .v-card {
+        flex: none !important;
+        width: 100% !important;
+        margin-bottom: 12px !important;
+    }
 }
 </style>

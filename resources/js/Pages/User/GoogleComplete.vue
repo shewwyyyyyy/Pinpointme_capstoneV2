@@ -90,7 +90,7 @@
                                 </div>
 
                                 <!-- Emergency Contact Section (Optional) -->
-                                <v-expansion-panels class="mb-4" variant="accordion">
+                                <!-- <v-expansion-panels class="mb-4" variant="accordion">
                                     <v-expansion-panel>
                                         <v-expansion-panel-title>
                                             <v-icon class="mr-2" size="20">mdi-account-alert</v-icon>
@@ -127,7 +127,7 @@
                                             />
                                         </v-expansion-panel-text>
                                     </v-expansion-panel>
-                                </v-expansion-panels>
+                                </v-expansion-panels> -->
 
                                 <!-- Submit Button -->
                                 <v-btn
